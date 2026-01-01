@@ -23,70 +23,82 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 	levelID := createdSong.SongLevels[0].SongLevelID
 
 	t.Run("Create New Record", func(t *testing.T) {
-		recordBase := &model.PlayRecordBase{
-			SongLevelID: levelID,
-			Score:       1000000,
+		record := &model.PlayRecord{
+			PlayRecordBase: model.PlayRecordBase{
+				SongLevelID: levelID,
+				Score:       1000000,
+			},
+			Username: "testuser",
 		}
-		record, err := repo.CreateRecord(nil, recordBase, "testuser", false)
+		savedRecord, err := repo.CreateRecord(record, false)
 		assert.NoError(t, err)
-		assert.NotNil(t, record)
-		assert.Equal(t, 1000000, record.Score)
-		assert.Equal(t, "testuser", record.Username)
+		assert.NotNil(t, savedRecord)
+		assert.Equal(t, 1000000, savedRecord.Score)
+		assert.Equal(t, "testuser", savedRecord.Username)
 		// Level 15.0, Score 1000000 -> Rating 150.0 -> 15000
-		assert.Equal(t, 15000, record.Rating)
+		assert.Equal(t, 15000, savedRecord.Rating)
 
 		// Verify Best Record created
 		var best model.BestPlayRecord
-		err = db.Where("play_record_id = ?", record.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
 		assert.NoError(t, err)
-		assert.Equal(t, record.PlayRecordID, best.PlayRecordID)
+		assert.Equal(t, savedRecord.PlayRecordID, best.PlayRecordID)
 	})
 
 	t.Run("Update Best Record (Higher Score)", func(t *testing.T) {
 		// Previous best was 1000000
-		recordBase := &model.PlayRecordBase{
-			SongLevelID: levelID,
-			Score:       1000001,
+		record := &model.PlayRecord{
+			PlayRecordBase: model.PlayRecordBase{
+				SongLevelID: levelID,
+				Score:       1000001,
+			},
+			Username: "testuser",
 		}
-		record, err := repo.CreateRecord(nil, recordBase, "testuser", false)
+		savedRecord, err := repo.CreateRecord(record, false)
 		assert.NoError(t, err)
 
 		// Verify Best Record updated
 		var best model.BestPlayRecord
 		// We need to join to find the best record for this user/level, but here we can just check if the new record ID is in best_play_records table
 		// Actually, let's query by play_record_id
-		err = db.Where("play_record_id = ?", record.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
 		assert.NoError(t, err)
 	})
 
 	t.Run("Do Not Update Best Record (Lower Score)", func(t *testing.T) {
 		// Previous best was 1000001
-		recordBase := &model.PlayRecordBase{
-			SongLevelID: levelID,
-			Score:       900000,
+		record := &model.PlayRecord{
+			PlayRecordBase: model.PlayRecordBase{
+				SongLevelID: levelID,
+				Score:       900000,
+			},
+			Username: "testuser",
 		}
-		record, err := repo.CreateRecord(nil, recordBase, "testuser", false)
+		savedRecord, err := repo.CreateRecord(record, false)
 		assert.NoError(t, err)
 
 		// Verify Best Record NOT updated (should still point to previous high score)
 		var best model.BestPlayRecord
-		err = db.Where("play_record_id = ?", record.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
 		assert.Error(t, err) // Should not find this record as best
 		assert.Equal(t, "record not found", err.Error())
 	})
 
 	t.Run("Force Update Best Record (isReplaced=true)", func(t *testing.T) {
 		// Previous best was 1000001. New score is lower but forced.
-		recordBase := &model.PlayRecordBase{
-			SongLevelID: levelID,
-			Score:       800000,
+		record := &model.PlayRecord{
+			PlayRecordBase: model.PlayRecordBase{
+				SongLevelID: levelID,
+				Score:       800000,
+			},
+			Username: "testuser",
 		}
-		record, err := repo.CreateRecord(nil, recordBase, "testuser", true)
+		savedRecord, err := repo.CreateRecord(record, true)
 		assert.NoError(t, err)
 
 		// Verify Best Record updated
 		var best model.BestPlayRecord
-		err = db.Where("play_record_id = ?", record.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
 		assert.NoError(t, err)
 	})
 }
@@ -115,8 +127,14 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 	createdOld, _ := songRepo.CreateSong(songOld)
 
 	// Create Records
-	repo.CreateRecord(nil, &model.PlayRecordBase{SongLevelID: createdB15.SongLevels[0].SongLevelID, Score: 1000000}, "user_b50", false)
-	repo.CreateRecord(nil, &model.PlayRecordBase{SongLevelID: createdOld.SongLevels[0].SongLevelID, Score: 1000000}, "user_b50", false)
+	repo.CreateRecord(&model.PlayRecord{
+		PlayRecordBase: model.PlayRecordBase{SongLevelID: createdB15.SongLevels[0].SongLevelID, Score: 1000000},
+		Username:       "user_b50",
+	}, false)
+	repo.CreateRecord(&model.PlayRecord{
+		PlayRecordBase: model.PlayRecordBase{SongLevelID: createdOld.SongLevels[0].SongLevelID, Score: 1000000},
+		Username:       "user_b50",
+	}, false)
 
 	t.Run("Get B50", func(t *testing.T) {
 		b35, b15, err := repo.GetBest50Records("user_b50", 0)
