@@ -97,3 +97,10 @@ type SongLevelCSV struct {
 	Level       float64    `json:"level"`
 	Score       *int       `json:"score"`
 }
+
+// SongLevelWithScore represents a song level with the user's best score
+type SongLevelWithScore struct {
+	SongLevelID int     `json:"song_level_id"`
+	Level       float64 `json:"level"`
+	Score       *int    `json:"score"`
+}

@@ -18,7 +18,7 @@ func NewSongRepository(db *gorm.DB) *SongRepository {
 // GetAllSongs retrieves all songs
 func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 	var songs []model.Song
-	if err := r.db.Find(&songs).Error; err != nil {
+	if err := r.db.Preload("SongLevels").Find(&songs).Error; err != nil {
 		return nil, err
 	}
 	return songs, nil
@@ -27,7 +27,7 @@ func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 // GetSongByID retrieves a song by its ID
 func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 	var song model.Song
-	if err := r.db.Where("song_id = ?", songID).First(&song).Error; err != nil {
+	if err := r.db.Preload("SongLevels").Where("song_id = ?", songID).First(&song).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -39,7 +39,7 @@ func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 // GetSongByWikiID retrieves a song by its Wiki ID
 func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 	var song model.Song
-	if err := r.db.Where("wiki_id = ?", wikiID).First(&song).Error; err != nil {
+	if err := r.db.Preload("SongLevels").Where("wiki_id = ?", wikiID).First(&song).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}

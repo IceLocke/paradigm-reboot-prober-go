@@ -3,7 +3,6 @@ package repository
 import (
 	"errors"
 	"paradigm-reboot-prober-go/internal/model"
-	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/pkg/rating"
 	"time"
 
@@ -19,37 +18,32 @@ func NewRecordRepository(db *gorm.DB) *RecordRepository {
 }
 
 // CreateRecord creates a new play record and updates the best record if necessary
-func (r *RecordRepository) CreateRecord(req *request.BatchCreatePlayRecordRequest, recordBase *model.PlayRecordBase, username string, isReplaced bool) (*model.PlayRecord, error) {
+func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced bool) (*model.PlayRecord, error) {
 	var songLevel model.SongLevel
-	if err := r.db.Where("song_level_id = ?", recordBase.SongLevelID).First(&songLevel).Error; err != nil {
+	if err := r.db.Where("song_level_id = ?", record.SongLevelID).First(&songLevel).Error; err != nil {
 		return nil, errors.New("song level does not exist")
 	}
 
 	// Calculate rating
-	calculatedRating := rating.SingleRating(songLevel.Level, recordBase.Score)
-
-	record := model.PlayRecord{
-		PlayRecordBase: *recordBase,
-		Username:       username,
-		RecordTime:     time.Now(),
-		Rating:         calculatedRating,
-	}
+	calculatedRating := rating.SingleRating(songLevel.Level, record.Score)
+	record.Rating = calculatedRating
+	record.RecordTime = time.Now()
 
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(&record).Error; err != nil {
+		if err := tx.Create(record).Error; err != nil {
 			return err
 		}
 
 		var bestRecord model.BestPlayRecord
 		result := tx.Joins("PlayRecord").
-			Where("PlayRecord.song_level_id = ? AND PlayRecord.username = ?", record.SongLevelID, username).
+			Where("PlayRecord.song_level_id = ? AND PlayRecord.username = ?", record.SongLevelID, record.Username).
 			First(&bestRecord)
 
 		if result.Error == nil {
 			// Best record exists
 			if isReplaced || record.Score > bestRecord.PlayRecord.Score {
 				bestRecord.PlayRecordID = record.PlayRecordID
-				bestRecord.PlayRecord = &record
+				bestRecord.PlayRecord = record
 				if err := tx.Save(&bestRecord).Error; err != nil {
 					return err
 				}
@@ -58,7 +52,7 @@ func (r *RecordRepository) CreateRecord(req *request.BatchCreatePlayRecordReques
 			// Create new best record
 			newBestRecord := model.BestPlayRecord{
 				PlayRecordID: record.PlayRecordID,
-				PlayRecord:   &record,
+				PlayRecord:   record,
 			}
 			if err := tx.Create(&newBestRecord).Error; err != nil {
 				return err
@@ -74,7 +68,7 @@ func (r *RecordRepository) CreateRecord(req *request.BatchCreatePlayRecordReques
 		return nil, err
 	}
 
-	return &record, nil
+	return record, nil
 }
 
 // GetBest50Records retrieves the best 35 (old) and 15 (new) records for B50 calculation
@@ -128,4 +122,58 @@ func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex in
 
 	err := query.Offset(pageSize * (pageIndex - 1)).Limit(pageSize).Find(&records).Error
 	return records, err
+}
+
+// GetBestRecords retrieves the best records for a user with pagination and sorting
+func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+	var records []model.PlayRecord
+	query := r.db.Model(&model.PlayRecord{}).
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("SongLevel").
+		Joins("SongLevel.Song").
+		Where("play_records.username = ?", username)
+
+	orderStr := "desc"
+	if !order {
+		orderStr = "asc"
+	}
+
+	// Handle sorting logic (simplified mapping)
+	query = query.Order(sortBy + " " + orderStr)
+
+	err := query.Offset(pageSize * (pageIndex - 1)).Limit(pageSize).Find(&records).Error
+	return records, err
+}
+
+// GetAllLevelsWithBestScores retrieves all song levels with the user's best score (if any)
+func (r *RecordRepository) GetAllLevelsWithBestScores(username string) ([]model.SongLevelWithScore, error) {
+	var results []model.SongLevelWithScore
+
+	err := r.db.Table("song_levels").
+		Select("song_levels.song_level_id, song_levels.level, play_records.score").
+		Joins("LEFT JOIN play_records ON song_levels.song_level_id = play_records.song_level_id AND play_records.username = ?", username).
+		Joins("LEFT JOIN best_play_records ON play_records.play_record_id = best_play_records.play_record_id").
+		Where("play_records.play_record_id IS NULL OR best_play_records.play_record_id IS NOT NULL").
+		Scan(&results).Error
+
+	return results, err
+}
+
+// CountBestRecords counts the number of best records for a user
+func (r *RecordRepository) CountBestRecords(username string) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.BestPlayRecord{}).
+		Joins("JOIN play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Where("play_records.username = ?", username).
+		Count(&count).Error
+	return count, err
+}
+
+// CountAllRecords counts the total number of records for a user
+func (r *RecordRepository) CountAllRecords(username string) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.PlayRecord{}).
+		Where("username = ?", username).
+		Count(&count).Error
+	return count, err
 }
