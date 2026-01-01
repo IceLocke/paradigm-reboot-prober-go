@@ -1,0 +1,16 @@
+basePath: /api/v1
+host: https://api.prp.icel.site
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: 'This is the API documentation for the Paradigm: Reboot Prober service.'
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: 'Paradigm: Reboot Prober API'
+  version: "1.1"
+paths: {}
+swagger: "2.0"
