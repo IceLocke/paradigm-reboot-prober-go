@@ -9,7 +9,7 @@ database:
   port: 5432
   user: "postgres"
   password: "password"
-  dbname: "prprober"
+  dbname: "prp"
   sslmode: "disable"
 
 auth:
