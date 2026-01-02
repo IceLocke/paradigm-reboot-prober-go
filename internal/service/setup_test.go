@@ -4,7 +4,7 @@ import (
 	"paradigm-reboot-prober-go/internal/model"
 	"testing"
 
-	"gorm.io/driver/sqlite"
+	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 

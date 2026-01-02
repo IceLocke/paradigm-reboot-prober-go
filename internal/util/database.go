@@ -6,8 +6,8 @@ import (
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 
+	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
