@@ -35,15 +35,18 @@ func InitDB() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto-migrate models
-	err = DB.AutoMigrate(
+	// Auto-migrate models in order to avoid foreign key issues in PostgreSQL
+	models := []interface{}{
 		&model.User{},
 		&model.Song{},
 		&model.SongLevel{},
 		&model.PlayRecord{},
 		&model.BestPlayRecord{},
-	)
-	if err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
+	}
+
+	for _, m := range models {
+		if err := DB.AutoMigrate(m); err != nil {
+			log.Fatalf("Failed to migrate model %T: %v", m, err)
+		}
 	}
 }

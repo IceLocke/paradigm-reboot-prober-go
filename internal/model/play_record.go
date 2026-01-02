@@ -24,7 +24,7 @@ func (PlayRecord) TableName() string {
 type BestPlayRecord struct {
 	BestRecordID int         `gorm:"primaryKey;column:best_record_id" json:"best_record_id"`
 	PlayRecordID int         `gorm:"not null" json:"play_record_id"`
-	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID;references:PlayRecordID" json:"play_record,omitempty"`
+	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID" json:"play_record,omitempty"`
 }
 
 // TableName specifies the table name for GORM
