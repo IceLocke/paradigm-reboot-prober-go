@@ -17,14 +17,15 @@ func TestRecordController(t *testing.T) {
 	env := setupEnv(t)
 	r := gin.Default()
 
-	r.POST("/records", env.recordCtrl.UploadRecords)
-	r.GET("/b50", env.recordCtrl.GetB50)
+	r.POST("/records/:username", env.recordCtrl.UploadRecords)
+	r.GET("/records/:username", env.recordCtrl.GetPlayRecords)
 
 	// Seed data
 	user := model.User{
 		UserBase: model.UserBase{
-			Username:    "testuser",
-			UploadToken: "testtoken",
+			Username:       "testuser",
+			UploadToken:    "testtoken",
+			AnonymousProbe: true,
 		},
 	}
 	env.db.Create(&user)
@@ -50,16 +51,18 @@ func TestRecordController(t *testing.T) {
 			},
 		}
 		body, _ := json.Marshal(reqBody)
-		w := performRequest(r, "POST", "/records", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
+		w := performRequest(r, "POST", "/records/testuser", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
 
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Body.String(), "1000000")
+		assert.Equal(t, http.StatusCreated, w.Code)
 	})
 
-	t.Run("GetB50 Success", func(t *testing.T) {
-		w := performRequest(r, "GET", "/b50?username=testuser", nil, nil)
+	t.Run("GetPlayRecords Success", func(t *testing.T) {
+		w := performRequest(r, "GET", "/records/testuser?scope=b50", nil, nil)
+
 		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Body.String(), "testuser")
+		var resp map[string]interface{}
+		json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.Equal(t, "testuser", resp["username"])
 	})
 
 	t.Run("UploadCSV Success", func(t *testing.T) {

@@ -124,7 +124,7 @@ func (ctrl *UserController) RefreshUploadToken(c *gin.Context) {
 // @Param user body request.UpdateUserRequest true "User update info"
 // @Success 200 {object} model.User
 // @Failure 400 {object} gin.H
-// @Router /user/me [patch]
+// @Router /user/me [put]
 func (ctrl *UserController) UpdateMe(c *gin.Context) {
 	username := c.GetString("username")
 	var req request.UpdateUserRequest

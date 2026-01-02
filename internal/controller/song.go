@@ -105,7 +105,7 @@ func (ctrl *SongController) CreateSong(c *gin.Context) {
 // @Param song body request.UpdateSongRequest true "Song update info"
 // @Success 200 {array} model.SongLevelInfo
 // @Failure 400 {object} gin.H
-// @Router /songs [patch]
+// @Router /songs [put]
 func (ctrl *SongController) UpdateSong(c *gin.Context) {
 	var req request.UpdateSongRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

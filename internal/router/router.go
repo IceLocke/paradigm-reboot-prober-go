@@ -46,7 +46,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	v1 := r.Group("/api/v1")
+	v1 := r.Group("/api/v2")
 	{
 		// Public routes
 		v1.POST("/user/register", userCtrl.Register)
@@ -54,20 +54,27 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		v1.GET("/songs", songCtrl.GetAllSongLevels)
 		v1.GET("/songs/:song_id", songCtrl.GetSingleSongInfo)
 
+		// Routes with optional auth
+		optionalAuth := v1.Group("")
+		optionalAuth.Use(middleware.OptionalAuthMiddleware())
+		{
+			optionalAuth.GET("/records/:username", recordCtrl.GetPlayRecords)
+			optionalAuth.GET("/records/:username/export/csv", recordCtrl.ExportCSV)
+			optionalAuth.GET("/records/:username/export/b50", recordCtrl.GetB50Img)
+			optionalAuth.GET("/records/:username/trends", recordCtrl.GetB50Trends)
+		}
+
 		// Protected routes
 		auth := v1.Group("")
 		auth.Use(middleware.AuthMiddleware())
 		{
 			// User routes
 			auth.GET("/user/me", userCtrl.GetMe)
-			auth.PATCH("/user/me", userCtrl.UpdateMe)
+			auth.PUT("/user/me", userCtrl.UpdateMe)
 			auth.POST("/user/me/upload-token", userCtrl.RefreshUploadToken)
 
 			// Record routes
-			auth.POST("/records", recordCtrl.UploadRecords)
-			auth.GET("/records/b50", recordCtrl.GetB50)
-			auth.GET("/records/best", recordCtrl.GetBestRecords)
-			auth.GET("/records/all", recordCtrl.GetAllRecords)
+			auth.POST("/records/:username", recordCtrl.UploadRecords)
 
 			// Upload routes
 			auth.POST("/upload/csv", uploadCtrl.UploadCSV)
@@ -75,7 +82,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 			// Admin routes (Admin check should be inside controller or another middleware)
 			auth.POST("/songs", songCtrl.CreateSong)
-			auth.PATCH("/songs", songCtrl.UpdateSong)
+			auth.PUT("/songs", songCtrl.UpdateSong)
 		}
 	}
 

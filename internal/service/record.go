@@ -45,8 +45,8 @@ func (s *RecordService) GetAllRecords(username string, pageSize, pageIndex int, 
 	return s.recordRepo.GetAllRecords(username, pageSize, pageIndex, sortBy, order == "desc")
 }
 
-func (s *RecordService) GetBest50Records(username string) ([]*model.PlayRecord, error) {
-	b35, b15, err := s.recordRepo.GetBest50Records(username, 0)
+func (s *RecordService) GetBest50Records(username string, underflow int) ([]*model.PlayRecord, error) {
+	b35, b15, err := s.recordRepo.GetBest50Records(username, underflow)
 	if err != nil {
 		return nil, err
 	}

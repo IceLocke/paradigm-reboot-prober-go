@@ -150,7 +150,8 @@ func (r *RecordRepository) GetAllLevelsWithBestScores(username string) ([]model.
 	var results []model.SongLevelWithScore
 
 	err := r.db.Table("song_levels").
-		Select("song_levels.song_level_id, song_levels.level, play_records.score").
+		Select("song_levels.song_level_id, songs.title, songs.version, song_levels.difficulty, song_levels.level, COALESCE(play_records.score, 0) as score").
+		Joins("JOIN songs ON song_levels.song_id = songs.song_id").
 		Joins("LEFT JOIN play_records ON song_levels.song_level_id = play_records.song_level_id AND play_records.username = ?", username).
 		Joins("LEFT JOIN best_play_records ON play_records.play_record_id = best_play_records.play_record_id").
 		Where("play_records.play_record_id IS NULL OR best_play_records.play_record_id IS NOT NULL").
