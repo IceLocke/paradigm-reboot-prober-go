@@ -44,11 +44,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Lowercase repository name
+        run: |
+          echo "REPO_LOWER=$(echo ${GITHUB_REPOSITORY} | tr '[:upper:]' '[:lower:]')" >> ${GITHUB_ENV}
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ghcr.io/${{ env.REPO_LOWER }}
           tags: |
             type=ref,event=branch
             type=sha,format=short
@@ -65,7 +69,7 @@ jobs:
       - name: Start Services with Docker Compose (Integration Test)
         run: |
           # Use the newly built image for integration test
-          export APP_IMAGE=ghcr.io/${{ github.repository }}:sha-${GITHUB_SHA::7}
+          export APP_IMAGE=ghcr.io/${{ env.REPO_LOWER }}:sha-${GITHUB_SHA::7}
           docker compose up -d
 
       - name: Wait for Services to be Ready
@@ -104,8 +108,9 @@ jobs:
     steps:
       - name: Simulate Deployment
         run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
           echo "Starting deployment simulation..."
-          echo "Image: ghcr.io/${{ github.repository }}:latest"
+          echo "Image: ghcr.io/${REPO_LOWER}:latest"
           echo "Deployment successful (Simulated)!"
 
       # - name: Deploy via SSH (Commented out for future use)
