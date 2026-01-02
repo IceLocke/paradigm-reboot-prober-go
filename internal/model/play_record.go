@@ -23,8 +23,8 @@ func (PlayRecord) TableName() string {
 // BestPlayRecord represents the best record for a specific song level
 type BestPlayRecord struct {
 	BestRecordID int         `gorm:"primaryKey;column:best_record_id" json:"best_record_id"`
-	PlayRecordID int         `gorm:"not null" json:"play_record_id"`
-	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID" json:"play_record,omitempty"`
+	PlayRecordID int         `gorm:"column:play_record_id;not null" json:"play_record_id"`
+	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID;references:PlayRecordID" json:"play_record,omitempty"`
 }
 
 // TableName specifies the table name for GORM
