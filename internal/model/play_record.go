@@ -11,7 +11,6 @@ type PlayRecord struct {
 	RecordTime   time.Time  `gorm:"not null" json:"record_time"`
 	Username     string     `gorm:"not null" json:"username"`
 	Rating       int        `gorm:"not null" json:"rating"`
-	User         *User      `gorm:"foreignKey:Username;references:Username" json:"user,omitempty"`
 	SongLevel    *SongLevel `gorm:"foreignKey:SongLevelID;references:SongLevelID" json:"song_level,omitempty"`
 }
 

@@ -30,23 +30,22 @@ func InitDB() {
 		log.Fatalf("Unsupported database type: %s", dbConfig.Type)
 	}
 
-	DB, err = gorm.Open(dialector, &gorm.Config{})
+	DB, err = gorm.Open(dialector, &gorm.Config{
+		DisableForeignKeyConstraintWhenMigrating: true,
+	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto-migrate models in order to avoid foreign key issues in PostgreSQL
-	models := []interface{}{
+	// Auto-migrate models
+	err = DB.AutoMigrate(
 		&model.User{},
 		&model.Song{},
 		&model.SongLevel{},
 		&model.PlayRecord{},
 		&model.BestPlayRecord{},
-	}
-
-	for _, m := range models {
-		if err := DB.AutoMigrate(m); err != nil {
-			log.Fatalf("Failed to migrate model %T: %v", m, err)
-		}
+	)
+	if err != nil {
+		log.Fatalf("Failed to migrate database: %v", err)
 	}
 }

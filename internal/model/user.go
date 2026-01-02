@@ -19,8 +19,7 @@ type UserBase struct {
 type User struct {
 	UserID int `gorm:"primaryKey;column:user_id" json:"user_id"`
 	UserBase
-	EncodedPassword string       `gorm:"not null" json:"-"`
-	PlayRecords     []PlayRecord `gorm:"foreignKey:Username;references:Username" json:"play_records,omitempty"`
+	EncodedPassword string `gorm:"not null" json:"-"`
 }
 
 // TableName specifies the table name for GORM
