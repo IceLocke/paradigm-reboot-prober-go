@@ -33,7 +33,7 @@ func GenerateJWT(claims jwt.MapClaims, expiresDelta *time.Duration) (string, err
 	claims["exp"] = expire.Unix()
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(config.SecretKey))
+	return token.SignedString([]byte(config.GlobalConfig.Auth.SecretKey))
 }
 
 // GenerateAccessJWT generates an access token for the given username.
@@ -50,9 +50,8 @@ func ExtractPayloads(tokenString string) (jwt.MapClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-		return []byte(config.SecretKey), nil
+		return []byte(config.GlobalConfig.Auth.SecretKey), nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

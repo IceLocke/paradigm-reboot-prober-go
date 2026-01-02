@@ -27,6 +27,18 @@ func (r *UserRepository) GetUserByUsername(username string) (*model.User, error)
 	return &user, nil
 }
 
+// GetUserByUploadToken retrieves a user by their upload token
+func (r *UserRepository) GetUserByUploadToken(token string) (*model.User, error) {
+	var user model.User
+	if err := r.db.Where("upload_token = ?", token).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
 // CreateUser creates a new user
 func (r *UserRepository) CreateUser(user *model.User) error {
 	// Set default nickname if not provided

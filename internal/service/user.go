@@ -41,6 +41,10 @@ func (s *UserService) GetUser(username string) (*model.User, error) {
 	return s.userRepo.GetUserByUsername(username)
 }
 
+func (s *UserService) GetUserByUploadToken(token string) (*model.User, error) {
+	return s.userRepo.GetUserByUploadToken(token)
+}
+
 func generateHexToken(n int) (string, error) {
 	bytes := make([]byte, n)
 	if _, err := rand.Read(bytes); err != nil {
@@ -97,8 +101,41 @@ func (s *UserService) RefreshUploadToken(username string) (string, error) {
 	if err := s.userRepo.UpdateUser(user); err != nil {
 		return "", err
 	}
-
 	return uploadToken, nil
+}
+
+func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest) (*model.User, error) {
+	user, err := s.userRepo.GetUserByUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
+
+	if req.Nickname != nil {
+		user.Nickname = *req.Nickname
+	}
+	if req.QQNumber != nil {
+		user.QQNumber = req.QQNumber
+	}
+	if req.Account != nil {
+		user.Account = req.Account
+	}
+	if req.AccountNumber != nil {
+		user.AccountNumber = req.AccountNumber
+	}
+	if req.UUID != nil {
+		user.UUID = req.UUID
+	}
+	if req.AnonymousProbe != nil {
+		user.AnonymousProbe = *req.AnonymousProbe
+	}
+
+	if err := s.userRepo.UpdateUser(user); err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func (s *UserService) CheckProbeAuthority(username string, currentUser *model.User) error {

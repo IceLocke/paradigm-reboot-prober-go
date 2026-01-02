@@ -2,7 +2,9 @@ package main
 
 import (
 	"log"
+	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/router"
+	"paradigm-reboot-prober-go/internal/util"
 )
 
 // @title           Paradigm: Reboot Prober API
@@ -20,9 +22,15 @@ import (
 // @host      https://api.prp.icel.site
 // @BasePath  /api/v2
 func main() {
-	r := router.SetupRouter()
+	// Load Configuration
+	config.LoadConfig("config/config.yaml")
 
-	port := ":8080"
+	// Initialize Database
+	util.InitDB()
+
+	r := router.SetupRouter(util.DB)
+
+	port := config.GlobalConfig.Server.Port
 	log.Printf("Server starting on %s", port)
 	if err := r.Run(port); err != nil {
 		log.Fatalf("Failed to start server: %v", err)

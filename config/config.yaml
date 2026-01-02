@@ -1,0 +1,21 @@
+server:
+  port: ":8080"
+
+database:
+  # type: "sqlite"
+  # dsn: "prober.db"
+  type: "postgres"
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "password"
+  dbname: "prprober"
+  sslmode: "disable"
+
+auth:
+  secret_key: "your_secret_key_here"
+  jwt_algorithm: "HS256"
+
+upload:
+  csv_path: "./uploads/csv/"
+  img_path: "./uploads/img/"
