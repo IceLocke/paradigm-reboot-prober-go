@@ -42,7 +42,18 @@ jobs:
 
       - name: Wait for Services to be Ready
         run: |
-          timeout 60s bash -c 'until curl -s http://localhost:8080/health; do sleep 2; done'
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/health; then
+              echo "Service is up!"
+              exit 0
+            fi
+            echo "Waiting for service... ($i)"
+            docker compose ps
+            sleep 2
+          done
+          echo "Service timed out"
+          docker compose logs
+          exit 1
           
       - name: Check Health Status
         run: |

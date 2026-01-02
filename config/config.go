@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -63,6 +64,26 @@ func LoadConfig(configPath string) {
 	}
 	if dsn := os.Getenv("DB_DSN"); dsn != "" {
 		GlobalConfig.Database.DSN = dsn
+	}
+	if host := os.Getenv("DB_HOST"); host != "" {
+		GlobalConfig.Database.Host = host
+	}
+	if portStr := os.Getenv("DB_PORT"); portStr != "" {
+		if p, err := strconv.Atoi(portStr); err == nil {
+			GlobalConfig.Database.Port = p
+		}
+	}
+	if user := os.Getenv("DB_USER"); user != "" {
+		GlobalConfig.Database.User = user
+	}
+	if pass := os.Getenv("DB_PASSWORD"); pass != "" {
+		GlobalConfig.Database.Password = pass
+	}
+	if name := os.Getenv("DB_NAME"); name != "" {
+		GlobalConfig.Database.DBName = name
+	}
+	if ssl := os.Getenv("DB_SSLMODE"); ssl != "" {
+		GlobalConfig.Database.SSLMode = ssl
 	}
 	if secret := os.Getenv("SECRET_KEY"); secret != "" {
 		GlobalConfig.Auth.SecretKey = secret
