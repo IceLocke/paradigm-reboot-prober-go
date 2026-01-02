@@ -27,18 +27,46 @@ jobs:
         run: go test -v ./...
 
   docker-build:
-    name: Docker Build & Integration Test
+    name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [test]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Docker Image
-        run: docker build -t prprober-app:latest .
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Start Services with Docker Compose
-        run: docker compose up -d
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=sha,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ id.meta.outputs.tags }}
+          labels: ${{ id.meta.outputs.labels }}
+
+      - name: Start Services with Docker Compose (Integration Test)
+        run: |
+          # Use the newly built image for integration test
+          export APP_IMAGE=ghcr.io/${{ github.repository }}:sha-${GITHUB_SHA::7}
+          docker compose up -d
 
       - name: Wait for Services to be Ready
         run: |
@@ -74,10 +102,20 @@ jobs:
     needs: [docker-build]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy
+      - name: Simulate Deployment
         run: |
-          echo "Starting deployment to production server..."
-          echo "Deployment successful!"
+          echo "Starting deployment simulation..."
+          echo "Image: ghcr.io/${{ github.repository }}:latest"
+          echo "Deployment successful (Simulated)!"
+
+      # - name: Deploy via SSH (Commented out for future use)
+      #   uses: appleboy/ssh-action@v1.0.3
+      #   with:
+      #     host: ${{ secrets.DEPLOY_HOST }}
+      #     username: ${{ secrets.DEPLOY_USER }}
+      #     key: ${{ secrets.DEPLOY_KEY }}
+      #     script: |
+      #       cd /path/to/your/project
+      #       docker compose pull
+      #       docker compose up -d
+      #       docker image prune -f
