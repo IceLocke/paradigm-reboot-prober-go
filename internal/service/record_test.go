@@ -46,7 +46,7 @@ func TestRecordService(t *testing.T) {
 	})
 
 	t.Run("GetBest50Records", func(t *testing.T) {
-		records, err := recordService.GetBest50Records("testuser")
+		records, err := recordService.GetBest50Records("testuser", 0)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 	})
@@ -61,8 +61,7 @@ func TestRecordService(t *testing.T) {
 		levels, err := recordService.GetAllLevelsWithBestScores("testuser")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, levels)
-		assert.NotNil(t, levels[0].Score)
-		assert.Equal(t, 1000000, *levels[0].Score)
+		assert.Equal(t, 1000000, levels[0].Score)
 	})
 
 	t.Run("CountRecords", func(t *testing.T) {
