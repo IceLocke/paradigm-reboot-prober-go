@@ -1,0 +1,75 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run Unit Tests
+        run: go test -v ./...
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: golangci-lint
+        uses: golangci-lint/golangci-lint-action@v6
+        with:
+          version: latest
+
+  docker-build:
+    name: Docker Build & Integration Test
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t prprober-app:latest .
+
+      - name: Start Services with Docker Compose
+        run: docker-compose up -d
+
+      - name: Wait for Services to be Ready
+        run: |
+          timeout 60s bash -c 'until curl -s http://localhost:8080/health; do sleep 2; done'
+          
+      - name: Check Health Status
+        run: |
+          STATUS=$(curl -s http://localhost:8080/health | jq -r '.status')
+          if [ "$STATUS" != "up" ]; then
+            echo "Health check failed: $STATUS"
+            docker-compose logs app
+            exit 1
+          fi
+
+      - name: Stop Services
+        if: always()
+        run: docker-compose down -v
