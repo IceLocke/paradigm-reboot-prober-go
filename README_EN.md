@@ -1,40 +1,40 @@
-# Paradigm: Reboot Prober Golang 重构版 (WIP)
+# Paradigm: Reboot Prober (Go) 
 
 [![CI/CD Pipeline](https://github.com/IceLocke/paradigm-reboot-prober-go/actions/workflows/ci.yml/badge.svg)](https://github.com/IceLocke/paradigm-reboot-prober-go/actions/workflows/ci.yml)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/IceLocke/paradigm-reboot-prober-go)](https://go.dev/)
 [![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://github.com/IceLocke/paradigm-reboot-prober-go/pkgs/container/paradigm-reboot-prober-go)
 [![License](https://img.shields.io/github/license/IceLocke/paradigm-reboot-prober-go)](LICENSE)
 
-这是一个基于 Go 语言开发的 **Paradigm: Reboot** 查分器后端服务。支持如下特性：
+A backend service for **Paradigm: Reboot** score tracking, built with Go.
 
-- **成绩管理**: 支持批量上传成绩，自动计算单曲 Rating 并维护最佳成绩。
-- **B50 计算**: 自动筛选 B35 (旧曲) + B15 (新曲) 构成 Best 50。
-- **数据导出**: 支持将个人成绩导出为 CSV 文件，。
-- **API 文档**: 集成 Swagger 文档，方便对接。
-- **容器化**: 支持 Docker 一键部署。
+- **Score Management**: Batch upload support, automatic Rating calculation, and best record tracking.
+- **B50 Calculation**: Automatically calculates Best 50 (B35 Old + B15 New).
+- **Data Export**: Export personal records to CSV.
+- **API Documentation**: Integrated Swagger UI.
+- **Cloud Native**: Docker and Docker Compose support.
 
-## 🚀 快速开始
+## 🚀 Getting Started
 
-### 本地运行
+### Local Development
 
-1. **克隆仓库**:
+1. **Clone the repo**:
 
    ```bash
    git clone https://github.com/IceLocke/paradigm-reboot-prober-go.git
    cd paradigm-reboot-prober-go
    ```
-2. **启动服务**:
+2. **Run**:
 
    ```bash
    go run cmd/server/main.go
    ```
 
-### 使用 Docker Compose
+### Using Docker Compose
 
 ```bash
 docker-compose up -d
 ```
 
-## 📖 API 文档
+## 📖 API Documentation
 
-访问：`http://localhost:8080/swagger/index.html`
+Visit: `http://localhost:8080/swagger/index.html`
