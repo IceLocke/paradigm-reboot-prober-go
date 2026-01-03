@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
 	"strconv"
@@ -23,12 +24,12 @@ func NewSongController(songService *service.SongService) *SongController {
 // @Tags song
 // @Produce json
 // @Success 200 {array} model.SongLevelInfo
-// @Failure 500 {object} gin.H
+// @Failure 500 {object} model.Response
 // @Router /songs [get]
 func (ctrl *SongController) GetAllSongLevels(c *gin.Context) {
 	levels, err := ctrl.songService.GetAllSongLevels()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, levels)
@@ -42,8 +43,8 @@ func (ctrl *SongController) GetAllSongLevels(c *gin.Context) {
 // @Param song_id path string true "Song ID"
 // @Param src query string false "Source (prp or wiki)" default(prp)
 // @Success 200 {object} model.Song
-// @Failure 400 {object} gin.H
-// @Failure 404 {object} gin.H
+// @Failure 400 {object} model.Response
+// @Failure 404 {object} model.Response
 // @Router /songs/{song_id} [get]
 func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 	songIDStr := c.Param("song_id")
@@ -54,7 +55,7 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 		// If not an integer, try searching by WikiID
 		song, err := ctrl.songService.GetSingleSongByWikiID(songIDStr)
 		if err != nil {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 			return
 		}
 		c.JSON(http.StatusOK, song)
@@ -63,7 +64,7 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 
 	song, err := ctrl.songService.GetSingleSong(songID, src)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, song)
@@ -78,18 +79,18 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 // @Security BearerAuth
 // @Param song body request.CreateSongRequest true "Song creation info"
 // @Success 200 {array} model.SongLevelInfo
-// @Failure 400 {object} gin.H
+// @Failure 400 {object} model.Response
 // @Router /songs [post]
 func (ctrl *SongController) CreateSong(c *gin.Context) {
 	var req request.CreateSongRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 
 	levels, err := ctrl.songService.CreateSong(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, levels)
@@ -104,18 +105,18 @@ func (ctrl *SongController) CreateSong(c *gin.Context) {
 // @Security BearerAuth
 // @Param song body request.UpdateSongRequest true "Song update info"
 // @Success 200 {array} model.SongLevelInfo
-// @Failure 400 {object} gin.H
+// @Failure 400 {object} model.Response
 // @Router /songs [put]
 func (ctrl *SongController) UpdateSong(c *gin.Context) {
 	var req request.UpdateSongRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 
 	levels, err := ctrl.songService.UpdateSong(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, levels)

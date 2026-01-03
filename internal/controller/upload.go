@@ -37,30 +37,30 @@ func generateRandomHex(n int) string {
 // @Security BearerAuth
 // @Param file formData file true "CSV file"
 // @Success 200 {object} model.UploadFileResponse
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
+// @Failure 400 {object} model.Response
+// @Failure 401 {object} model.Response
 // @Router /upload/csv [post]
 func (ctrl *UploadController) UploadCSV(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+		c.JSON(http.StatusUnauthorized, model.Response{Error: "authentication required"})
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no file uploaded"})
+		c.JSON(http.StatusBadRequest, model.Response{Error: "no file uploaded"})
 		return
 	}
 
 	if filepath.Ext(file.Filename) != ".csv" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "only CSV files are allowed"})
+		c.JSON(http.StatusBadRequest, model.Response{Error: "only CSV files are allowed"})
 		return
 	}
 
 	// Ensure directory exists
 	if err := os.MkdirAll(config.GlobalConfig.Upload.CSVPath, os.ModePerm); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create upload directory"})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to create upload directory"})
 		return
 	}
 
@@ -68,7 +68,7 @@ func (ctrl *UploadController) UploadCSV(c *gin.Context) {
 	dst := filepath.Join(config.GlobalConfig.Upload.CSVPath, filename)
 
 	if err := c.SaveUploadedFile(file, dst); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to save file"})
 		return
 	}
 
@@ -84,27 +84,27 @@ func (ctrl *UploadController) UploadCSV(c *gin.Context) {
 // @Security BearerAuth
 // @Param file formData file true "Image file"
 // @Success 200 {object} model.UploadFileResponse
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
+// @Failure 400 {object} model.Response
+// @Failure 401 {object} model.Response
+// @Failure 403 {object} model.Response
 // @Router /upload/img [post]
 func (ctrl *UploadController) UploadImg(c *gin.Context) {
 	username := c.GetString("username")
 	user, err := ctrl.userService.GetUser(username)
 	if err != nil || user == nil || !user.IsAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+		c.JSON(http.StatusForbidden, model.Response{Error: "admin access required"})
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "no file uploaded"})
+		c.JSON(http.StatusBadRequest, model.Response{Error: "no file uploaded"})
 		return
 	}
 
 	// Ensure directory exists
 	if err := os.MkdirAll(config.GlobalConfig.Upload.ImgPath, os.ModePerm); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create upload directory"})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to create upload directory"})
 		return
 	}
 
@@ -112,7 +112,7 @@ func (ctrl *UploadController) UploadImg(c *gin.Context) {
 	dst := filepath.Join(config.GlobalConfig.Upload.ImgPath, filename)
 
 	if err := c.SaveUploadedFile(file, dst); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save file"})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to save file"})
 		return
 	}
 

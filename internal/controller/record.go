@@ -38,9 +38,9 @@ func NewRecordController(recordService *service.RecordService, userService *serv
 // @Param sort_by query string false "Sort by (rating, score, record_time, etc.)" default(rating)
 // @Param order query string false "Order (desc or asce)" default(desc)
 // @Success 200 {object} model.PlayRecordResponse
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
-// @Failure 403 {object} gin.H
+// @Failure 400 {object} model.Response
+// @Failure 401 {object} model.Response
+// @Failure 403 {object} model.Response
 // @Router /records/{username} [get]
 func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	username := c.Param("username")
@@ -60,7 +60,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	// Check authority
 	if err := ctrl.userService.CheckProbeAuthority(username, currentUser); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		c.JSON(http.StatusForbidden, model.Response{Error: err.Error()})
 		return
 	}
 
@@ -78,12 +78,12 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		records, err = ctrl.recordService.GetAllRecords(username, pageSize, pageIndex-1, sortBy, order)
 		total, _ = ctrl.recordService.CountAllRecords(username)
 	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid scope parameter"})
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter"})
 		return
 	}
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
 
@@ -103,20 +103,20 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 // @Param username path string true "Username"
 // @Param record body request.BatchCreatePlayRecordRequest true "Play records upload info"
 // @Success 201 {array} model.PlayRecord
-// @Failure 400 {object} gin.H
-// @Failure 401 {object} gin.H
+// @Failure 400 {object} model.Response
+// @Failure 401 {object} model.Response
 // @Router /records/{username} [post]
 func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 	username := c.Param("username")
 	var req request.BatchCreatePlayRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 
 	// Ambiguous data check
 	if (len(req.PlayRecords) > 0) == (req.CSVFilename != "") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ambiguous data: provide either play_records or csv_filename"})
+		c.JSON(http.StatusBadRequest, model.Response{Error: "ambiguous data: provide either play_records or csv_filename"})
 		return
 	}
 
@@ -133,7 +133,7 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 	}
 
 	if !authorized {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		c.JSON(http.StatusUnauthorized, model.Response{Error: "unauthorized"})
 		return
 	}
 
@@ -145,7 +145,7 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 		var err error
 		playRecords, err = util.GetRecordsFromCSV(csvPath)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse csv: " + err.Error()})
+			c.JSON(http.StatusBadRequest, model.Response{Error: "failed to parse csv: " + err.Error()})
 			return
 		}
 		isReplace = true // CSV upload usually implies replacement in original code
@@ -155,7 +155,7 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 
 	records, err := ctrl.recordService.CreateRecords(username, playRecords, isReplace)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
 
@@ -169,7 +169,7 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 // @Produce text/csv
 // @Param username path string true "Username"
 // @Success 200 {string} string "CSV content"
-// @Failure 401 {object} gin.H
+// @Failure 401 {object} model.Response
 // @Router /records/{username}/export/csv [get]
 func (ctrl *RecordController) ExportCSV(c *gin.Context) {
 	username := c.Param("username")
@@ -183,19 +183,19 @@ func (ctrl *RecordController) ExportCSV(c *gin.Context) {
 
 	// Check authority
 	if err := ctrl.userService.CheckProbeAuthority(username, currentUser); err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		c.JSON(http.StatusForbidden, model.Response{Error: err.Error()})
 		return
 	}
 
 	records, err := ctrl.recordService.GetAllLevelsWithBestScores(username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
 
 	csvData, err := util.GenerateCSV(records)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSV"})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to generate CSV"})
 		return
 	}
 
@@ -210,10 +210,10 @@ func (ctrl *RecordController) ExportCSV(c *gin.Context) {
 // @Produce image/png
 // @Param username path string true "Username"
 // @Success 200 {file} binary
-// @Failure 403 {object} gin.H
+// @Failure 403 {object} model.Response
 // @Router /records/{username}/export/b50 [get]
 func (ctrl *RecordController) GetB50Img(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented yet"})
+	c.JSON(http.StatusNotImplemented, model.Response{Error: "not implemented yet"})
 }
 
 // GetB50Trends godoc
@@ -222,9 +222,9 @@ func (ctrl *RecordController) GetB50Img(c *gin.Context) {
 // @Tags record
 // @Produce json
 // @Param username path string true "Username"
-// @Success 200 {object} gin.H
-// @Failure 403 {object} gin.H
+// @Success 200 {object} model.Response
+// @Failure 403 {object} model.Response
 // @Router /records/{username}/trends [get]
 func (ctrl *RecordController) GetB50Trends(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "not implemented yet"})
+	c.JSON(http.StatusNotImplemented, model.Response{Error: "not implemented yet"})
 }

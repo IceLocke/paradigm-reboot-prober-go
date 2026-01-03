@@ -1,4 +1,457 @@
-basePath: /api/v1
+basePath: /api/v2
+definitions:
+  model.Difficulty:
+    enum:
+    - Detected
+    - Invaded
+    - Massive
+    - Reboot
+    type: string
+    x-enum-varnames:
+    - DifficultyDetected
+    - DifficultyInvaded
+    - DifficultyMassive
+    - DifficultyReboot
+  model.LevelInfo:
+    properties:
+      difficulty:
+        allOf:
+        - $ref: '#/definitions/model.Difficulty'
+        example: Massive
+      level:
+        example: 14.5
+        type: number
+      level_design:
+        example: Designer
+        type: string
+      notes:
+        example: 1000
+        type: integer
+    type: object
+  model.PlayRecord:
+    properties:
+      play_record_id:
+        type: integer
+      rating:
+        type: integer
+      record_time:
+        type: string
+      score:
+        example: 1000000
+        type: integer
+      song_level:
+        $ref: '#/definitions/model.SongLevel'
+      song_level_id:
+        example: 1
+        type: integer
+      username:
+        type: string
+    required:
+    - score
+    - song_level_id
+    type: object
+  model.PlayRecordBase:
+    properties:
+      score:
+        example: 1000000
+        type: integer
+      song_level_id:
+        example: 1
+        type: integer
+    required:
+    - score
+    - song_level_id
+    type: object
+  model.PlayRecordInfo:
+    properties:
+      play_record_id:
+        type: integer
+      rating:
+        type: integer
+      record_time:
+        type: string
+      score:
+        type: integer
+      song_level:
+        $ref: '#/definitions/model.SongLevelInfoSimple'
+    type: object
+  model.PlayRecordResponse:
+    properties:
+      records:
+        items:
+          $ref: '#/definitions/model.PlayRecordInfo'
+        type: array
+      total:
+        type: integer
+      username:
+        type: string
+    type: object
+  model.Response:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  model.Song:
+    properties:
+      album:
+        example: First Album
+        type: string
+      artist:
+        example: Artist Name
+        type: string
+      b15:
+        example: false
+        type: boolean
+      bpm:
+        example: "180"
+        type: string
+      cover:
+        example: https://example.com/cover.jpg
+        type: string
+      genre:
+        example: Pop
+        type: string
+      illustrator:
+        example: Artist
+        type: string
+      length:
+        example: "2:30"
+        type: string
+      song_id:
+        type: integer
+      song_levels:
+        items:
+          $ref: '#/definitions/model.SongLevel'
+        type: array
+      title:
+        example: Song Title
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+      wiki_id:
+        example: w123
+        type: string
+    type: object
+  model.SongLevel:
+    properties:
+      difficulty:
+        allOf:
+        - $ref: '#/definitions/model.Difficulty'
+        example: Massive
+      fitting_level:
+        type: number
+      level:
+        type: number
+      level_design:
+        type: string
+      notes:
+        type: integer
+      song:
+        $ref: '#/definitions/model.Song'
+      song_id:
+        type: integer
+      song_level_id:
+        type: integer
+    type: object
+  model.SongLevelInfo:
+    properties:
+      album:
+        example: First Album
+        type: string
+      artist:
+        example: Artist Name
+        type: string
+      b15:
+        example: false
+        type: boolean
+      bpm:
+        example: "180"
+        type: string
+      cover:
+        example: https://example.com/cover.jpg
+        type: string
+      difficulty:
+        allOf:
+        - $ref: '#/definitions/model.Difficulty'
+        example: Massive
+      fitting_level:
+        example: 13.4
+        type: number
+      genre:
+        example: Pop
+        type: string
+      illustrator:
+        example: Artist
+        type: string
+      length:
+        example: "2:30"
+        type: string
+      level:
+        example: 13.2
+        type: number
+      level_design:
+        example: Designer
+        type: string
+      notes:
+        example: 850
+        type: integer
+      song_id:
+        example: 1
+        type: integer
+      song_level_id:
+        example: 10
+        type: integer
+      title:
+        example: Song Title
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+      wiki_id:
+        example: w123
+        type: string
+    type: object
+  model.SongLevelInfoSimple:
+    properties:
+      b15:
+        type: boolean
+      cover:
+        type: string
+      difficulty:
+        $ref: '#/definitions/model.Difficulty'
+      fitting_level:
+        type: number
+      level:
+        type: number
+      song_id:
+        type: integer
+      song_level_id:
+        type: integer
+      title:
+        type: string
+      version:
+        type: string
+      wiki_id:
+        type: string
+    type: object
+  model.Token:
+    properties:
+      access_token:
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  model.UploadFileResponse:
+    properties:
+      filename:
+        type: string
+    type: object
+  model.UploadToken:
+    properties:
+      upload_token:
+        type: string
+    type: object
+  model.User:
+    properties:
+      account:
+        example: act_001
+        type: string
+      account_number:
+        example: 1001
+        type: integer
+      anonymous_probe:
+        example: false
+        type: boolean
+      email:
+        example: user@example.com
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      is_admin:
+        example: false
+        type: boolean
+      nickname:
+        example: 小明
+        type: string
+      qq_number:
+        example: 12345678
+        type: integer
+      upload_token:
+        example: token_xyz
+        type: string
+      user_id:
+        type: integer
+      username:
+        example: user123
+        type: string
+      uuid:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    required:
+    - email
+    - username
+    type: object
+  request.BatchCreatePlayRecordRequest:
+    properties:
+      csv_filename:
+        type: string
+      is_replace:
+        type: boolean
+      play_records:
+        items:
+          $ref: '#/definitions/model.PlayRecordBase'
+        type: array
+      upload_token:
+        type: string
+    type: object
+  request.CreateSongRequest:
+    properties:
+      album:
+        example: First Album
+        type: string
+      artist:
+        example: Artist Name
+        type: string
+      b15:
+        example: false
+        type: boolean
+      bpm:
+        example: "180"
+        type: string
+      cover:
+        example: https://example.com/cover.jpg
+        type: string
+      genre:
+        example: Pop
+        type: string
+      illustrator:
+        example: Artist
+        type: string
+      length:
+        example: "2:30"
+        type: string
+      levels:
+        items:
+          $ref: '#/definitions/model.LevelInfo'
+        type: array
+      title:
+        example: Song Title
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+      wiki_id:
+        example: w123
+        type: string
+    type: object
+  request.CreateUserRequest:
+    properties:
+      account:
+        example: act_001
+        type: string
+      account_number:
+        example: 1001
+        type: integer
+      anonymous_probe:
+        example: false
+        type: boolean
+      email:
+        example: user@example.com
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      is_admin:
+        example: false
+        type: boolean
+      nickname:
+        example: 小明
+        type: string
+      password:
+        example: secret123
+        minLength: 6
+        type: string
+      qq_number:
+        example: 12345678
+        type: integer
+      upload_token:
+        example: token_xyz
+        type: string
+      username:
+        example: user123
+        type: string
+      uuid:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  request.UpdateSongRequest:
+    properties:
+      album:
+        example: First Album
+        type: string
+      artist:
+        example: Artist Name
+        type: string
+      b15:
+        example: false
+        type: boolean
+      bpm:
+        example: "180"
+        type: string
+      cover:
+        example: https://example.com/cover.jpg
+        type: string
+      genre:
+        example: Pop
+        type: string
+      illustrator:
+        example: Artist
+        type: string
+      length:
+        example: "2:30"
+        type: string
+      levels:
+        items:
+          $ref: '#/definitions/model.LevelInfo'
+        type: array
+      song_id:
+        type: integer
+      title:
+        example: Song Title
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+      wiki_id:
+        example: w123
+        type: string
+    required:
+    - song_id
+    type: object
+  request.UpdateUserRequest:
+    properties:
+      account:
+        type: string
+      account_number:
+        type: integer
+      anonymous_probe:
+        type: boolean
+      nickname:
+        type: string
+      qq_number:
+        type: integer
+      uuid:
+        type: string
+    type: object
 host: https://api.prp.icel.site
 info:
   contact:
@@ -11,6 +464,468 @@ info:
     url: http://www.apache.org/licenses/LICENSE-2.0.html
   termsOfService: http://swagger.io/terms/
   title: 'Paradigm: Reboot Prober API'
-  version: "1.1"
-paths: {}
+  version: "2"
+paths:
+  /records/{username}:
+    get:
+      description: Retrieve play records for a user based on scope (b50, best, all)
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      - default: b50
+        description: Scope (b50, best, all)
+        in: query
+        name: scope
+        type: string
+      - default: 0
+        description: Underflow for b50
+        in: query
+        name: underflow
+        type: integer
+      - default: 50
+        description: Page size
+        in: query
+        name: page_size
+        type: integer
+      - default: 1
+        description: Page index
+        in: query
+        name: page_index
+        type: integer
+      - default: rating
+        description: Sort by (rating, score, record_time, etc.)
+        in: query
+        name: sort_by
+        type: string
+      - default: desc
+        description: Order (desc or asce)
+        in: query
+        name: order
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.PlayRecordResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Get play records
+      tags:
+      - record
+    post:
+      consumes:
+      - application/json
+      description: Batch upload play records for a user
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      - description: Play records upload info
+        in: body
+        name: record
+        required: true
+        schema:
+          $ref: '#/definitions/request.BatchCreatePlayRecordRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            items:
+              $ref: '#/definitions/model.PlayRecord'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Upload play records
+      tags:
+      - record
+  /records/{username}/export/b50:
+    get:
+      description: Generate and return B50 image for a user
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - image/png
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Get B50 image
+      tags:
+      - record
+  /records/{username}/export/csv:
+    get:
+      description: Export all best records for a user to CSV
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - text/csv
+      responses:
+        "200":
+          description: CSV content
+          schema:
+            type: string
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Export records to CSV
+      tags:
+      - record
+  /records/{username}/trends:
+    get:
+      description: Get B50 rating trends for a user
+      parameters:
+      - description: Username
+        in: path
+        name: username
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Get B50 trends
+      tags:
+      - record
+  /songs:
+    get:
+      description: Retrieve a list of all song levels with their details
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.SongLevelInfo'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Get all song levels
+      tags:
+      - song
+    post:
+      consumes:
+      - application/json
+      description: Create a new song with its levels (Admin only)
+      parameters:
+      - description: Song creation info
+        in: body
+        name: song
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateSongRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.SongLevelInfo'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Create a new song
+      tags:
+      - song
+    put:
+      consumes:
+      - application/json
+      description: Update song details and its levels (Admin only)
+      parameters:
+      - description: Song update info
+        in: body
+        name: song
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateSongRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.SongLevelInfo'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Update an existing song
+      tags:
+      - song
+  /songs/{song_id}:
+    get:
+      description: Retrieve detailed information about a single song by ID
+      parameters:
+      - description: Song ID
+        in: path
+        name: song_id
+        required: true
+        type: string
+      - default: prp
+        description: Source (prp or wiki)
+        in: query
+        name: src
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Song'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Get single song info
+      tags:
+      - song
+  /upload/csv:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a CSV file containing play records
+      parameters:
+      - description: CSV file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.UploadFileResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Upload CSV file
+      tags:
+      - upload
+  /upload/img:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload an image file (Admin only)
+      parameters:
+      - description: Image file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.UploadFileResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Upload image file
+      tags:
+      - upload
+  /user/login:
+    post:
+      consumes:
+      - application/x-www-form-urlencoded
+      description: Authenticate user and return JWT token
+      parameters:
+      - description: Username
+        in: formData
+        name: username
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Token'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Login user
+      tags:
+      - user
+  /user/me:
+    get:
+      description: Get the profile of the currently authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Get current user info
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      description: Update the profile of the currently authenticated user
+      parameters:
+      - description: User update info
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Update current user info
+      tags:
+      - user
+  /user/me/upload-token:
+    post:
+      description: Generate a new upload token for the current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.UploadToken'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Refresh upload token
+      tags:
+      - user
+  /user/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account
+      parameters:
+      - description: User registration info
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Register a new user
+      tags:
+      - user
 swagger: "2.0"

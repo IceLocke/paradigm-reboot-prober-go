@@ -25,18 +25,18 @@ func NewUserController(userService *service.UserService) *UserController {
 // @Produce json
 // @Param user body request.CreateUserRequest true "User registration info"
 // @Success 200 {object} model.User
-// @Failure 400 {object} gin.H
+// @Failure 400 {object} model.Response
 // @Router /user/register [post]
 func (ctrl *UserController) Register(c *gin.Context) {
 	var req request.CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 
 	user, err := ctrl.userService.CreateUser(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 
@@ -52,7 +52,7 @@ func (ctrl *UserController) Register(c *gin.Context) {
 // @Param username formData string true "Username"
 // @Param password formData string true "Password"
 // @Success 200 {object} model.Token
-// @Failure 401 {object} gin.H
+// @Failure 401 {object} model.Response
 // @Router /user/login [post]
 func (ctrl *UserController) Login(c *gin.Context) {
 	username := c.PostForm("username")
@@ -60,7 +60,7 @@ func (ctrl *UserController) Login(c *gin.Context) {
 
 	token, err := ctrl.userService.Login(username, password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
 		return
 	}
 
@@ -77,17 +77,17 @@ func (ctrl *UserController) Login(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} model.User
-// @Failure 401 {object} gin.H
+// @Failure 401 {object} model.Response
 // @Router /user/me [get]
 func (ctrl *UserController) GetMe(c *gin.Context) {
 	username := c.GetString("username")
 	user, err := ctrl.userService.GetUser(username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
 
@@ -101,13 +101,13 @@ func (ctrl *UserController) GetMe(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} model.UploadToken
-// @Failure 401 {object} gin.H
+// @Failure 401 {object} model.Response
 // @Router /user/me/upload-token [post]
 func (ctrl *UserController) RefreshUploadToken(c *gin.Context) {
 	username := c.GetString("username")
 	token, err := ctrl.userService.RefreshUploadToken(username)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
 
@@ -123,19 +123,19 @@ func (ctrl *UserController) RefreshUploadToken(c *gin.Context) {
 // @Security BearerAuth
 // @Param user body request.UpdateUserRequest true "User update info"
 // @Success 200 {object} model.User
-// @Failure 400 {object} gin.H
+// @Failure 400 {object} model.Response
 // @Router /user/me [put]
 func (ctrl *UserController) UpdateMe(c *gin.Context) {
 	username := c.GetString("username")
 	var req request.UpdateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 
 	user, err := ctrl.userService.UpdateUser(username, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
 

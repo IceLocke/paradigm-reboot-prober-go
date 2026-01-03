@@ -13,9 +13,1370 @@
             "name": "Apache 2.0",
             "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
         },
-        "version": "1.1"
+        "version": "2"
     },
     "host": "https://api.prp.icel.site",
-    "basePath": "/api/v1",
-    "paths": {}
+    "basePath": "/api/v2",
+    "paths": {
+        "/records/{username}": {
+            "get": {
+                "description": "Retrieve play records for a user based on scope (b50, best, all)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "record"
+                ],
+                "summary": "Get play records",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "b50",
+                        "description": "Scope (b50, best, all)",
+                        "name": "scope",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 0,
+                        "description": "Underflow for b50",
+                        "name": "underflow",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "Page size",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Page index",
+                        "name": "page_index",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "rating",
+                        "description": "Sort by (rating, score, record_time, etc.)",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "default": "desc",
+                        "description": "Order (desc or asce)",
+                        "name": "order",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.PlayRecordResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Batch upload play records for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "record"
+                ],
+                "summary": "Upload play records",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Play records upload info",
+                        "name": "record",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.BatchCreatePlayRecordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.PlayRecord"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/records/{username}/export/b50": {
+            "get": {
+                "description": "Generate and return B50 image for a user",
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "record"
+                ],
+                "summary": "Get B50 image",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/records/{username}/export/csv": {
+            "get": {
+                "description": "Export all best records for a user to CSV",
+                "produces": [
+                    "text/csv"
+                ],
+                "tags": [
+                    "record"
+                ],
+                "summary": "Export records to CSV",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "CSV content",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/records/{username}/trends": {
+            "get": {
+                "description": "Get B50 rating trends for a user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "record"
+                ],
+                "summary": "Get B50 trends",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/songs": {
+            "get": {
+                "description": "Retrieve a list of all song levels with their details",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "song"
+                ],
+                "summary": "Get all song levels",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.SongLevelInfo"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update song details and its levels (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "song"
+                ],
+                "summary": "Update an existing song",
+                "parameters": [
+                    {
+                        "description": "Song update info",
+                        "name": "song",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateSongRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.SongLevelInfo"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Create a new song with its levels (Admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "song"
+                ],
+                "summary": "Create a new song",
+                "parameters": [
+                    {
+                        "description": "Song creation info",
+                        "name": "song",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.CreateSongRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.SongLevelInfo"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/songs/{song_id}": {
+            "get": {
+                "description": "Retrieve detailed information about a single song by ID",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "song"
+                ],
+                "summary": "Get single song info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Song ID",
+                        "name": "song_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "prp",
+                        "description": "Source (prp or wiki)",
+                        "name": "src",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Song"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/upload/csv": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload a CSV file containing play records",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "upload"
+                ],
+                "summary": "Upload CSV file",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "CSV file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.UploadFileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/upload/img": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload an image file (Admin only)",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "upload"
+                ],
+                "summary": "Upload image file",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Image file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.UploadFileResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/login": {
+            "post": {
+                "description": "Authenticate user and return JWT token",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Login user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Username",
+                        "name": "username",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Token"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/me": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get the profile of the currently authenticated user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Get current user info",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Update the profile of the currently authenticated user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Update current user info",
+                "parameters": [
+                    {
+                        "description": "User update info",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.UpdateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/me/upload-token": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Generate a new upload token for the current user",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Refresh upload token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.UploadToken"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/user/register": {
+            "post": {
+                "description": "Create a new user account",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "description": "User registration info",
+                        "name": "user",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "model.Difficulty": {
+            "type": "string",
+            "enum": [
+                "Detected",
+                "Invaded",
+                "Massive",
+                "Reboot"
+            ],
+            "x-enum-varnames": [
+                "DifficultyDetected",
+                "DifficultyInvaded",
+                "DifficultyMassive",
+                "DifficultyReboot"
+            ]
+        },
+        "model.LevelInfo": {
+            "type": "object",
+            "properties": {
+                "difficulty": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Difficulty"
+                        }
+                    ],
+                    "example": "Massive"
+                },
+                "level": {
+                    "type": "number",
+                    "example": 14.5
+                },
+                "level_design": {
+                    "type": "string",
+                    "example": "Designer"
+                },
+                "notes": {
+                    "type": "integer",
+                    "example": 1000
+                }
+            }
+        },
+        "model.PlayRecord": {
+            "type": "object",
+            "required": [
+                "score",
+                "song_level_id"
+            ],
+            "properties": {
+                "play_record_id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "record_time": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "integer",
+                    "example": 1000000
+                },
+                "song_level": {
+                    "$ref": "#/definitions/model.SongLevel"
+                },
+                "song_level_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.PlayRecordBase": {
+            "type": "object",
+            "required": [
+                "score",
+                "song_level_id"
+            ],
+            "properties": {
+                "score": {
+                    "type": "integer",
+                    "example": 1000000
+                },
+                "song_level_id": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "model.PlayRecordInfo": {
+            "type": "object",
+            "properties": {
+                "play_record_id": {
+                    "type": "integer"
+                },
+                "rating": {
+                    "type": "integer"
+                },
+                "record_time": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "integer"
+                },
+                "song_level": {
+                    "$ref": "#/definitions/model.SongLevelInfoSimple"
+                }
+            }
+        },
+        "model.PlayRecordResponse": {
+            "type": "object",
+            "properties": {
+                "records": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PlayRecordInfo"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Response": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Song": {
+            "type": "object",
+            "properties": {
+                "album": {
+                    "type": "string",
+                    "example": "First Album"
+                },
+                "artist": {
+                    "type": "string",
+                    "example": "Artist Name"
+                },
+                "b15": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "bpm": {
+                    "type": "string",
+                    "example": "180"
+                },
+                "cover": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "genre": {
+                    "type": "string",
+                    "example": "Pop"
+                },
+                "illustrator": {
+                    "type": "string",
+                    "example": "Artist"
+                },
+                "length": {
+                    "type": "string",
+                    "example": "2:30"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "song_levels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.SongLevel"
+                    }
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Song Title"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "wiki_id": {
+                    "type": "string",
+                    "example": "w123"
+                }
+            }
+        },
+        "model.SongLevel": {
+            "type": "object",
+            "properties": {
+                "difficulty": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Difficulty"
+                        }
+                    ],
+                    "example": "Massive"
+                },
+                "fitting_level": {
+                    "type": "number"
+                },
+                "level": {
+                    "type": "number"
+                },
+                "level_design": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "integer"
+                },
+                "song": {
+                    "$ref": "#/definitions/model.Song"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "song_level_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.SongLevelInfo": {
+            "type": "object",
+            "properties": {
+                "album": {
+                    "type": "string",
+                    "example": "First Album"
+                },
+                "artist": {
+                    "type": "string",
+                    "example": "Artist Name"
+                },
+                "b15": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "bpm": {
+                    "type": "string",
+                    "example": "180"
+                },
+                "cover": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "difficulty": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Difficulty"
+                        }
+                    ],
+                    "example": "Massive"
+                },
+                "fitting_level": {
+                    "type": "number",
+                    "example": 13.4
+                },
+                "genre": {
+                    "type": "string",
+                    "example": "Pop"
+                },
+                "illustrator": {
+                    "type": "string",
+                    "example": "Artist"
+                },
+                "length": {
+                    "type": "string",
+                    "example": "2:30"
+                },
+                "level": {
+                    "type": "number",
+                    "example": 13.2
+                },
+                "level_design": {
+                    "type": "string",
+                    "example": "Designer"
+                },
+                "notes": {
+                    "type": "integer",
+                    "example": 850
+                },
+                "song_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "song_level_id": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Song Title"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "wiki_id": {
+                    "type": "string",
+                    "example": "w123"
+                }
+            }
+        },
+        "model.SongLevelInfoSimple": {
+            "type": "object",
+            "properties": {
+                "b15": {
+                    "type": "boolean"
+                },
+                "cover": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "$ref": "#/definitions/model.Difficulty"
+                },
+                "fitting_level": {
+                    "type": "number"
+                },
+                "level": {
+                    "type": "number"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "song_level_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "wiki_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.Token": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                }
+            }
+        },
+        "model.UploadFileResponse": {
+            "type": "object",
+            "properties": {
+                "filename": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.UploadToken": {
+            "type": "object",
+            "properties": {
+                "upload_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.User": {
+            "type": "object",
+            "required": [
+                "email",
+                "username"
+            ],
+            "properties": {
+                "account": {
+                    "type": "string",
+                    "example": "act_001"
+                },
+                "account_number": {
+                    "type": "integer",
+                    "example": 1001
+                },
+                "anonymous_probe": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "is_admin": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "小明"
+                },
+                "qq_number": {
+                    "type": "integer",
+                    "example": 12345678
+                },
+                "upload_token": {
+                    "type": "string",
+                    "example": "token_xyz"
+                },
+                "user_id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "user123"
+                },
+                "uuid": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "request.BatchCreatePlayRecordRequest": {
+            "type": "object",
+            "properties": {
+                "csv_filename": {
+                    "type": "string"
+                },
+                "is_replace": {
+                    "type": "boolean"
+                },
+                "play_records": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.PlayRecordBase"
+                    }
+                },
+                "upload_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "request.CreateSongRequest": {
+            "type": "object",
+            "properties": {
+                "album": {
+                    "type": "string",
+                    "example": "First Album"
+                },
+                "artist": {
+                    "type": "string",
+                    "example": "Artist Name"
+                },
+                "b15": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "bpm": {
+                    "type": "string",
+                    "example": "180"
+                },
+                "cover": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "genre": {
+                    "type": "string",
+                    "example": "Pop"
+                },
+                "illustrator": {
+                    "type": "string",
+                    "example": "Artist"
+                },
+                "length": {
+                    "type": "string",
+                    "example": "2:30"
+                },
+                "levels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.LevelInfo"
+                    }
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Song Title"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "wiki_id": {
+                    "type": "string",
+                    "example": "w123"
+                }
+            }
+        },
+        "request.CreateUserRequest": {
+            "type": "object",
+            "required": [
+                "email",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "account": {
+                    "type": "string",
+                    "example": "act_001"
+                },
+                "account_number": {
+                    "type": "integer",
+                    "example": 1001
+                },
+                "anonymous_probe": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "is_admin": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "小明"
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "secret123"
+                },
+                "qq_number": {
+                    "type": "integer",
+                    "example": 12345678
+                },
+                "upload_token": {
+                    "type": "string",
+                    "example": "token_xyz"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "user123"
+                },
+                "uuid": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
+        "request.UpdateSongRequest": {
+            "type": "object",
+            "required": [
+                "song_id"
+            ],
+            "properties": {
+                "album": {
+                    "type": "string",
+                    "example": "First Album"
+                },
+                "artist": {
+                    "type": "string",
+                    "example": "Artist Name"
+                },
+                "b15": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "bpm": {
+                    "type": "string",
+                    "example": "180"
+                },
+                "cover": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "genre": {
+                    "type": "string",
+                    "example": "Pop"
+                },
+                "illustrator": {
+                    "type": "string",
+                    "example": "Artist"
+                },
+                "length": {
+                    "type": "string",
+                    "example": "2:30"
+                },
+                "levels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.LevelInfo"
+                    }
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Song Title"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "wiki_id": {
+                    "type": "string",
+                    "example": "w123"
+                }
+            }
+        },
+        "request.UpdateUserRequest": {
+            "type": "object",
+            "properties": {
+                "account": {
+                    "type": "string"
+                },
+                "account_number": {
+                    "type": "integer"
+                },
+                "anonymous_probe": {
+                    "type": "boolean"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "qq_number": {
+                    "type": "integer"
+                },
+                "uuid": {
+                    "type": "string"
+                }
+            }
+        }
+    }
 }
