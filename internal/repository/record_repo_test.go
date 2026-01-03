@@ -127,14 +127,16 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 	createdOld, _ := songRepo.CreateSong(songOld)
 
 	// Create Records
-	repo.CreateRecord(&model.PlayRecord{
+	_, err := repo.CreateRecord(&model.PlayRecord{
 		PlayRecordBase: model.PlayRecordBase{SongLevelID: createdB15.SongLevels[0].SongLevelID, Score: 1000000},
 		Username:       "user_b50",
 	}, false)
-	repo.CreateRecord(&model.PlayRecord{
+	assert.NoError(t, err)
+	_, err = repo.CreateRecord(&model.PlayRecord{
 		PlayRecordBase: model.PlayRecordBase{SongLevelID: createdOld.SongLevels[0].SongLevelID, Score: 1000000},
 		Username:       "user_b50",
 	}, false)
+	assert.NoError(t, err)
 
 	t.Run("Get B50", func(t *testing.T) {
 		b35, b15, err := repo.GetBest50Records("user_b50", 0)

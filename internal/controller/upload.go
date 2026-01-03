@@ -24,7 +24,7 @@ func NewUploadController(userService *service.UserService) *UploadController {
 
 func generateRandomHex(n int) string {
 	bytes := make([]byte, n)
-	rand.Read(bytes)
+	_, _ = rand.Read(bytes)
 	return hex.EncodeToString(bytes)
 }
 

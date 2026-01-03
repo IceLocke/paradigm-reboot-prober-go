@@ -12,7 +12,7 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/gorm"
 
-	_ "paradigm-reboot-prober-go/docs"
+	_ "paradigm-reboot-prober-go/docs" // Swagger docs
 )
 
 // SetupRouter initializes the routes for the application

@@ -63,7 +63,7 @@ func GetRecordsFromCSV(filePath string) ([]model.PlayRecordBase, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Read the whole file to handle BOM and encoding easily
 	content, err := io.ReadAll(f)
@@ -129,10 +129,12 @@ func GenerateEmptyCSV(filePath string, songLevels []model.SongLevel) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Write UTF-8 BOM
-	f.Write([]byte("\ufeff"))
+	if _, err := f.Write([]byte("\ufeff")); err != nil {
+		return err
+	}
 
 	writer := csv.NewWriter(f)
 	header := []string{"song_level_id", "title", "version", "difficulty", "level", "score"}

@@ -41,7 +41,8 @@ func TestSongController(t *testing.T) {
 		w := performRequest(r, "GET", "/songs/1", nil, nil)
 		assert.Equal(t, http.StatusOK, w.Code)
 		var s model.Song
-		json.Unmarshal(w.Body.Bytes(), &s)
+		err := json.Unmarshal(w.Body.Bytes(), &s)
+		assert.NoError(t, err)
 		assert.Equal(t, "Test Song", s.Title)
 	})
 

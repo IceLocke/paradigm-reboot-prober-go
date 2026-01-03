@@ -61,7 +61,8 @@ func TestRecordController(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code)
 		var resp map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		err := json.Unmarshal(w.Body.Bytes(), &resp)
+		assert.NoError(t, err)
 		assert.Equal(t, "testuser", resp["username"])
 	})
 
@@ -71,9 +72,11 @@ func TestRecordController(t *testing.T) {
 
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
-		part, _ := writer.CreateFormFile("file", "test.csv")
-		part.Write([]byte(csvContent))
-		writer.Close()
+		part, err := writer.CreateFormFile("file", "test.csv")
+		assert.NoError(t, err)
+		_, err = part.Write([]byte(csvContent))
+		assert.NoError(t, err)
+		_ = writer.Close()
 
 		r.POST("/upload/csv", func(c *gin.Context) {
 			c.Set("username", "testuser")

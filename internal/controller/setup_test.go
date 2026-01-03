@@ -10,7 +10,6 @@ import (
 	"paradigm-reboot-prober-go/internal/service"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
@@ -33,13 +32,6 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	}
 
 	return db
-}
-
-func setupTestRouter() (*gin.Engine, *gorm.DB) {
-	gin.SetMode(gin.TestMode)
-	r := gin.Default()
-	db := setupTestDB(&testing.T{})
-	return r, db
 }
 
 func performRequest(r http.Handler, method, path string, body io.Reader, headers map[string]string) *httptest.ResponseRecorder {

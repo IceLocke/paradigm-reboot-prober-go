@@ -33,7 +33,8 @@ func TestUserController(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		var user model.User
-		json.Unmarshal(w.Body.Bytes(), &user)
+		err := json.Unmarshal(w.Body.Bytes(), &user)
+		assert.NoError(t, err)
 		assert.Equal(t, "testuser", user.Username)
 	})
 
@@ -46,7 +47,8 @@ func TestUserController(t *testing.T) {
 
 		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		var token model.Token
-		json.Unmarshal(w.Body.Bytes(), &token)
+		err := json.Unmarshal(w.Body.Bytes(), &token)
+		assert.NoError(t, err)
 		assert.NotEmpty(t, token.AccessToken)
 	})
 
@@ -59,7 +61,8 @@ func TestUserController(t *testing.T) {
 		w := performRequest(r, "GET", "/me", nil, nil)
 		assert.Equal(t, http.StatusOK, w.Code)
 		var user model.User
-		json.Unmarshal(w.Body.Bytes(), &user)
+		err := json.Unmarshal(w.Body.Bytes(), &user)
+		assert.NoError(t, err)
 		assert.Equal(t, "testuser", user.Username)
 	})
 

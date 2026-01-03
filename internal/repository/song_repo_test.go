@@ -50,7 +50,8 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 			{Difficulty: model.DifficultyInvaded, Level: 10.0, Notes: 500},
 		},
 	}
-	repo.CreateSong(song)
+	_, err := repo.CreateSong(song)
+	assert.NoError(t, err)
 
 	t.Run("Update Song Metadata and Levels", func(t *testing.T) {
 		updatedSong := &model.Song{
@@ -102,7 +103,8 @@ func TestSongRepository_GetSong(t *testing.T) {
 	song := &model.Song{
 		SongBase: model.SongBase{WikiID: "find_me", Title: "Find Me"},
 	}
-	repo.CreateSong(song)
+	_, err := repo.CreateSong(song)
+	assert.NoError(t, err)
 
 	t.Run("Get By ID", func(t *testing.T) {
 		found, err := repo.GetSongByID(song.SongID)

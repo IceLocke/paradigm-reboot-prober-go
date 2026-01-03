@@ -40,22 +40,22 @@ func (r *UserRepository) GetUserByUploadToken(token string) (*model.User, error)
 }
 
 // CreateUser creates a new user
-func (r *UserRepository) CreateUser(user *model.User) error {
+func (r *UserRepository) CreateUser(user *model.User) (*model.User, error) {
 	// Set default nickname if not provided
 	if user.Nickname == "" {
 		user.Nickname = user.Username
 	}
 
 	if err := r.db.Create(user).Error; err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return user, nil
 }
 
 // UpdateUser updates an existing user's information (PUT semantics)
-func (r *UserRepository) UpdateUser(user *model.User) error {
+func (r *UserRepository) UpdateUser(user *model.User) (*model.User, error) {
 	if err := r.db.Save(user).Error; err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return user, nil
 }

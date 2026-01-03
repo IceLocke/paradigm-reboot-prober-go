@@ -33,8 +33,8 @@ func TestGenerateEmptyCSVAndGetRecords(t *testing.T) {
 	// Setup temporary file
 	tmpFile, err := os.CreateTemp("", "test_*.csv")
 	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
-	tmpFile.Close()
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = tmpFile.Close()
 
 	songLevels := []model.SongLevel{
 		{
@@ -76,11 +76,12 @@ func TestGenerateEmptyCSVAndGetRecords(t *testing.T) {
 func TestGetRecordsFromCSV_Malformed(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "malformed_*.csv")
 	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	content := "song_level_id,score\n1,1000000\ninvalid,row\n2,900000"
-	tmpFile.WriteString(content)
-	tmpFile.Close()
+	_, err = tmpFile.WriteString(content)
+	assert.NoError(t, err)
+	_ = tmpFile.Close()
 
 	records, err := GetRecordsFromCSV(tmpFile.Name())
 	assert.NoError(t, err)
@@ -92,7 +93,7 @@ func TestGetRecordsFromCSV_Malformed(t *testing.T) {
 func TestGetRecordsFromCSV_GBK(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "gbk_*.csv")
 	assert.NoError(t, err)
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	// GBK encoded content: "song_level_id,score\n1,1000000"
 	// In GBK, these characters are the same as ASCII, but we can add some Chinese to be sure

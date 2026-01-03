@@ -23,14 +23,14 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			},
 			EncodedPassword: "encoded_password",
 		}
-		err := repo.CreateUser(user)
+		createdUser, err := repo.CreateUser(user)
 		assert.NoError(t, err)
-		assert.NotNil(t, user)
-		assert.Equal(t, "testuser", user.Username)
-		assert.Equal(t, "Test User", user.Nickname)
-		assert.Equal(t, "token123", user.UploadToken)
-		assert.True(t, user.IsActive)
-		assert.False(t, user.IsAdmin)
+		assert.NotNil(t, createdUser)
+		assert.Equal(t, "testuser", createdUser.Username)
+		assert.Equal(t, "Test User", createdUser.Nickname)
+		assert.Equal(t, "token123", createdUser.UploadToken)
+		assert.True(t, createdUser.IsActive)
+		assert.False(t, createdUser.IsAdmin)
 	})
 
 	t.Run("Create User Default Nickname", func(t *testing.T) {
@@ -42,9 +42,9 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			},
 			EncodedPassword: "pass",
 		}
-		err := repo.CreateUser(user)
+		createdUser, err := repo.CreateUser(user)
 		assert.NoError(t, err)
-		assert.Equal(t, "user_no_nick", user.Nickname)
+		assert.Equal(t, "user_no_nick", createdUser.Nickname)
 	})
 
 	t.Run("Create Duplicate User", func(t *testing.T) {
@@ -56,7 +56,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			},
 			EncodedPassword: "pass",
 		}
-		err := repo.CreateUser(user1)
+		_, err := repo.CreateUser(user1)
 		assert.NoError(t, err)
 
 		user2 := &model.User{
@@ -67,7 +67,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			},
 			EncodedPassword: "pass",
 		}
-		err = repo.CreateUser(user2)
+		_, err = repo.CreateUser(user2)
 		assert.Error(t, err) // Should fail due to unique constraint
 	})
 }
@@ -85,7 +85,8 @@ func TestUserRepository_GetUserByUsername(t *testing.T) {
 		},
 		EncodedPassword: "pass",
 	}
-	repo.CreateUser(user)
+	_, err := repo.CreateUser(user)
+	assert.NoError(t, err)
 
 	t.Run("User Found", func(t *testing.T) {
 		foundUser, err := repo.GetUserByUsername("findme")
@@ -115,7 +116,8 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		},
 		EncodedPassword: "pass",
 	}
-	repo.CreateUser(user)
+	_, err := repo.CreateUser(user)
+	assert.NoError(t, err)
 
 	t.Run("Update Fields", func(t *testing.T) {
 		// Fetch user first
@@ -127,14 +129,15 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		userToUpdate.Nickname = newNick
 		userToUpdate.QQNumber = &newQQ
 
-		err := repo.UpdateUser(userToUpdate)
+		updatedUser, err := repo.UpdateUser(userToUpdate)
 		assert.NoError(t, err)
+		assert.Equal(t, "Updated Nick", updatedUser.Nickname)
 
 		// Verify
-		updatedUser, _ := repo.GetUserByUsername("update_target")
-		assert.Equal(t, "Updated Nick", updatedUser.Nickname)
-		assert.NotNil(t, updatedUser.QQNumber)
-		assert.Equal(t, 123456, *updatedUser.QQNumber)
+		fetchedUser, _ := repo.GetUserByUsername("update_target")
+		assert.Equal(t, "Updated Nick", fetchedUser.Nickname)
+		assert.NotNil(t, fetchedUser.QQNumber)
+		assert.Equal(t, 123456, *fetchedUser.QQNumber)
 	})
 
 	t.Run("Idempotency Check (PUT semantics)", func(t *testing.T) {
@@ -142,7 +145,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		newAccount := "new_account"
 		userToUpdate.Account = &newAccount
 
-		err := repo.UpdateUser(userToUpdate)
+		_, err := repo.UpdateUser(userToUpdate)
 		assert.NoError(t, err)
 
 		updatedUser, _ := repo.GetUserByUsername("update_target")

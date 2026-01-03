@@ -78,10 +78,7 @@ func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, e
 	user.IsActive = true
 	user.IsAdmin = false
 
-	if err := s.userRepo.CreateUser(user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.userRepo.CreateUser(user)
 }
 
 func (s *UserService) RefreshUploadToken(username string) (string, error) {
@@ -98,7 +95,7 @@ func (s *UserService) RefreshUploadToken(username string) (string, error) {
 		return "", errors.New("generate token failed")
 	}
 	user.UploadToken = uploadToken
-	if err := s.userRepo.UpdateUser(user); err != nil {
+	if _, err := s.userRepo.UpdateUser(user); err != nil {
 		return "", err
 	}
 	return uploadToken, nil
@@ -132,10 +129,7 @@ func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest
 		user.AnonymousProbe = *req.AnonymousProbe
 	}
 
-	if err := s.userRepo.UpdateUser(user); err != nil {
-		return nil, err
-	}
-	return user, nil
+	return s.userRepo.UpdateUser(user)
 }
 
 func (s *UserService) CheckProbeAuthority(username string, currentUser *model.User) error {
