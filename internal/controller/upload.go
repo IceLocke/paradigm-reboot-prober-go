@@ -10,6 +10,7 @@ import (
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/service"
 	"path/filepath"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,9 +24,14 @@ func NewUploadController(userService *service.UserService) *UploadController {
 }
 
 func generateRandomHex(n int) string {
-	bytes := make([]byte, n)
-	_, _ = rand.Read(bytes)
-	return hex.EncodeToString(bytes)
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		// Fallback to a less ideal but functional approach
+		for i := range b {
+			b[i] = byte(i ^ 0xAB)
+		}
+	}
+	return hex.EncodeToString(b)
 }
 
 // UploadCSV godoc
@@ -53,13 +59,13 @@ func (ctrl *UploadController) UploadCSV(c *gin.Context) {
 		return
 	}
 
-	if filepath.Ext(file.Filename) != ".csv" {
+	if !strings.EqualFold(filepath.Ext(file.Filename), ".csv") {
 		c.JSON(http.StatusBadRequest, model.Response{Error: "only CSV files are allowed"})
 		return
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(config.GlobalConfig.Upload.CSVPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(config.GlobalConfig.Upload.CSVPath, 0750); err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to create upload directory"})
 		return
 	}
@@ -103,12 +109,14 @@ func (ctrl *UploadController) UploadImg(c *gin.Context) {
 	}
 
 	// Ensure directory exists
-	if err := os.MkdirAll(config.GlobalConfig.Upload.ImgPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(config.GlobalConfig.Upload.ImgPath, 0750); err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to create upload directory"})
 		return
 	}
 
-	filename := fmt.Sprintf("%s_%s%s", generateRandomHex(8), file.Filename, filepath.Ext(file.Filename))
+	// Sanitize filename to prevent path traversal
+	safeFilename := filepath.Base(file.Filename)
+	filename := fmt.Sprintf("%s_%s", generateRandomHex(8), safeFilename)
 	dst := filepath.Join(config.GlobalConfig.Upload.ImgPath, filename)
 
 	if err := c.SaveUploadedFile(file, dst); err != nil {

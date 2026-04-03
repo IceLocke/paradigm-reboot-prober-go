@@ -17,7 +17,7 @@ import (
 
 // SetupRouter initializes the routes for the application
 func SetupRouter(db *gorm.DB) *gin.Engine {
-	r := gin.Default()
+	r := gin.Default() // gin.Default() already includes Logger and Recovery middleware
 
 	// Initialize Repositories
 	userRepo := repository.NewUserRepository(db)
@@ -35,9 +35,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	recordCtrl := controller.NewRecordController(recordService, userService)
 	uploadCtrl := controller.NewUploadController(userService)
 
-	r.Use(gin.Logger())
-	r.Use(gin.Recovery())
-
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "up",
@@ -46,43 +43,47 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	v1 := r.Group("/api/v2")
+	v2 := r.Group("/api/v2")
 	{
 		// Public routes
-		v1.POST("/user/register", userCtrl.Register)
-		v1.POST("/user/login", userCtrl.Login)
-		v1.GET("/songs", songCtrl.GetAllSongLevels)
-		v1.GET("/songs/:song_id", songCtrl.GetSingleSongInfo)
+		v2.POST("/user/register", userCtrl.Register)
+		v2.POST("/user/login", userCtrl.Login)
+		v2.GET("/songs", songCtrl.GetAllCharts)
+		v2.GET("/songs/:song_id", songCtrl.GetSingleSongInfo)
 
 		// Routes with optional auth
-		optionalAuth := v1.Group("")
+		optionalAuth := v2.Group("")
 		optionalAuth.Use(middleware.OptionalAuthMiddleware())
 		{
 			optionalAuth.GET("/records/:username", recordCtrl.GetPlayRecords)
-			optionalAuth.GET("/records/:username/export/csv", recordCtrl.ExportCSV)
-			optionalAuth.GET("/records/:username/export/b50", recordCtrl.GetB50Img)
-			optionalAuth.GET("/records/:username/trends", recordCtrl.GetB50Trends)
+
+			// Record upload: under optional auth so upload-token-based auth works
+			// (handler performs its own authorization check)
+			optionalAuth.POST("/records/:username", recordCtrl.UploadRecords)
 		}
 
 		// Protected routes
-		auth := v1.Group("")
+		auth := v2.Group("")
 		auth.Use(middleware.AuthMiddleware())
 		{
 			// User routes
 			auth.GET("/user/me", userCtrl.GetMe)
 			auth.PUT("/user/me", userCtrl.UpdateMe)
 			auth.POST("/user/me/upload-token", userCtrl.RefreshUploadToken)
-
-			// Record routes
-			auth.POST("/records/:username", recordCtrl.UploadRecords)
+			auth.PUT("/user/me/password", userCtrl.ChangePassword)
 
 			// Upload routes
 			auth.POST("/upload/csv", uploadCtrl.UploadCSV)
 			auth.POST("/upload/img", uploadCtrl.UploadImg)
 
-			// Admin routes (Admin check should be inside controller or another middleware)
-			auth.POST("/songs", songCtrl.CreateSong)
-			auth.PUT("/songs", songCtrl.UpdateSong)
+			// Admin routes (with admin middleware)
+			admin := auth.Group("")
+			admin.Use(middleware.AdminMiddleware(userService))
+			{
+				admin.POST("/songs", songCtrl.CreateSong)
+				admin.PUT("/songs", songCtrl.UpdateSong)
+				admin.POST("/user/reset-password", userCtrl.ResetPassword)
+			}
 		}
 	}
 

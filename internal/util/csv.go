@@ -15,21 +15,21 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// GenerateCSV generates a CSV string from a list of SongLevelWithScore records
-func GenerateCSV(records []model.SongLevelWithScore) (string, error) {
+// GenerateCSV generates a CSV string from a list of ChartWithScore records
+func GenerateCSV(records []model.ChartWithScore) (string, error) {
 	var buf bytes.Buffer
 	// Write UTF-8 BOM for Excel compatibility
 	buf.Write([]byte("\ufeff"))
 
 	writer := csv.NewWriter(&buf)
-	header := []string{"song_level_id", "title", "version", "difficulty", "level", "score"}
+	header := []string{"chart_id", "title", "version", "difficulty", "level", "score"}
 	if err := writer.Write(header); err != nil {
 		return "", err
 	}
 
 	for _, rec := range records {
 		row := []string{
-			strconv.Itoa(rec.SongLevelID),
+			strconv.Itoa(rec.ChartID),
 			rec.Title,
 			rec.Version,
 			string(rec.Difficulty),
@@ -105,17 +105,20 @@ func GetRecordsFromCSV(filePath string) ([]model.PlayRecordBase, error) {
 
 		record := model.PlayRecordBase{}
 
-		if idx, ok := headerMap["song_level_id"]; ok && idx < len(row) {
+		if idx, ok := headerMap["chart_id"]; ok && idx < len(row) {
 			id, _ := strconv.Atoi(row[idx])
-			record.SongLevelID = id
+			record.ChartID = id
 		}
 
 		if idx, ok := headerMap["score"]; ok && idx < len(row) {
-			score, _ := strconv.Atoi(row[idx])
+			score, err := strconv.Atoi(row[idx])
+			if err != nil {
+				continue // Skip rows with invalid score
+			}
 			record.Score = score
 		}
 
-		if record.SongLevelID != 0 {
+		if record.ChartID != 0 {
 			records = append(records, record)
 		}
 	}
@@ -123,8 +126,8 @@ func GetRecordsFromCSV(filePath string) ([]model.PlayRecordBase, error) {
 	return records, nil
 }
 
-// GenerateEmptyCSV creates a default CSV file with headers and song level info
-func GenerateEmptyCSV(filePath string, songLevels []model.SongLevel) error {
+// GenerateEmptyCSV creates a default CSV file with headers and chart info
+func GenerateEmptyCSV(filePath string, charts []model.Chart) error {
 	f, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -137,25 +140,25 @@ func GenerateEmptyCSV(filePath string, songLevels []model.SongLevel) error {
 	}
 
 	writer := csv.NewWriter(f)
-	header := []string{"song_level_id", "title", "version", "difficulty", "level", "score"}
+	header := []string{"chart_id", "title", "version", "difficulty", "level", "score"}
 	if err := writer.Write(header); err != nil {
 		return err
 	}
 
-	for _, sl := range songLevels {
+	for _, chart := range charts {
 		title := ""
 		version := ""
-		if sl.Song != nil {
-			title = sl.Song.Title
-			version = sl.Song.Version
+		if chart.Song != nil {
+			title = chart.Song.Title
+			version = chart.Song.Version
 		}
 
 		row := []string{
-			strconv.Itoa(sl.SongLevelID),
+			strconv.Itoa(chart.ChartID),
 			title,
 			version,
-			string(sl.Difficulty),
-			strconv.FormatFloat(sl.Level, 'f', 1, 64),
+			string(chart.Difficulty),
+			strconv.FormatFloat(chart.Level, 'f', 1, 64),
 			"0",
 		}
 		if err := writer.Write(row); err != nil {

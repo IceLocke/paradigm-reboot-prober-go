@@ -49,8 +49,8 @@ func TestSongService(t *testing.T) {
 		assert.Equal(t, song.SongID, songByID.SongID)
 	})
 
-	t.Run("GetAllSongLevels", func(t *testing.T) {
-		levels, err := songService.GetAllSongLevels()
+	t.Run("GetAllCharts", func(t *testing.T) {
+		levels, err := songService.GetAllCharts()
 		assert.NoError(t, err)
 		assert.NotEmpty(t, levels)
 		assert.Equal(t, "Test Song", levels[0].Title)

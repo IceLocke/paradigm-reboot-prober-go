@@ -1,11 +1,113 @@
 basePath: /api/v2
 definitions:
+  model.Chart:
+    properties:
+      chart_id:
+        type: integer
+      difficulty:
+        allOf:
+        - $ref: '#/definitions/model.Difficulty'
+        example: massive
+      fitting_level:
+        type: number
+      level:
+        type: number
+      level_design:
+        type: string
+      notes:
+        type: integer
+      song:
+        $ref: '#/definitions/model.Song'
+      song_id:
+        type: integer
+    type: object
+  model.ChartInfo:
+    properties:
+      album:
+        example: First Album
+        type: string
+      artist:
+        example: Artist Name
+        type: string
+      b15:
+        example: false
+        type: boolean
+      bpm:
+        example: "180"
+        type: string
+      chart_id:
+        example: 10
+        type: integer
+      cover:
+        example: https://example.com/cover.jpg
+        type: string
+      difficulty:
+        allOf:
+        - $ref: '#/definitions/model.Difficulty'
+        example: massive
+      fitting_level:
+        example: 13.4
+        type: number
+      genre:
+        example: Pop
+        type: string
+      illustrator:
+        example: Artist
+        type: string
+      length:
+        example: "2:30"
+        type: string
+      level:
+        example: 13.2
+        type: number
+      level_design:
+        example: Designer
+        type: string
+      notes:
+        example: 850
+        type: integer
+      song_id:
+        example: 1
+        type: integer
+      title:
+        example: Song Title
+        type: string
+      version:
+        example: 1.0.0
+        type: string
+      wiki_id:
+        example: w123
+        type: string
+    type: object
+  model.ChartInfoSimple:
+    properties:
+      b15:
+        type: boolean
+      chart_id:
+        type: integer
+      cover:
+        type: string
+      difficulty:
+        $ref: '#/definitions/model.Difficulty'
+      fitting_level:
+        type: number
+      level:
+        type: number
+      song_id:
+        type: integer
+      title:
+        type: string
+      version:
+        type: string
+      wiki_id:
+        type: string
+    type: object
   model.Difficulty:
     enum:
-    - Detected
-    - Invaded
-    - Massive
-    - Reboot
+    - detected
+    - invaded
+    - massive
+    - reboot
     type: string
     x-enum-varnames:
     - DifficultyDetected
@@ -17,7 +119,7 @@ definitions:
       difficulty:
         allOf:
         - $ref: '#/definitions/model.Difficulty'
-        example: Massive
+        example: massive
       level:
         example: 14.5
         type: number
@@ -30,6 +132,11 @@ definitions:
     type: object
   model.PlayRecord:
     properties:
+      chart:
+        $ref: '#/definitions/model.Chart'
+      chart_id:
+        example: 1
+        type: integer
       play_record_id:
         type: integer
       rating:
@@ -38,32 +145,29 @@ definitions:
         type: string
       score:
         example: 1000000
-        type: integer
-      song_level:
-        $ref: '#/definitions/model.SongLevel'
-      song_level_id:
-        example: 1
+        minimum: 0
         type: integer
       username:
         type: string
     required:
-    - score
-    - song_level_id
+    - chart_id
     type: object
   model.PlayRecordBase:
     properties:
-      score:
-        example: 1000000
-        type: integer
-      song_level_id:
+      chart_id:
         example: 1
         type: integer
+      score:
+        example: 1000000
+        minimum: 0
+        type: integer
     required:
-    - score
-    - song_level_id
+    - chart_id
     type: object
   model.PlayRecordInfo:
     properties:
+      chart:
+        $ref: '#/definitions/model.ChartInfoSimple'
       play_record_id:
         type: integer
       rating:
@@ -72,8 +176,6 @@ definitions:
         type: string
       score:
         type: integer
-      song_level:
-        $ref: '#/definitions/model.SongLevelInfoSimple'
     type: object
   model.PlayRecordResponse:
     properties:
@@ -107,79 +209,13 @@ definitions:
       bpm:
         example: "180"
         type: string
-      cover:
-        example: https://example.com/cover.jpg
-        type: string
-      genre:
-        example: Pop
-        type: string
-      illustrator:
-        example: Artist
-        type: string
-      length:
-        example: "2:30"
-        type: string
-      song_id:
-        type: integer
-      song_levels:
+      charts:
         items:
-          $ref: '#/definitions/model.SongLevel'
+          $ref: '#/definitions/model.Chart'
         type: array
-      title:
-        example: Song Title
-        type: string
-      version:
-        example: 1.0.0
-        type: string
-      wiki_id:
-        example: w123
-        type: string
-    type: object
-  model.SongLevel:
-    properties:
-      difficulty:
-        allOf:
-        - $ref: '#/definitions/model.Difficulty'
-        example: Massive
-      fitting_level:
-        type: number
-      level:
-        type: number
-      level_design:
-        type: string
-      notes:
-        type: integer
-      song:
-        $ref: '#/definitions/model.Song'
-      song_id:
-        type: integer
-      song_level_id:
-        type: integer
-    type: object
-  model.SongLevelInfo:
-    properties:
-      album:
-        example: First Album
-        type: string
-      artist:
-        example: Artist Name
-        type: string
-      b15:
-        example: false
-        type: boolean
-      bpm:
-        example: "180"
-        type: string
       cover:
         example: https://example.com/cover.jpg
         type: string
-      difficulty:
-        allOf:
-        - $ref: '#/definitions/model.Difficulty'
-        example: Massive
-      fitting_level:
-        example: 13.4
-        type: number
       genre:
         example: Pop
         type: string
@@ -189,20 +225,7 @@ definitions:
       length:
         example: "2:30"
         type: string
-      level:
-        example: 13.2
-        type: number
-      level_design:
-        example: Designer
-        type: string
-      notes:
-        example: 850
-        type: integer
       song_id:
-        example: 1
-        type: integer
-      song_level_id:
-        example: 10
         type: integer
       title:
         example: Song Title
@@ -212,29 +235,6 @@ definitions:
         type: string
       wiki_id:
         example: w123
-        type: string
-    type: object
-  model.SongLevelInfoSimple:
-    properties:
-      b15:
-        type: boolean
-      cover:
-        type: string
-      difficulty:
-        $ref: '#/definitions/model.Difficulty'
-      fitting_level:
-        type: number
-      level:
-        type: number
-      song_id:
-        type: integer
-      song_level_id:
-        type: integer
-      title:
-        type: string
-      version:
-        type: string
-      wiki_id:
         type: string
     type: object
   model.Token:
@@ -308,6 +308,19 @@ definitions:
         type: array
       upload_token:
         type: string
+    type: object
+  request.ChangePasswordRequest:
+    properties:
+      new_password:
+        example: newpass456
+        minLength: 6
+        type: string
+      old_password:
+        example: oldpass123
+        type: string
+    required:
+    - new_password
+    - old_password
     type: object
   request.CreateSongRequest:
     properties:
@@ -393,6 +406,19 @@ definitions:
     - password
     - username
     type: object
+  request.ResetPasswordRequest:
+    properties:
+      new_password:
+        example: newpass456
+        minLength: 6
+        type: string
+      username:
+        example: targetuser
+        type: string
+    required:
+    - new_password
+    - username
+    type: object
   request.UpdateSongRequest:
     properties:
       album:
@@ -452,7 +478,7 @@ definitions:
       uuid:
         type: string
     type: object
-host: https://api.prp.icel.site
+host: api.prp.icel.site
 info:
   contact:
     email: support@swagger.io
@@ -468,7 +494,8 @@ info:
 paths:
   /records/{username}:
     get:
-      description: Retrieve play records for a user based on scope (b50, best, all)
+      description: Retrieve play records for a user based on scope (b50, best, all,
+        all-charts)
       parameters:
       - description: Username
         in: path
@@ -476,7 +503,7 @@ paths:
         required: true
         type: string
       - default: b50
-        description: Scope (b50, best, all)
+        description: Scope (b50, best, all, all-charts)
         in: query
         name: scope
         type: string
@@ -563,78 +590,9 @@ paths:
       summary: Upload play records
       tags:
       - record
-  /records/{username}/export/b50:
-    get:
-      description: Generate and return B50 image for a user
-      parameters:
-      - description: Username
-        in: path
-        name: username
-        required: true
-        type: string
-      produces:
-      - image/png
-      responses:
-        "200":
-          description: OK
-          schema:
-            type: file
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.Response'
-      summary: Get B50 image
-      tags:
-      - record
-  /records/{username}/export/csv:
-    get:
-      description: Export all best records for a user to CSV
-      parameters:
-      - description: Username
-        in: path
-        name: username
-        required: true
-        type: string
-      produces:
-      - text/csv
-      responses:
-        "200":
-          description: CSV content
-          schema:
-            type: string
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.Response'
-      summary: Export records to CSV
-      tags:
-      - record
-  /records/{username}/trends:
-    get:
-      description: Get B50 rating trends for a user
-      parameters:
-      - description: Username
-        in: path
-        name: username
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.Response'
-      summary: Get B50 trends
-      tags:
-      - record
   /songs:
     get:
-      description: Retrieve a list of all song levels with their details
+      description: Retrieve a list of all charts with their details
       produces:
       - application/json
       responses:
@@ -642,19 +600,19 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/model.SongLevelInfo'
+              $ref: '#/definitions/model.ChartInfo'
             type: array
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/model.Response'
-      summary: Get all song levels
+      summary: Get all charts
       tags:
       - song
     post:
       consumes:
       - application/json
-      description: Create a new song with its levels (Admin only)
+      description: Create a new song with its charts (Admin only)
       parameters:
       - description: Song creation info
         in: body
@@ -669,7 +627,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/model.SongLevelInfo'
+              $ref: '#/definitions/model.ChartInfo'
             type: array
         "400":
           description: Bad Request
@@ -683,7 +641,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Update song details and its levels (Admin only)
+      description: Update song details and its charts (Admin only)
       parameters:
       - description: Song update info
         in: body
@@ -698,7 +656,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/model.SongLevelInfo'
+              $ref: '#/definitions/model.ChartInfo'
             type: array
         "400":
           description: Bad Request
@@ -883,6 +841,38 @@ paths:
       summary: Update current user info
       tags:
       - user
+  /user/me/password:
+    put:
+      consumes:
+      - application/json
+      description: Change the current user's password
+      parameters:
+      - description: Password change info
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - user
   /user/me/upload-token:
     post:
       description: Generate a new upload token for the current user
@@ -928,4 +918,38 @@ paths:
       summary: Register a new user
       tags:
       - user
+  /user/reset-password:
+    post:
+      consumes:
+      - application/json
+      description: Reset a user's password by admin
+      parameters:
+      - description: Password reset info
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ResetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/model.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/model.Response'
+      security:
+      - BearerAuth: []
+      summary: Reset user password (Admin only)
+      tags:
+      - user
+schemes:
+- https
 swagger: "2.0"

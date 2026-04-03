@@ -35,7 +35,7 @@ func SingleRating(level float64, score int) int {
 		rating = 10 * (level + 2*term)
 	} else {
 		// for bound, reward in zip(bounds, rewards):
-		//     rating += reward if score >= bound else 0
+		// rating += reward if score >= bound else 0
 		for i, bound := range bounds {
 			if score >= bound {
 				rating += rewards[i]

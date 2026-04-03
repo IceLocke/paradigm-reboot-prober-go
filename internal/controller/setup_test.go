@@ -23,7 +23,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	err = db.AutoMigrate(
 		&model.User{},
 		&model.Song{},
-		&model.SongLevel{},
+		&model.Chart{},
 		&model.PlayRecord{},
 		&model.BestPlayRecord{},
 	)

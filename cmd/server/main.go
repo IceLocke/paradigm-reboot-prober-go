@@ -19,11 +19,17 @@ import (
 // @license.name  Apache 2.0
 // @license.url   http://www.apache.org/licenses/LICENSE-2.0.html
 
-// @host      https://api.prp.icel.site
+// @host      api.prp.icel.site
+// @schemes   https
 // @BasePath  /api/v2
 func main() {
 	// Load Configuration
 	config.LoadConfig("config/config.yaml")
+
+	// Validate JWT secret key
+	if config.GlobalConfig.Auth.SecretKey == "your_secret_key_here" {
+		log.Fatal("JWT secret key must be changed from default value")
+	}
 
 	// Initialize Database
 	util.InitDB()

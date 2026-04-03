@@ -18,7 +18,7 @@ func NewSongRepository(db *gorm.DB) *SongRepository {
 // GetAllSongs retrieves all songs
 func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 	var songs []model.Song
-	if err := r.db.Preload("SongLevels").Find(&songs).Error; err != nil {
+	if err := r.db.Preload("Charts").Find(&songs).Error; err != nil {
 		return nil, err
 	}
 	return songs, nil
@@ -27,7 +27,7 @@ func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 // GetSongByID retrieves a song by its ID
 func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 	var song model.Song
-	if err := r.db.Preload("SongLevels").Where("song_id = ?", songID).First(&song).Error; err != nil {
+	if err := r.db.Preload("Charts").Where("song_id = ?", songID).First(&song).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -39,7 +39,7 @@ func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 // GetSongByWikiID retrieves a song by its Wiki ID
 func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 	var song model.Song
-	if err := r.db.Preload("SongLevels").Where("wiki_id = ?", wikiID).First(&song).Error; err != nil {
+	if err := r.db.Preload("Charts").Where("wiki_id = ?", wikiID).First(&song).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -48,7 +48,7 @@ func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 	return &song, nil
 }
 
-// CreateSong creates a new song with its levels
+// CreateSong creates a new song with its charts
 func (r *SongRepository) CreateSong(song *model.Song) (*model.Song, error) {
 	// GORM handles association creation automatically if configured correctly
 	if err := r.db.Create(song).Error; err != nil {
@@ -57,52 +57,53 @@ func (r *SongRepository) CreateSong(song *model.Song) (*model.Song, error) {
 	return song, nil
 }
 
-// UpdateSong updates an existing song and its levels
+// UpdateSong updates an existing song and its charts
 func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model.Song, error) {
 	var result *model.Song
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		var existingSong model.Song
-		if err := tx.Preload("SongLevels").First(&existingSong, songID).Error; err != nil {
+		if err := tx.Preload("Charts").First(&existingSong, songID).Error; err != nil {
 			return err
 		}
 
 		// Update basic attributes
 		existingSong.Title = updatedSong.Title
 		existingSong.Artist = updatedSong.Artist
+		existingSong.Genre = updatedSong.Genre
 		existingSong.Cover = updatedSong.Cover
 		existingSong.Illustrator = updatedSong.Illustrator
+		existingSong.Version = updatedSong.Version
 		existingSong.BPM = updatedSong.BPM
 		existingSong.B15 = updatedSong.B15
 		existingSong.Album = updatedSong.Album
+		existingSong.Length = updatedSong.Length
 		existingSong.WikiID = updatedSong.WikiID
-		// Add other fields if necessary
 
 		if err := tx.Save(&existingSong).Error; err != nil {
 			return err
 		}
 
-		// Update Song Levels
-		// Strategy: Map existing levels by Difficulty, update if exists, create if new
-		existingLevelsMap := make(map[model.Difficulty]*model.SongLevel)
-		for i := range existingSong.SongLevels {
-			level := &existingSong.SongLevels[i]
-			existingLevelsMap[level.Difficulty] = level
+		// Update Charts
+		// Strategy: Map existing charts by Difficulty, update if exists, create if new
+		existingLevelsMap := make(map[model.Difficulty]*model.Chart)
+		for i := range existingSong.Charts {
+			chart := &existingSong.Charts[i]
+			existingLevelsMap[chart.Difficulty] = chart
 		}
 
-		for _, newLevel := range updatedSong.SongLevels {
-			if existingLevel, exists := existingLevelsMap[newLevel.Difficulty]; exists {
-				// Update existing level
-				existingLevel.Level = newLevel.Level
-				existingLevel.LevelDesign = newLevel.LevelDesign
-				existingLevel.Notes = newLevel.Notes
-				existingLevel.FittingLevel = newLevel.FittingLevel
-				if err := tx.Save(existingLevel).Error; err != nil {
+		for _, newChart := range updatedSong.Charts {
+			if existingChart, exists := existingLevelsMap[newChart.Difficulty]; exists {
+				// Update existing chart
+				existingChart.Level = newChart.Level
+				existingChart.LevelDesign = newChart.LevelDesign
+				existingChart.Notes = newChart.Notes
+				if err := tx.Save(existingChart).Error; err != nil {
 					return err
 				}
 			} else {
-				// Create new level
-				newLevel.SongID = existingSong.SongID
-				if err := tx.Create(&newLevel).Error; err != nil {
+				// Create new chart
+				newChart.SongID = existingSong.SongID
+				if err := tx.Create(&newChart).Error; err != nil {
 					return err
 				}
 			}

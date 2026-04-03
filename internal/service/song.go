@@ -15,27 +15,28 @@ func NewSongService(songRepo *repository.SongRepository) *SongService {
 	return &SongService{songRepo: songRepo}
 }
 
-func (s *SongService) GetAllSongLevels() ([]model.SongLevelInfo, error) {
+func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 	songs, err := s.songRepo.GetAllSongs()
 	if err != nil {
 		return nil, err
 	}
 
-	var songLevels []model.SongLevelInfo
+	var charts []model.ChartInfo
 	for _, song := range songs {
-		for _, level := range song.SongLevels {
-			songLevels = append(songLevels, model.SongLevelInfo{
-				SongBase:    song.SongBase,
-				SongID:      song.SongID,
-				SongLevelID: level.SongLevelID,
-				Difficulty:  level.Difficulty,
-				Level:       level.Level,
-				Notes:       level.Notes,
-				// Add other fields as needed
+		for _, level := range song.Charts {
+			charts = append(charts, model.ChartInfo{
+				SongBase:     song.SongBase,
+				SongID:       song.SongID,
+				ChartID:      level.ChartID,
+				Difficulty:   level.Difficulty,
+				Level:        level.Level,
+				FittingLevel: level.FittingLevel,
+				LevelDesign:  level.LevelDesign,
+				Notes:        level.Notes,
 			})
 		}
 	}
-	return songLevels, nil
+	return charts, nil
 }
 
 func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error) {
@@ -48,7 +49,7 @@ func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error)
 	case "wiki":
 		return nil, errors.New("wiki source not implemented yet")
 	default:
-		return nil, nil
+		return nil, errors.New("unsupported source type")
 	}
 
 	if err != nil {
@@ -77,7 +78,7 @@ func (s *SongService) GetSingleSongByWikiID(wikiID string) (*model.Song, error) 
 	return song, nil
 }
 
-func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.SongLevelInfo, error) {
+func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartInfo, error) {
 	// Map request to model.Song
 	song := &model.Song{
 		SongBase: req.SongBase,
@@ -85,13 +86,13 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.SongLe
 
 	// Map levels
 	for _, levelInfo := range req.Levels {
-		songLevel := model.SongLevel{
+		chart := model.Chart{
 			Difficulty:  levelInfo.Difficulty,
 			Level:       levelInfo.Level,
 			LevelDesign: &levelInfo.LevelDesign,
 			Notes:       levelInfo.Notes,
 		}
-		song.SongLevels = append(song.SongLevels, songLevel)
+		song.Charts = append(song.Charts, chart)
 	}
 
 	createdSong, err := s.songRepo.CreateSong(song)
@@ -100,26 +101,25 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.SongLe
 	}
 
 	// Convert to response format
-	var songLevels []model.SongLevelInfo
-	for _, level := range createdSong.SongLevels {
-		info := model.SongLevelInfo{
-			SongBase:    createdSong.SongBase,
-			SongID:      createdSong.SongID,
-			SongLevelID: level.SongLevelID,
-			Difficulty:  level.Difficulty,
-			Level:       level.Level,
-			Notes:       level.Notes,
+	var charts []model.ChartInfo
+	for _, level := range createdSong.Charts {
+		info := model.ChartInfo{
+			SongBase:     createdSong.SongBase,
+			SongID:       createdSong.SongID,
+			ChartID:      level.ChartID,
+			Difficulty:   level.Difficulty,
+			Level:        level.Level,
+			FittingLevel: level.FittingLevel,
+			LevelDesign:  level.LevelDesign,
+			Notes:        level.Notes,
 		}
-		if level.LevelDesign != nil {
-			info.LevelDesign = *level.LevelDesign
-		}
-		songLevels = append(songLevels, info)
+		charts = append(charts, info)
 	}
 
-	return songLevels, nil
+	return charts, nil
 }
 
-func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.SongLevelInfo, error) {
+func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartInfo, error) {
 	// Map request to model.Song
 	song := &model.Song{
 		SongBase: req.SongBase,
@@ -127,13 +127,13 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.SongLe
 
 	// Map levels
 	for _, levelInfo := range req.Levels {
-		songLevel := model.SongLevel{
+		chart := model.Chart{
 			Difficulty:  levelInfo.Difficulty,
 			Level:       levelInfo.Level,
 			LevelDesign: &levelInfo.LevelDesign,
 			Notes:       levelInfo.Notes,
 		}
-		song.SongLevels = append(song.SongLevels, songLevel)
+		song.Charts = append(song.Charts, chart)
 	}
 
 	updatedSong, err := s.songRepo.UpdateSong(req.SongID, song)
@@ -142,21 +142,20 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.SongLe
 	}
 
 	// Convert to response format
-	var songLevels []model.SongLevelInfo
-	for _, level := range updatedSong.SongLevels {
-		info := model.SongLevelInfo{
-			SongBase:    updatedSong.SongBase,
-			SongID:      updatedSong.SongID,
-			SongLevelID: level.SongLevelID,
-			Difficulty:  level.Difficulty,
-			Level:       level.Level,
-			Notes:       level.Notes,
+	var charts []model.ChartInfo
+	for _, level := range updatedSong.Charts {
+		info := model.ChartInfo{
+			SongBase:     updatedSong.SongBase,
+			SongID:       updatedSong.SongID,
+			ChartID:      level.ChartID,
+			Difficulty:   level.Difficulty,
+			Level:        level.Level,
+			FittingLevel: level.FittingLevel,
+			LevelDesign:  level.LevelDesign,
+			Notes:        level.Notes,
 		}
-		if level.LevelDesign != nil {
-			info.LevelDesign = *level.LevelDesign
-		}
-		songLevels = append(songLevels, info)
+		charts = append(charts, info)
 	}
 
-	return songLevels, nil
+	return charts, nil
 }

@@ -5,11 +5,11 @@
 **Paradigm: Reboot Prober** (`paradigm-reboot-prober-go`) is a backend REST API service for the rhythm game **Paradigm: Reboot**. It provides score tracking, rating calculation, and Best 50 (B50) computation. The project is a Go rewrite (WIP) of a previous implementation.
 
 Core features:
-- **User Management**: Registration, JWT authentication, profile updates, upload tokens.
-- **Song Management**: CRUD for songs and their difficulty levels (admin-only for create/update).
+- **User Management**: Registration, JWT authentication, profile updates, upload tokens, password change/reset.
+- **Song Management**: CRUD for songs and their difficulty charts (admin-only for create/update).
 - **Score/Record Management**: Batch upload play records (JSON or CSV), automatic single-chart rating calculation, best record tracking.
 - **B50 Calculation**: Best 35 (old songs, `b15=false`) + Best 15 (new songs, `b15=true`) selection.
-- **Data Export**: Export personal best records to CSV.
+- **Data Export**: CSV generation from chart/score data.
 - **API Documentation**: Swagger UI auto-generated from code annotations.
 
 Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
@@ -18,7 +18,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 
 | Component       | Technology                                    |
 |-----------------|-----------------------------------------------|
-| Language        | Go 1.24                                       |
+| Language        | Go 1.24 (toolchain go1.24.4)                  |
 | Web Framework   | [Gin](https://github.com/gin-gonic/gin)       |
 | ORM             | [GORM](https://gorm.io/)                      |
 | Database        | PostgreSQL (production), SQLite (dev/testing)  |
@@ -29,6 +29,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | CI/CD           | GitHub Actions                                 |
 | Container       | Docker (multi-stage Alpine build)              |
 | Orchestration   | Docker Compose (app + PostgreSQL 16)           |
+| Frontend        | Vue.js (legacy, as git submodule)              |
 
 ## Project Structure
 
@@ -42,20 +43,20 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   └── config.yaml              # Default configuration file
 ├── internal/
 │   ├── controller/              # HTTP handlers (Gin handlers with Swagger annotations)
-│   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken
-│   │   ├── song.go              # GetAllSongLevels, GetSingleSongInfo, CreateSong, UpdateSong
-│   │   ├── record.go            # GetPlayRecords, UploadRecords, ExportCSV, GetB50Img, GetB50Trends
+│   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword
+│   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
+│   │   ├── record.go            # GetPlayRecords, UploadRecords
 │   │   └── upload.go            # UploadCSV, UploadImg
 │   ├── middleware/
 │   │   └── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
 │   ├── model/                   # Data models (GORM entities + DTOs)
 │   │   ├── user.go              # User, UserBase, UserInDB
-│   │   ├── song.go              # Song, SongLevel, SongBase, Difficulty enum, various info types
-│   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo
+│   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, LevelInfo
+│   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, ToPlayRecordInfo()
 │   │   ├── auth.go              # Token, UploadToken, UploadFileResponse
 │   │   ├── common.go            # Response (generic error/message response)
 │   │   └── request/             # Request DTOs
-│   │       ├── user.go          # CreateUserRequest, UpdateUserRequest
+│   │       ├── user.go          # CreateUserRequest, UpdateUserRequest, ChangePasswordRequest, ResetPasswordRequest
 │   │       ├── song.go          # CreateSongRequest, UpdateSongRequest
 │   │       └── play_record.go   # BatchCreatePlayRecordRequest
 │   ├── repository/              # Database access layer (GORM queries)
@@ -70,7 +71,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   └── record.go
 │   └── util/
 │       ├── database.go          # DB initialization (SQLite/PostgreSQL), auto-migration
-│       └── csv.go               # CSV generation, parsing (UTF-8 BOM, GBK decoding)
+│       └── csv.go               # CSV generation, parsing (UTF-8 BOM, GBK decoding), empty CSV template
 ├── pkg/                          # Shared/reusable packages
 │   ├── auth/
 │   │   └── auth.go              # Password hashing (bcrypt), JWT generation/validation
@@ -80,13 +81,21 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── docs.go
 │   ├── swagger.json
 │   └── swagger.yaml
-├── web/                          # (Currently empty, reserved for frontend assets)
+├── web/                          # Frontend assets
+│   ├── legacy/                  # Vue.js legacy frontend (git submodule → prp-prober-deploy)
+│   │   ├── src/                 # Vue components, utils, styles
+│   │   └── public/              # Static assets (covers, icons)
+│   └── styles/                  # Frontend style documentation
+│       ├── vue-style-pattern.md
+│       └── rules/               # Style rules (components, naive-ui, responsive, tokens)
 ├── .github/workflows/
 │   └── ci.yml                   # CI/CD pipeline
+├── .claude/                      # Claude AI settings
 ├── config/config.yaml           # Default config
 ├── Dockerfile                   # Multi-stage Docker build
 ├── docker-compose.yaml          # App + PostgreSQL compose setup
 ├── .golangci.yml                # Linter configuration
+├── .gitmodules                  # Git submodule config (web/legacy)
 ├── go.mod / go.sum              # Go module files
 └── AGENTS.md                    # This file
 ```
@@ -100,7 +109,7 @@ Request → Router → Middleware → Controller → Service → Repository → 
 ```
 
 - **Router** (`internal/router/`): Registers all routes, sets up middleware, wires dependencies (manual DI, no framework).
-- **Middleware** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware`).
+- **Middleware** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`).
 - **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services.
 - **Service** (`internal/service/`): Business logic. Orchestrates repository calls.
 - **Repository** (`internal/repository/`): Direct database operations via GORM. Rating calculation happens here when creating records.
@@ -109,10 +118,10 @@ Request → Router → Middleware → Controller → Service → Repository → 
 
 ### Key Domain Concepts
 
-- **Song**: A music track with metadata (title, artist, version, wiki_id, b15 flag, etc.).
-- **SongLevel**: A specific difficulty chart of a song. Difficulties: `Detected`, `Invaded`, `Massive`, `Reboot`.
-- **PlayRecord**: A single play attempt with a score, linked to a SongLevel and User.
-- **BestPlayRecord**: Points to the best PlayRecord per user per SongLevel. Updated automatically when a higher score is submitted.
+- **Song**: A music track with metadata (title, artist, genre, cover, illustrator, version, album, bpm, length, wiki_id, b15 flag).
+- **Chart**: A specific difficulty chart (谱面) of a song. Difficulties: `detected`, `invaded`, `massive`, `reboot`. Each chart has a level, optional fitting_level, optional level_design, and notes count.
+- **PlayRecord**: A single play attempt with a score, linked to a Chart and User.
+- **BestPlayRecord**: Points to the best PlayRecord per user per Chart. Updated automatically when a higher score is submitted.
 - **Rating**: Calculated from chart level and score using a piecewise formula (see `pkg/rating/rating.go`). Stored as `int` (rating × 100).
 - **B50**: Best 50 = B35 (top 35 ratings from old songs where `b15=false`) + B15 (top 15 ratings from new songs where `b15=true`).
 
@@ -122,7 +131,7 @@ Request → Router → Middleware → Controller → Service → Repository → 
 |---------------------|------------------|-------------------|
 | `prober_users`      | `User`           | `user_id`         |
 | `songs`             | `Song`           | `song_id`         |
-| `song_levels`       | `SongLevel`      | `song_level_id`   |
+| `charts`            | `Chart`          | `chart_id`        |
 | `play_records`      | `PlayRecord`     | `play_record_id`  |
 | `best_play_records` | `BestPlayRecord` | `best_record_id`  |
 
@@ -268,32 +277,31 @@ Base path: `/api/v2`
 |--------|-----------------------|--------------------------------|
 | POST   | `/user/register`      | `UserController.Register`      |
 | POST   | `/user/login`         | `UserController.Login`         |
-| GET    | `/songs`              | `SongController.GetAllSongLevels` |
+| GET    | `/songs`              | `SongController.GetAllCharts`  |
 | GET    | `/songs/:song_id`     | `SongController.GetSingleSongInfo` |
 
-### Optional Auth Routes (accessible without login if `anonymous_probe=true`)
+### Optional Auth Routes (accessible without login, but auth checked for permissions)
 | Method | Path                                  | Handler                        |
 |--------|---------------------------------------|--------------------------------|
 | GET    | `/records/:username`                  | `RecordController.GetPlayRecords` |
-| GET    | `/records/:username/export/csv`       | `RecordController.ExportCSV`   |
-| GET    | `/records/:username/export/b50`       | `RecordController.GetB50Img` *(not implemented)* |
-| GET    | `/records/:username/trends`           | `RecordController.GetB50Trends` *(not implemented)* |
+| POST   | `/records/:username`                  | `RecordController.UploadRecords`  |
 
 ### Authenticated Routes (JWT required)
 | Method | Path                        | Handler                              |
 |--------|-----------------------------|--------------------------------------|
 | GET    | `/user/me`                  | `UserController.GetMe`               |
 | PUT    | `/user/me`                  | `UserController.UpdateMe`            |
+| PUT    | `/user/me/password`         | `UserController.ChangePassword`       |
 | POST   | `/user/me/upload-token`     | `UserController.RefreshUploadToken`   |
-| POST   | `/records/:username`        | `RecordController.UploadRecords`      |
 | POST   | `/upload/csv`               | `UploadController.UploadCSV`          |
 | POST   | `/upload/img`               | `UploadController.UploadImg`          |
 
 ### Admin Routes (JWT + `is_admin=true`)
-| Method | Path       | Handler                        |
-|--------|------------|--------------------------------|
-| POST   | `/songs`   | `SongController.CreateSong`    |
-| PUT    | `/songs`   | `SongController.UpdateSong`    |
+| Method | Path                    | Handler                        |
+|--------|-------------------------|--------------------------------|
+| POST   | `/songs`                | `SongController.CreateSong`    |
+| PUT    | `/songs`                | `SongController.UpdateSong`    |
+| POST   | `/user/reset-password`  | `UserController.ResetPassword` |
 
 ### Non-API Routes
 | Method | Path              | Description          |
@@ -301,15 +309,26 @@ Base path: `/api/v2`
 | GET    | `/health`         | Health check         |
 | GET    | `/swagger/*any`   | Swagger UI           |
 
+### GetPlayRecords Scopes
+
+The `GET /records/:username` endpoint supports the following `scope` query parameter values:
+
+| Scope        | Description                                              | Pagination |
+|--------------|----------------------------------------------------------|------------|
+| `b50`        | Best 50 records (B35 + B15), supports `underflow` param  | No         |
+| `best`       | All best records (one per chart per user)                 | Yes        |
+| `all`        | All play records                                          | Yes        |
+| `all-charts` | All charts with user's best score (0 if not played)       | No         |
+
 ## Code Style Guidelines
 
-- **Go version**: 1.24 (set in `go.mod` and CI).
+- **Go version**: 1.24 (set in `go.mod` and CI), toolchain go1.24.4.
 - **Formatting**: Enforced by `gofmt` via golangci-lint.
 - **Naming**: Standard Go conventions. The `var-naming` revive rule is disabled to allow certain non-standard names (e.g., `ID` suffixes in model fields).
 - **Error handling**: Errors are returned up the call chain. Controllers translate errors to appropriate HTTP status codes and `model.Response` JSON.
 - **Comments**: English. Controller methods have Swagger godoc annotations.
 - **SQL injection prevention**: Sort column names are validated against a whitelist (`allowedSortColumns` in `record_repo.go`).
-- **GORM conventions**: Models define explicit `TableName()` methods. Primary keys use custom column names (e.g., `user_id`, `song_id`).
+- **GORM conventions**: Models define explicit `TableName()` methods. Primary keys use custom column names (e.g., `user_id`, `song_id`, `chart_id`).
 - **Struct tags**: Models use `gorm`, `json`, `binding`, and `example` tags.
 - **Deferred cleanup**: File handles use `defer func() { _ = f.Close() }()` pattern (explicitly ignoring close errors).
 
@@ -318,10 +337,11 @@ Base path: `/api/v2`
 - **JWT secret**: Must be changed from default before startup (enforced by `log.Fatal` check in `main.go`).
 - **Password storage**: bcrypt hashing via `golang.org/x/crypto/bcrypt` with `DefaultCost`.
 - **Authorization model**:
-  - Record viewing respects `anonymous_probe` user setting.
+  - Record viewing respects `anonymous_probe` user setting; admins can view any user's records.
   - Record uploading requires JWT auth (own records) or a valid `upload_token` (third-party upload).
   - Song creation/update requires admin role.
   - Image upload requires admin role.
+  - Password reset requires admin role.
 - **SQL injection**: Sort parameters are whitelisted; all other queries use GORM's parameterized queries.
 - **File uploads**: CSV uploads are restricted to `.csv` extension. Files are saved with randomized hex-suffixed filenames to avoid collisions and path traversal.
 - **Token expiration**: JWT access tokens expire after 24 hours. Default (no duration specified) is 30 minutes.

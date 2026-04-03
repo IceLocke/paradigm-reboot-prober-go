@@ -34,7 +34,7 @@ func TestRecordController(t *testing.T) {
 		SongBase: model.SongBase{
 			Title: "Test Song",
 		},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyMassive, Level: 10},
 		},
 	}
@@ -45,8 +45,8 @@ func TestRecordController(t *testing.T) {
 			UploadToken: "testtoken",
 			PlayRecords: []model.PlayRecordBase{
 				{
-					SongLevelID: 1,
-					Score:       1000000,
+					ChartID: 1,
+					Score:   1000000,
 				},
 			},
 		}

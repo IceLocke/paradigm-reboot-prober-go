@@ -1,0 +1,4 @@
+[submodule "web/legacy"]
+	path = web/legacy
+	url = https://github.com/IceLocke/prp-prober-deploy
+	branch = main

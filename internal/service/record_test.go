@@ -17,18 +17,18 @@ func TestRecordService(t *testing.T) {
 	// Setup Song and Level
 	song := &model.Song{
 		SongBase: model.SongBase{WikiID: "song_1", Title: "Test Song"},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyMassive, Level: 15.0},
 		},
 	}
 	createdSong, _ := songRepo.CreateSong(song)
-	levelID := createdSong.SongLevels[0].SongLevelID
+	levelID := createdSong.Charts[0].ChartID
 
 	t.Run("CreateRecords", func(t *testing.T) {
 		records := []model.PlayRecordBase{
 			{
-				SongLevelID: levelID,
-				Score:       1000000,
+				ChartID: levelID,
+				Score:   1000000,
 			},
 		}
 		savedRecords, err := recordService.CreateRecords("testuser", records, false)
@@ -57,8 +57,8 @@ func TestRecordService(t *testing.T) {
 		assert.NotEmpty(t, records)
 	})
 
-	t.Run("GetAllLevelsWithBestScores", func(t *testing.T) {
-		levels, err := recordService.GetAllLevelsWithBestScores("testuser")
+	t.Run("GetAllChartsWithBestScores", func(t *testing.T) {
+		levels, err := recordService.GetAllChartsWithBestScores("testuser")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, levels)
 		assert.Equal(t, 1000000, levels[0].Score)

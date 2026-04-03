@@ -14,7 +14,7 @@ func TestSongController(t *testing.T) {
 	env := setupEnv(t)
 	r := gin.Default()
 
-	r.GET("/songs", env.songCtrl.GetAllSongLevels)
+	r.GET("/songs", env.songCtrl.GetAllCharts)
 	r.GET("/songs/:song_id", env.songCtrl.GetSingleSongInfo)
 
 	// Seed data
@@ -23,16 +23,16 @@ func TestSongController(t *testing.T) {
 			Title:  "Test Song",
 			Artist: "Test Artist",
 		},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyMassive, Level: 10},
 		},
 	}
 	env.db.Create(&song)
 
-	t.Run("GetAllSongLevels Success", func(t *testing.T) {
+	t.Run("GetAllCharts Success", func(t *testing.T) {
 		w := performRequest(r, "GET", "/songs", nil, nil)
 		assert.Equal(t, http.StatusOK, w.Code)
-		// Note: GetAllSongLevels returns []model.SongLevelInfo, not []model.Song
+		// Note: GetAllCharts returns []model.ChartInfo, not []model.Song
 		// But for simplicity in test, we just check if it's not empty
 		assert.NotEmpty(t, w.Body.String())
 	})

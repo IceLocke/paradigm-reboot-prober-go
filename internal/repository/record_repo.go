@@ -9,6 +9,21 @@ import (
 	"gorm.io/gorm"
 )
 
+// allowedSortColumns defines the whitelist of columns that can be used for sorting
+var allowedSortColumns = map[string]string{
+	"rating":      "rating",
+	"score":       "score",
+	"record_time": "record_time",
+}
+
+// validateSortBy returns a safe column name for ORDER BY, defaulting to "rating" if not allowed
+func validateSortBy(sortBy string) string {
+	if col, ok := allowedSortColumns[sortBy]; ok {
+		return col
+	}
+	return "rating" // default
+}
+
 type RecordRepository struct {
 	db *gorm.DB
 }
@@ -19,13 +34,13 @@ func NewRecordRepository(db *gorm.DB) *RecordRepository {
 
 // CreateRecord creates a new play record and updates the best record if necessary
 func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced bool) (*model.PlayRecord, error) {
-	var songLevel model.SongLevel
-	if err := r.db.Where("song_level_id = ?", record.SongLevelID).First(&songLevel).Error; err != nil {
-		return nil, errors.New("song level does not exist")
+	var chart model.Chart
+	if err := r.db.Where("chart_id = ?", record.ChartID).First(&chart).Error; err != nil {
+		return nil, errors.New("chart does not exist")
 	}
 
 	// Calculate rating
-	calculatedRating := rating.SingleRating(songLevel.Level, record.Score)
+	calculatedRating := rating.SingleRating(chart.Level, record.Score)
 	record.Rating = calculatedRating
 	record.RecordTime = time.Now()
 
@@ -36,7 +51,7 @@ func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced boo
 
 		var bestRecord model.BestPlayRecord
 		result := tx.Joins("PlayRecord").
-			Where("PlayRecord.song_level_id = ? AND PlayRecord.username = ?", record.SongLevelID, record.Username).
+			Where("PlayRecord.chart_id = ? AND PlayRecord.username = ?", record.ChartID, record.Username).
 			First(&bestRecord)
 
 		if result.Error == nil {
@@ -79,13 +94,13 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	// Base query for best records
 	baseQuery := r.db.Model(&model.PlayRecord{}).
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
-		Joins("SongLevel").
-		Joins("SongLevel.Song").
+		Joins("Chart").
+		Joins("Chart.Song").
 		Where("play_records.username = ?", username)
 
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
-		Where("SongLevel__Song.b15 = ?", false).
+		Where("Chart__Song.b15 = ?", false).
 		Order("rating desc").
 		Limit(35 + underflow).
 		Find(&b35).Error; err != nil {
@@ -94,7 +109,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 
 	// B15: B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
-		Where("SongLevel__Song.b15 = ?", true).
+		Where("Chart__Song.b15 = ?", true).
 		Order("rating desc").
 		Limit(15 + underflow).
 		Find(&b15).Error; err != nil {
@@ -108,19 +123,20 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Where("username = ?", username).
-		Joins("SongLevel").
-		Joins("SongLevel.Song")
+		Joins("Chart").
+		Joins("Chart.Song")
 
 	orderStr := "desc"
 	if !order {
 		orderStr = "asc"
 	}
 
-	// Handle sorting logic (simplified mapping)
-	// In production, map sortBy string to actual column names safely
-	query = query.Order(sortBy + " " + orderStr)
+	// Use whitelist validation to prevent SQL injection
+	safeSortBy := validateSortBy(sortBy)
+	query = query.Order(safeSortBy + " " + orderStr)
 
-	err := query.Offset(pageSize * (pageIndex - 1)).Limit(pageSize).Find(&records).Error
+	// pageIndex is 0-indexed from the service layer
+	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
 	return records, err
 }
 
@@ -129,8 +145,8 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 	var records []model.PlayRecord
 	query := r.db.Model(&model.PlayRecord{}).
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
-		Joins("SongLevel").
-		Joins("SongLevel.Song").
+		Joins("Chart").
+		Joins("Chart.Song").
 		Where("play_records.username = ?", username)
 
 	orderStr := "desc"
@@ -138,21 +154,23 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 		orderStr = "asc"
 	}
 
-	// Handle sorting logic (simplified mapping)
-	query = query.Order(sortBy + " " + orderStr)
+	// Use whitelist validation to prevent SQL injection
+	safeSortBy := validateSortBy(sortBy)
+	query = query.Order(safeSortBy + " " + orderStr)
 
-	err := query.Offset(pageSize * (pageIndex - 1)).Limit(pageSize).Find(&records).Error
+	// pageIndex is 0-indexed from the service layer
+	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
 	return records, err
 }
 
-// GetAllLevelsWithBestScores retrieves all song levels with the user's best score (if any)
-func (r *RecordRepository) GetAllLevelsWithBestScores(username string) ([]model.SongLevelWithScore, error) {
-	var results []model.SongLevelWithScore
+// GetAllChartsWithBestScores retrieves all charts with the user's best score (if any)
+func (r *RecordRepository) GetAllChartsWithBestScores(username string) ([]model.ChartWithScore, error) {
+	var results []model.ChartWithScore
 
-	err := r.db.Table("song_levels").
-		Select("song_levels.song_level_id, songs.title, songs.version, song_levels.difficulty, song_levels.level, COALESCE(play_records.score, 0) as score").
-		Joins("JOIN songs ON song_levels.song_id = songs.song_id").
-		Joins("LEFT JOIN play_records ON song_levels.song_level_id = play_records.song_level_id AND play_records.username = ?", username).
+	err := r.db.Table("charts").
+		Select("charts.chart_id, songs.title, songs.version, charts.difficulty, charts.level, COALESCE(play_records.score, 0) as score").
+		Joins("JOIN songs ON charts.song_id = songs.song_id").
+		Joins("LEFT JOIN play_records ON charts.chart_id = play_records.chart_id AND play_records.username = ?", username).
 		Joins("LEFT JOIN best_play_records ON play_records.play_record_id = best_play_records.play_record_id").
 		Where("play_records.play_record_id IS NULL OR best_play_records.play_record_id IS NOT NULL").
 		Scan(&results).Error

@@ -5,6 +5,7 @@ import (
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,6 +35,8 @@ func (ctrl *UserController) Register(c *gin.Context) {
 		return
 	}
 
+	req.Username = strings.ToLower(req.Username)
+
 	user, err := ctrl.userService.CreateUser(&req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
@@ -56,6 +59,7 @@ func (ctrl *UserController) Register(c *gin.Context) {
 // @Router /user/login [post]
 func (ctrl *UserController) Login(c *gin.Context) {
 	username := c.PostForm("username")
+	username = strings.ToLower(username)
 	password := c.PostForm("password")
 
 	token, err := ctrl.userService.Login(username, password)
@@ -140,4 +144,55 @@ func (ctrl *UserController) UpdateMe(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, user)
+}
+
+// ChangePassword godoc
+// @Summary Change password
+// @Description Change the current user's password
+// @Tags user
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body request.ChangePasswordRequest true "Password change info"
+// @Success 200 {object} model.Response
+// @Failure 400 {object} model.Response
+// @Failure 401 {object} model.Response
+// @Router /user/me/password [put]
+func (ctrl *UserController) ChangePassword(c *gin.Context) {
+	username := c.GetString("username")
+	var req request.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		return
+	}
+	if err := ctrl.userService.ChangePassword(username, &req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, model.Response{Message: "password changed successfully"})
+}
+
+// ResetPassword godoc
+// @Summary Reset user password (Admin only)
+// @Description Reset a user's password by admin
+// @Tags user
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body request.ResetPasswordRequest true "Password reset info"
+// @Success 200 {object} model.Response
+// @Failure 400 {object} model.Response
+// @Failure 403 {object} model.Response
+// @Router /user/reset-password [post]
+func (ctrl *UserController) ResetPassword(c *gin.Context) {
+	var req request.ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		return
+	}
+	if err := ctrl.userService.ResetPassword(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, model.Response{Message: "password reset successfully"})
 }

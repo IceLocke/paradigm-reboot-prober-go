@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
@@ -9,6 +10,7 @@ import (
 	"paradigm-reboot-prober-go/internal/util"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -27,11 +29,11 @@ func NewRecordController(recordService *service.RecordService, userService *serv
 
 // GetPlayRecords godoc
 // @Summary Get play records
-// @Description Retrieve play records for a user based on scope (b50, best, all)
+// @Description Retrieve play records for a user based on scope (b50, best, all, all-charts)
 // @Tags record
 // @Produce json
 // @Param username path string true "Username"
-// @Param scope query string false "Scope (b50, best, all)" default(b50)
+// @Param scope query string false "Scope (b50, best, all, all-charts)" default(b50)
 // @Param underflow query int false "Underflow for b50" default(0)
 // @Param page_size query int false "Page size" default(50)
 // @Param page_index query int false "Page index" default(1)
@@ -44,10 +46,25 @@ func NewRecordController(recordService *service.RecordService, userService *serv
 // @Router /records/{username} [get]
 func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	username := c.Param("username")
+	username = strings.ToLower(username)
 	scope := c.DefaultQuery("scope", "b50")
 	underflow, _ := strconv.Atoi(c.DefaultQuery("underflow", "0"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
 	pageIndex, _ := strconv.Atoi(c.DefaultQuery("page_index", "1"))
+
+	// Validate pagination parameters to prevent abuse
+	if underflow < 0 {
+		underflow = 0
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	if pageIndex < 1 {
+		pageIndex = 1
+	}
 	sortBy := c.DefaultQuery("sort_by", "rating")
 	order := c.DefaultQuery("order", "desc")
 
@@ -64,34 +81,72 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		return
 	}
 
-	var records interface{}
-	var total int64
-	var err error
-
 	switch scope {
 	case "b50":
-		records, err = ctrl.recordService.GetBest50Records(username, underflow)
+		records, err := ctrl.recordService.GetBest50Records(username, underflow)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		var recordInfos []model.PlayRecordInfo
+		for _, r := range records {
+			recordInfos = append(recordInfos, model.ToPlayRecordInfo(r))
+		}
+		c.JSON(http.StatusOK, model.PlayRecordResponse{
+			Username: username,
+			Total:    len(recordInfos),
+			Records:  recordInfos,
+		})
+
 	case "best":
-		records, err = ctrl.recordService.GetBestRecords(username, pageSize, pageIndex-1, sortBy, order)
-		total, _ = ctrl.recordService.CountBestRecords(username)
+		records, err := ctrl.recordService.GetBestRecords(username, pageSize, pageIndex-1, sortBy, order)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		total, _ := ctrl.recordService.CountBestRecords(username)
+		var recordInfos []model.PlayRecordInfo
+		for i := range records {
+			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
+		}
+		c.JSON(http.StatusOK, model.PlayRecordResponse{
+			Username: username,
+			Total:    int(total),
+			Records:  recordInfos,
+		})
+
 	case "all":
-		records, err = ctrl.recordService.GetAllRecords(username, pageSize, pageIndex-1, sortBy, order)
-		total, _ = ctrl.recordService.CountAllRecords(username)
+		records, err := ctrl.recordService.GetAllRecords(username, pageSize, pageIndex-1, sortBy, order)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		total, _ := ctrl.recordService.CountAllRecords(username)
+		var recordInfos []model.PlayRecordInfo
+		for i := range records {
+			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
+		}
+		c.JSON(http.StatusOK, model.PlayRecordResponse{
+			Username: username,
+			Total:    int(total),
+			Records:  recordInfos,
+		})
+
+	case "all-charts":
+		charts, err := ctrl.recordService.GetAllChartsWithBestScores(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"username": username,
+			"charts":   charts,
+		})
+
 	default:
 		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter"})
 		return
 	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"username": username,
-		"records":  records,
-		"total":    total,
-	})
 }
 
 // UploadRecords godoc
@@ -108,6 +163,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 // @Router /records/{username} [post]
 func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 	username := c.Param("username")
+	username = strings.ToLower(username)
 	var req request.BatchCreatePlayRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
@@ -127,7 +183,8 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 		authorized = true
 	} else {
 		user, err := ctrl.userService.GetUser(username)
-		if err == nil && user != nil && req.UploadToken != "" && req.UploadToken == user.UploadToken {
+		if err == nil && user != nil && req.UploadToken != "" &&
+			subtle.ConstantTimeCompare([]byte(req.UploadToken), []byte(user.UploadToken)) == 1 {
 			authorized = true
 		}
 	}
@@ -141,7 +198,9 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 	isReplace := req.IsReplace
 
 	if req.CSVFilename != "" {
-		csvPath := filepath.Join(config.GlobalConfig.Upload.CSVPath, req.CSVFilename)
+		// Sanitize filename to prevent path traversal
+		csvFilename := filepath.Base(req.CSVFilename)
+		csvPath := filepath.Join(config.GlobalConfig.Upload.CSVPath, csvFilename)
 		var err error
 		playRecords, err = util.GetRecordsFromCSV(csvPath)
 		if err != nil {
@@ -160,71 +219,4 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, records)
-}
-
-// ExportCSV godoc
-// @Summary Export records to CSV
-// @Description Export all best records for a user to CSV
-// @Tags record
-// @Produce text/csv
-// @Param username path string true "Username"
-// @Success 200 {string} string "CSV content"
-// @Failure 401 {object} model.Response
-// @Router /records/{username}/export/csv [get]
-func (ctrl *RecordController) ExportCSV(c *gin.Context) {
-	username := c.Param("username")
-
-	// Get current user from context (if authenticated)
-	var currentUser *model.User
-	currentUsername, exists := c.Get("username")
-	if exists {
-		currentUser, _ = ctrl.userService.GetUser(currentUsername.(string))
-	}
-
-	// Check authority
-	if err := ctrl.userService.CheckProbeAuthority(username, currentUser); err != nil {
-		c.JSON(http.StatusForbidden, model.Response{Error: err.Error()})
-		return
-	}
-
-	records, err := ctrl.recordService.GetAllLevelsWithBestScores(username)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
-		return
-	}
-
-	csvData, err := util.GenerateCSV(records)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, model.Response{Error: "failed to generate CSV"})
-		return
-	}
-
-	c.Header("Content-Disposition", "attachment; filename=records.csv")
-	c.Data(http.StatusOK, "text/csv", []byte(csvData))
-}
-
-// GetB50Img godoc
-// @Summary Get B50 image
-// @Description Generate and return B50 image for a user
-// @Tags record
-// @Produce image/png
-// @Param username path string true "Username"
-// @Success 200 {file} binary
-// @Failure 403 {object} model.Response
-// @Router /records/{username}/export/b50 [get]
-func (ctrl *RecordController) GetB50Img(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, model.Response{Error: "not implemented yet"})
-}
-
-// GetB50Trends godoc
-// @Summary Get B50 trends
-// @Description Get B50 rating trends for a user
-// @Tags record
-// @Produce json
-// @Param username path string true "Username"
-// @Success 200 {object} model.Response
-// @Failure 403 {object} model.Response
-// @Router /records/{username}/trends [get]
-func (ctrl *RecordController) GetB50Trends(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, model.Response{Error: "not implemented yet"})
 }

@@ -66,8 +66,8 @@ func (s *RecordService) GetBestRecords(username string, pageSize, pageIndex int,
 	return s.recordRepo.GetBestRecords(username, pageSize, pageIndex, sortBy, order == "desc")
 }
 
-func (s *RecordService) GetAllLevelsWithBestScores(username string) ([]model.SongLevelWithScore, error) {
-	return s.recordRepo.GetAllLevelsWithBestScores(username)
+func (s *RecordService) GetAllChartsWithBestScores(username string) ([]model.ChartWithScore, error) {
+	return s.recordRepo.GetAllChartsWithBestScores(username)
 }
 
 func (s *RecordService) CountBestRecords(username string) (int64, error) {

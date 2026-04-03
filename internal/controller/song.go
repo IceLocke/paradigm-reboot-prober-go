@@ -18,16 +18,16 @@ func NewSongController(songService *service.SongService) *SongController {
 	return &SongController{songService: songService}
 }
 
-// GetAllSongLevels godoc
-// @Summary Get all song levels
-// @Description Retrieve a list of all song levels with their details
+// GetAllCharts godoc
+// @Summary Get all charts
+// @Description Retrieve a list of all charts with their details
 // @Tags song
 // @Produce json
-// @Success 200 {array} model.SongLevelInfo
+// @Success 200 {array} model.ChartInfo
 // @Failure 500 {object} model.Response
 // @Router /songs [get]
-func (ctrl *SongController) GetAllSongLevels(c *gin.Context) {
-	levels, err := ctrl.songService.GetAllSongLevels()
+func (ctrl *SongController) GetAllCharts(c *gin.Context) {
+	levels, err := ctrl.songService.GetAllCharts()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
@@ -72,13 +72,13 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 
 // CreateSong godoc
 // @Summary Create a new song
-// @Description Create a new song with its levels (Admin only)
+// @Description Create a new song with its charts (Admin only)
 // @Tags song
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param song body request.CreateSongRequest true "Song creation info"
-// @Success 200 {array} model.SongLevelInfo
+// @Success 200 {array} model.ChartInfo
 // @Failure 400 {object} model.Response
 // @Router /songs [post]
 func (ctrl *SongController) CreateSong(c *gin.Context) {
@@ -98,13 +98,13 @@ func (ctrl *SongController) CreateSong(c *gin.Context) {
 
 // UpdateSong godoc
 // @Summary Update an existing song
-// @Description Update song details and its levels (Admin only)
+// @Description Update song details and its charts (Admin only)
 // @Tags song
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param song body request.UpdateSongRequest true "Song update info"
-// @Success 200 {array} model.SongLevelInfo
+// @Success 200 {array} model.ChartInfo
 // @Failure 400 {object} model.Response
 // @Router /songs [put]
 func (ctrl *SongController) UpdateSong(c *gin.Context) {

@@ -41,7 +41,7 @@ func InitDB() {
 	err = DB.AutoMigrate(
 		&model.User{},
 		&model.Song{},
-		&model.SongLevel{},
+		&model.Chart{},
 		&model.PlayRecord{},
 		&model.BestPlayRecord{},
 	)

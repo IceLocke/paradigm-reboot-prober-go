@@ -26,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/records/{username}": {
             "get": {
-                "description": "Retrieve play records for a user based on scope (b50, best, all)",
+                "description": "Retrieve play records for a user based on scope (b50, best, all, all-charts)",
                 "produces": [
                     "application/json"
                 ],
@@ -45,7 +45,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "default": "b50",
-                        "description": "Scope (b50, best, all)",
+                        "description": "Scope (b50, best, all, all-charts)",
                         "name": "scope",
                         "in": "query"
                     },
@@ -167,128 +167,23 @@ const docTemplate = `{
                 }
             }
         },
-        "/records/{username}/export/b50": {
-            "get": {
-                "description": "Generate and return B50 image for a user",
-                "produces": [
-                    "image/png"
-                ],
-                "tags": [
-                    "record"
-                ],
-                "summary": "Get B50 image",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "file"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/records/{username}/export/csv": {
-            "get": {
-                "description": "Export all best records for a user to CSV",
-                "produces": [
-                    "text/csv"
-                ],
-                "tags": [
-                    "record"
-                ],
-                "summary": "Export records to CSV",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "CSV content",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/records/{username}/trends": {
-            "get": {
-                "description": "Get B50 rating trends for a user",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "record"
-                ],
-                "summary": "Get B50 trends",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Username",
-                        "name": "username",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/songs": {
             "get": {
-                "description": "Retrieve a list of all song levels with their details",
+                "description": "Retrieve a list of all charts with their details",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "song"
                 ],
-                "summary": "Get all song levels",
+                "summary": "Get all charts",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/model.SongLevelInfo"
+                                "$ref": "#/definitions/model.ChartInfo"
                             }
                         }
                     },
@@ -306,7 +201,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Update song details and its levels (Admin only)",
+                "description": "Update song details and its charts (Admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -334,7 +229,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/model.SongLevelInfo"
+                                "$ref": "#/definitions/model.ChartInfo"
                             }
                         }
                     },
@@ -352,7 +247,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Create a new song with its levels (Admin only)",
+                "description": "Create a new song with its charts (Admin only)",
                 "consumes": [
                     "application/json"
                 ],
@@ -380,7 +275,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/model.SongLevelInfo"
+                                "$ref": "#/definitions/model.ChartInfo"
                             }
                         }
                     },
@@ -664,6 +559,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/user/me/password": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Change the current user's password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Change password",
+                "parameters": [
+                    {
+                        "description": "Password change info",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ChangePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/user/me/upload-token": {
             "post": {
                 "security": [
@@ -734,16 +680,217 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/user/reset-password": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Reset a user's password by admin",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "Reset user password (Admin only)",
+                "parameters": [
+                    {
+                        "description": "Password reset info",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/request.ResetPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "model.Chart": {
+            "type": "object",
+            "properties": {
+                "chart_id": {
+                    "type": "integer"
+                },
+                "difficulty": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Difficulty"
+                        }
+                    ],
+                    "example": "massive"
+                },
+                "fitting_level": {
+                    "type": "number"
+                },
+                "level": {
+                    "type": "number"
+                },
+                "level_design": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "integer"
+                },
+                "song": {
+                    "$ref": "#/definitions/model.Song"
+                },
+                "song_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.ChartInfo": {
+            "type": "object",
+            "properties": {
+                "album": {
+                    "type": "string",
+                    "example": "First Album"
+                },
+                "artist": {
+                    "type": "string",
+                    "example": "Artist Name"
+                },
+                "b15": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "bpm": {
+                    "type": "string",
+                    "example": "180"
+                },
+                "chart_id": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "cover": {
+                    "type": "string",
+                    "example": "https://example.com/cover.jpg"
+                },
+                "difficulty": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/model.Difficulty"
+                        }
+                    ],
+                    "example": "massive"
+                },
+                "fitting_level": {
+                    "type": "number",
+                    "example": 13.4
+                },
+                "genre": {
+                    "type": "string",
+                    "example": "Pop"
+                },
+                "illustrator": {
+                    "type": "string",
+                    "example": "Artist"
+                },
+                "length": {
+                    "type": "string",
+                    "example": "2:30"
+                },
+                "level": {
+                    "type": "number",
+                    "example": 13.2
+                },
+                "level_design": {
+                    "type": "string",
+                    "example": "Designer"
+                },
+                "notes": {
+                    "type": "integer",
+                    "example": 850
+                },
+                "song_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Song Title"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "wiki_id": {
+                    "type": "string",
+                    "example": "w123"
+                }
+            }
+        },
+        "model.ChartInfoSimple": {
+            "type": "object",
+            "properties": {
+                "b15": {
+                    "type": "boolean"
+                },
+                "chart_id": {
+                    "type": "integer"
+                },
+                "cover": {
+                    "type": "string"
+                },
+                "difficulty": {
+                    "$ref": "#/definitions/model.Difficulty"
+                },
+                "fitting_level": {
+                    "type": "number"
+                },
+                "level": {
+                    "type": "number"
+                },
+                "song_id": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "wiki_id": {
+                    "type": "string"
+                }
+            }
+        },
         "model.Difficulty": {
             "type": "string",
             "enum": [
-                "Detected",
-                "Invaded",
-                "Massive",
-                "Reboot"
+                "detected",
+                "invaded",
+                "massive",
+                "reboot"
             ],
             "x-enum-varnames": [
                 "DifficultyDetected",
@@ -761,7 +908,7 @@ const docTemplate = `{
                             "$ref": "#/definitions/model.Difficulty"
                         }
                     ],
-                    "example": "Massive"
+                    "example": "massive"
                 },
                 "level": {
                     "type": "number",
@@ -780,10 +927,16 @@ const docTemplate = `{
         "model.PlayRecord": {
             "type": "object",
             "required": [
-                "score",
-                "song_level_id"
+                "chart_id"
             ],
             "properties": {
+                "chart": {
+                    "$ref": "#/definitions/model.Chart"
+                },
+                "chart_id": {
+                    "type": "integer",
+                    "example": 1
+                },
                 "play_record_id": {
                     "type": "integer"
                 },
@@ -795,14 +948,8 @@ const docTemplate = `{
                 },
                 "score": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 1000000
-                },
-                "song_level": {
-                    "$ref": "#/definitions/model.SongLevel"
-                },
-                "song_level_id": {
-                    "type": "integer",
-                    "example": 1
                 },
                 "username": {
                     "type": "string"
@@ -812,23 +959,26 @@ const docTemplate = `{
         "model.PlayRecordBase": {
             "type": "object",
             "required": [
-                "score",
-                "song_level_id"
+                "chart_id"
             ],
             "properties": {
-                "score": {
-                    "type": "integer",
-                    "example": 1000000
-                },
-                "song_level_id": {
+                "chart_id": {
                     "type": "integer",
                     "example": 1
+                },
+                "score": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 1000000
                 }
             }
         },
         "model.PlayRecordInfo": {
             "type": "object",
             "properties": {
+                "chart": {
+                    "$ref": "#/definitions/model.ChartInfoSimple"
+                },
                 "play_record_id": {
                     "type": "integer"
                 },
@@ -840,9 +990,6 @@ const docTemplate = `{
                 },
                 "score": {
                     "type": "integer"
-                },
-                "song_level": {
-                    "$ref": "#/definitions/model.SongLevelInfoSimple"
                 }
             }
         },
@@ -893,113 +1040,15 @@ const docTemplate = `{
                     "type": "string",
                     "example": "180"
                 },
-                "cover": {
-                    "type": "string",
-                    "example": "https://example.com/cover.jpg"
-                },
-                "genre": {
-                    "type": "string",
-                    "example": "Pop"
-                },
-                "illustrator": {
-                    "type": "string",
-                    "example": "Artist"
-                },
-                "length": {
-                    "type": "string",
-                    "example": "2:30"
-                },
-                "song_id": {
-                    "type": "integer"
-                },
-                "song_levels": {
+                "charts": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/model.SongLevel"
+                        "$ref": "#/definitions/model.Chart"
                     }
-                },
-                "title": {
-                    "type": "string",
-                    "example": "Song Title"
-                },
-                "version": {
-                    "type": "string",
-                    "example": "1.0.0"
-                },
-                "wiki_id": {
-                    "type": "string",
-                    "example": "w123"
-                }
-            }
-        },
-        "model.SongLevel": {
-            "type": "object",
-            "properties": {
-                "difficulty": {
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.Difficulty"
-                        }
-                    ],
-                    "example": "Massive"
-                },
-                "fitting_level": {
-                    "type": "number"
-                },
-                "level": {
-                    "type": "number"
-                },
-                "level_design": {
-                    "type": "string"
-                },
-                "notes": {
-                    "type": "integer"
-                },
-                "song": {
-                    "$ref": "#/definitions/model.Song"
-                },
-                "song_id": {
-                    "type": "integer"
-                },
-                "song_level_id": {
-                    "type": "integer"
-                }
-            }
-        },
-        "model.SongLevelInfo": {
-            "type": "object",
-            "properties": {
-                "album": {
-                    "type": "string",
-                    "example": "First Album"
-                },
-                "artist": {
-                    "type": "string",
-                    "example": "Artist Name"
-                },
-                "b15": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "bpm": {
-                    "type": "string",
-                    "example": "180"
                 },
                 "cover": {
                     "type": "string",
                     "example": "https://example.com/cover.jpg"
-                },
-                "difficulty": {
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/model.Difficulty"
-                        }
-                    ],
-                    "example": "Massive"
-                },
-                "fitting_level": {
-                    "type": "number",
-                    "example": 13.4
                 },
                 "genre": {
                     "type": "string",
@@ -1013,25 +1062,8 @@ const docTemplate = `{
                     "type": "string",
                     "example": "2:30"
                 },
-                "level": {
-                    "type": "number",
-                    "example": 13.2
-                },
-                "level_design": {
-                    "type": "string",
-                    "example": "Designer"
-                },
-                "notes": {
-                    "type": "integer",
-                    "example": 850
-                },
                 "song_id": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "song_level_id": {
-                    "type": "integer",
-                    "example": 10
+                    "type": "integer"
                 },
                 "title": {
                     "type": "string",
@@ -1044,41 +1076,6 @@ const docTemplate = `{
                 "wiki_id": {
                     "type": "string",
                     "example": "w123"
-                }
-            }
-        },
-        "model.SongLevelInfoSimple": {
-            "type": "object",
-            "properties": {
-                "b15": {
-                    "type": "boolean"
-                },
-                "cover": {
-                    "type": "string"
-                },
-                "difficulty": {
-                    "$ref": "#/definitions/model.Difficulty"
-                },
-                "fitting_level": {
-                    "type": "number"
-                },
-                "level": {
-                    "type": "number"
-                },
-                "song_id": {
-                    "type": "integer"
-                },
-                "song_level_id": {
-                    "type": "integer"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "version": {
-                    "type": "string"
-                },
-                "wiki_id": {
-                    "type": "string"
                 }
             }
         },
@@ -1183,6 +1180,24 @@ const docTemplate = `{
                 },
                 "upload_token": {
                     "type": "string"
+                }
+            }
+        },
+        "request.ChangePasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password",
+                "old_password"
+            ],
+            "properties": {
+                "new_password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "newpass456"
+                },
+                "old_password": {
+                    "type": "string",
+                    "example": "oldpass123"
                 }
             }
         },
@@ -1300,6 +1315,24 @@ const docTemplate = `{
                 }
             }
         },
+        "request.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "new_password",
+                "username"
+            ],
+            "properties": {
+                "new_password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "newpass456"
+                },
+                "username": {
+                    "type": "string",
+                    "example": "targetuser"
+                }
+            }
+        },
         "request.UpdateSongRequest": {
             "type": "object",
             "required": [
@@ -1390,9 +1423,9 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "2",
-	Host:             "https://api.prp.icel.site",
+	Host:             "api.prp.icel.site",
 	BasePath:         "/api/v2",
-	Schemes:          []string{},
+	Schemes:          []string{"https"},
 	Title:            "Paradigm: Reboot Prober API",
 	Description:      "This is the API documentation for the Paradigm: Reboot Prober service.",
 	InfoInstanceName: "swagger",

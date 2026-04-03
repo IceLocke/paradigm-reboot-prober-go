@@ -15,18 +15,18 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 	// Setup Song and Level
 	song := &model.Song{
 		SongBase: model.SongBase{WikiID: "rec_song", Title: "Record Song"},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
 		},
 	}
 	createdSong, _ := songRepo.CreateSong(song)
-	levelID := createdSong.SongLevels[0].SongLevelID
+	levelID := createdSong.Charts[0].ChartID
 
 	t.Run("Create New Record", func(t *testing.T) {
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				SongLevelID: levelID,
-				Score:       1000000,
+				ChartID: levelID,
+				Score:   1000000,
 			},
 			Username: "testuser",
 		}
@@ -49,8 +49,8 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		// Previous best was 1000000
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				SongLevelID: levelID,
-				Score:       1000001,
+				ChartID: levelID,
+				Score:   1000001,
 			},
 			Username: "testuser",
 		}
@@ -69,8 +69,8 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		// Previous best was 1000001
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				SongLevelID: levelID,
-				Score:       900000,
+				ChartID: levelID,
+				Score:   900000,
 			},
 			Username: "testuser",
 		}
@@ -88,8 +88,8 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		// Previous best was 1000001. New score is lower but forced.
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				SongLevelID: levelID,
-				Score:       800000,
+				ChartID: levelID,
+				Score:   800000,
 			},
 			Username: "testuser",
 		}
@@ -111,7 +111,7 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 	// Create B15 Song (New)
 	songB15 := &model.Song{
 		SongBase: model.SongBase{WikiID: "b15_song", Title: "B15 Song", B15: true},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyMassive, Level: 15.0},
 		},
 	}
@@ -120,7 +120,7 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 	// Create Non-B15 Song (Old)
 	songOld := &model.Song{
 		SongBase: model.SongBase{WikiID: "old_song", Title: "Old Song", B15: false},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyMassive, Level: 15.0},
 		},
 	}
@@ -128,12 +128,12 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 
 	// Create Records
 	_, err := repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{SongLevelID: createdB15.SongLevels[0].SongLevelID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: createdB15.Charts[0].ChartID, Score: 1000000},
 		Username:       "user_b50",
 	}, false)
 	assert.NoError(t, err)
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{SongLevelID: createdOld.SongLevels[0].SongLevelID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: createdOld.Charts[0].ChartID, Score: 1000000},
 		Username:       "user_b50",
 	}, false)
 	assert.NoError(t, err)
@@ -143,7 +143,7 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, b15, 1)
 		assert.Len(t, b35, 1)
-		assert.Equal(t, "B15 Song", b15[0].SongLevel.Song.Title)
-		assert.Equal(t, "Old Song", b35[0].SongLevel.Song.Title)
+		assert.Equal(t, "B15 Song", b15[0].Chart.Song.Title)
+		assert.Equal(t, "Old Song", b35[0].Chart.Song.Title)
 	})
 }

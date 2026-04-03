@@ -4,12 +4,17 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/pkg/auth"
+	"regexp"
+	"strings"
 	"time"
 )
+
+var usernameRegex = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{5,15}$`)
 
 type UserService struct {
 	userRepo *repository.UserRepository
@@ -20,8 +25,10 @@ func NewUserService(userRepo *repository.UserRepository) *UserService {
 }
 
 func (s *UserService) Login(username, plainPassword string) (string, error) {
+	username = strings.ToLower(username)
+
 	user, err := s.userRepo.GetUserByUsername(username)
-	if err != nil {
+	if err != nil || user == nil {
 		return "", errors.New("incorrect username or password")
 	}
 
@@ -54,7 +61,16 @@ func generateHexToken(n int) (string, error) {
 }
 
 func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, error) {
-	existingUser, _ := s.userRepo.GetUserByUsername(req.Username)
+	req.Username = strings.ToLower(req.Username)
+
+	if !usernameRegex.MatchString(req.Username) {
+		return nil, errors.New("invalid username format")
+	}
+
+	existingUser, err := s.userRepo.GetUserByUsername(req.Username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check existing user: %w", err)
+	}
 	if existingUser != nil {
 		return nil, errors.New("username has already existed")
 	}
@@ -132,22 +148,69 @@ func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest
 	return s.userRepo.UpdateUser(user)
 }
 
-func (s *UserService) CheckProbeAuthority(username string, currentUser *model.User) error {
-	targetUser, err := s.userRepo.GetUserByUsername(username)
+func (s *UserService) ChangePassword(username string, req *request.ChangePasswordRequest) error {
+	user, err := s.userRepo.GetUserByUsername(username)
 	if err != nil {
+		return err
+	}
+	if user == nil {
 		return errors.New("user not found")
 	}
 
-	// !(允许匿名查询 | 认证 & 信息匹配 | 认证 & 是管理员)
+	if !auth.VerifyPassword(req.OldPassword, user.EncodedPassword) {
+		return errors.New("incorrect old password")
+	}
+
+	encodedPassword, err := auth.EncodePassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	user.EncodedPassword = encodedPassword
+	_, err = s.userRepo.UpdateUser(user)
+	return err
+}
+
+func (s *UserService) ResetPassword(req *request.ResetPasswordRequest) error {
+	req.Username = strings.ToLower(req.Username)
+
+	user, err := s.userRepo.GetUserByUsername(req.Username)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return errors.New("user not found")
+	}
+
+	encodedPassword, err := auth.EncodePassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	user.EncodedPassword = encodedPassword
+	_, err = s.userRepo.UpdateUser(user)
+	return err
+}
+
+func (s *UserService) CheckProbeAuthority(username string, currentUser *model.User) error {
+	targetUser, err := s.userRepo.GetUserByUsername(username)
+	if err != nil {
+		return fmt.Errorf("failed to query user: %w", err)
+	}
+	if targetUser == nil {
+		return errors.New("user not found")
+	}
+
+	// Authorized if: anonymous probe enabled, or authenticated as the target user, or admin
 	isAuthorized := targetUser.AnonymousProbe ||
 		(currentUser != nil && currentUser.Username == username) ||
 		(currentUser != nil && currentUser.IsAdmin)
 
 	if !isAuthorized {
-		if !targetUser.AnonymousProbe {
+		if currentUser == nil {
 			return errors.New("anonymous probes are not allowed")
 		}
-		if currentUser != nil && currentUser.Username != username {
+		if currentUser.Username != username {
 			return errors.New("authentication info not matched")
 		}
 		return errors.New("forbidden")

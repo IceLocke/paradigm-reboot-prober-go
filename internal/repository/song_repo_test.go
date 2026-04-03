@@ -18,7 +18,7 @@ func TestSongRepository_CreateSong(t *testing.T) {
 				Title:  "Test Song",
 				Artist: "Test Artist",
 			},
-			SongLevels: []model.SongLevel{
+			Charts: []model.Chart{
 				{
 					Difficulty: model.DifficultyMassive,
 					Level:      15.5,
@@ -30,8 +30,8 @@ func TestSongRepository_CreateSong(t *testing.T) {
 		created, err := repo.CreateSong(song)
 		assert.NoError(t, err)
 		assert.NotZero(t, created.SongID)
-		assert.Len(t, created.SongLevels, 1)
-		assert.Equal(t, model.DifficultyMassive, created.SongLevels[0].Difficulty)
+		assert.Len(t, created.Charts, 1)
+		assert.Equal(t, model.DifficultyMassive, created.Charts[0].Difficulty)
 	})
 }
 
@@ -45,7 +45,7 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 			WikiID: "song_update",
 			Title:  "Original Title",
 		},
-		SongLevels: []model.SongLevel{
+		Charts: []model.Chart{
 			{Difficulty: model.DifficultyDetected, Level: 5.0, Notes: 100},
 			{Difficulty: model.DifficultyInvaded, Level: 10.0, Notes: 500},
 		},
@@ -59,12 +59,12 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 				WikiID: "song_update",
 				Title:  "New Title", // Changed
 			},
-			SongLevels: []model.SongLevel{
+			Charts: []model.Chart{
 				{Difficulty: model.DifficultyDetected, Level: 6.0, Notes: 120},  // Changed
 				{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000}, // New
 				// Invaded is missing -> should remain or be removed?
 				// Looking at implementation:
-				// It iterates over updatedSong.SongLevels.
+				// It iterates over updatedSong.Charts.
 				// If exists in DB, update.
 				// If not exists in DB (but in update), create.
 				// It does NOT delete levels missing from update.
@@ -78,11 +78,11 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 		// Verify levels
 		// We need to fetch fresh from DB to be sure
 		var freshSong model.Song
-		db.Preload("SongLevels").First(&freshSong, song.SongID)
+		db.Preload("Charts").First(&freshSong, song.SongID)
 
-		assert.Len(t, freshSong.SongLevels, 3) // Detected (updated), Invaded (untouched), Massive (new)
+		assert.Len(t, freshSong.Charts, 3) // Detected (updated), Invaded (untouched), Massive (new)
 
-		for _, l := range freshSong.SongLevels {
+		for _, l := range freshSong.Charts {
 			if l.Difficulty == model.DifficultyDetected {
 				assert.Equal(t, 6.0, l.Level)
 			}

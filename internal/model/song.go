@@ -19,7 +19,7 @@ type SongBase struct {
 type Song struct {
 	SongID int `gorm:"primaryKey;column:song_id" json:"song_id"`
 	SongBase
-	SongLevels []SongLevel `gorm:"foreignKey:SongID" json:"song_levels"`
+	Charts []Chart `gorm:"foreignKey:SongID" json:"charts"`
 }
 
 // TableName specifies the table name for GORM
@@ -27,21 +27,21 @@ func (Song) TableName() string {
 	return "songs"
 }
 
-// Difficulty represents the difficulty level of a song level
+// Difficulty represents the difficulty level of a chart
 type Difficulty string
 
 const (
-	DifficultyDetected Difficulty = "Detected"
-	DifficultyInvaded  Difficulty = "Invaded"
-	DifficultyMassive  Difficulty = "Massive"
-	DifficultyReboot   Difficulty = "Reboot"
+	DifficultyDetected Difficulty = "detected"
+	DifficultyInvaded  Difficulty = "invaded"
+	DifficultyMassive  Difficulty = "massive"
+	DifficultyReboot   Difficulty = "reboot"
 )
 
-// SongLevel represents the specific difficulty of a song
-type SongLevel struct {
-	SongLevelID  int        `gorm:"primaryKey;column:song_level_id" json:"song_level_id"`
+// Chart represents a specific difficulty chart (谱面) of a song
+type Chart struct {
+	ChartID      int        `gorm:"primaryKey;column:chart_id" json:"chart_id"`
 	SongID       int        `gorm:"not null" json:"song_id"`
-	Difficulty   Difficulty `gorm:"type:varchar(20);not null" json:"difficulty" example:"Massive"`
+	Difficulty   Difficulty `gorm:"type:varchar(20);not null" json:"difficulty" example:"massive"`
 	Level        float64    `gorm:"not null" json:"level"`
 	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level"`
 	LevelDesign  *string    `gorm:"column:level_design" json:"level_design"`
@@ -50,60 +50,60 @@ type SongLevel struct {
 }
 
 // TableName specifies the table name for GORM
-func (SongLevel) TableName() string {
-	return "song_levels"
+func (Chart) TableName() string {
+	return "charts"
 }
 
-// LevelInfo represents the details of a difficulty level
+// LevelInfo represents the details of a difficulty level for create/update requests
 type LevelInfo struct {
-	Difficulty  Difficulty `json:"difficulty" example:"Massive"`
+	Difficulty  Difficulty `json:"difficulty" example:"massive"`
 	Level       float64    `json:"level" example:"14.5"`
 	LevelDesign string     `json:"level_design" example:"Designer"`
 	Notes       int        `json:"notes" example:"1000"`
 }
 
-// SongLevelInfo represents the detailed information of a song's difficulty level
-type SongLevelInfo struct {
+// ChartInfo represents the detailed information of a song's chart (flattened view)
+type ChartInfo struct {
 	SongBase
 	SongID       int        `json:"song_id" example:"1"`
-	SongLevelID  int        `json:"song_level_id" example:"10"`
-	Difficulty   Difficulty `json:"difficulty" example:"Massive"`
+	ChartID      int        `json:"chart_id" example:"10"`
+	Difficulty   Difficulty `json:"difficulty" example:"massive"`
 	Level        float64    `json:"level" example:"13.2"`
-	FittingLevel float64    `json:"fitting_level" example:"13.4"`
-	LevelDesign  string     `json:"level_design" example:"Designer"`
+	FittingLevel *float64   `json:"fitting_level" example:"13.4"`
+	LevelDesign  *string    `json:"level_design" example:"Designer"`
 	Notes        int        `json:"notes" example:"850"`
 }
 
-// SongLevelInfoSimple represents a simplified version of song difficulty information
-type SongLevelInfoSimple struct {
+// ChartInfoSimple represents a simplified version of chart information
+type ChartInfoSimple struct {
 	WikiID       string     `json:"wiki_id"`
 	Title        string     `json:"title"`
 	Version      string     `json:"version"`
 	B15          bool       `json:"b15"`
 	SongID       int        `json:"song_id"`
-	SongLevelID  int        `json:"song_level_id"`
+	ChartID      int        `json:"chart_id"`
 	Difficulty   Difficulty `json:"difficulty"`
 	Level        float64    `json:"level"`
 	Cover        string     `json:"cover"`
-	FittingLevel float64    `json:"fitting_level"`
+	FittingLevel *float64   `json:"fitting_level"`
 }
 
-// SongLevelCSV represents the model for CSV import
-type SongLevelCSV struct {
-	SongLevelID int        `json:"song_level_id"`
-	Title       string     `json:"title"`
-	Version     string     `json:"version"`
-	Difficulty  Difficulty `json:"difficulty"`
-	Level       float64    `json:"level"`
-	Score       *int       `json:"score"`
+// ChartCSV represents the model for CSV import
+type ChartCSV struct {
+	ChartID    int        `json:"chart_id"`
+	Title      string     `json:"title"`
+	Version    string     `json:"version"`
+	Difficulty Difficulty `json:"difficulty"`
+	Level      float64    `json:"level"`
+	Score      *int       `json:"score"`
 }
 
-// SongLevelWithScore represents a song level with the user's best score
-type SongLevelWithScore struct {
-	SongLevelID int        `json:"song_level_id"`
-	Title       string     `json:"title"`
-	Version     string     `json:"version"`
-	Difficulty  Difficulty `json:"difficulty"`
-	Level       float64    `json:"level"`
-	Score       int        `json:"score"`
+// ChartWithScore represents a chart with the user's best score
+type ChartWithScore struct {
+	ChartID    int        `json:"chart_id"`
+	Title      string     `json:"title"`
+	Version    string     `json:"version"`
+	Difficulty Difficulty `json:"difficulty"`
+	Level      float64    `json:"level"`
+	Score      int        `json:"score"`
 }
