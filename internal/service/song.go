@@ -1,13 +1,41 @@
 package service
 
 import (
+	"cmp"
 	"errors"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
+	"slices"
 	"strconv"
 	"strings"
 )
+
+// compareVersion compares two dot-separated version strings numerically.
+// Returns -1, 0, or +1 (like cmp.Compare). Non-numeric segments fall back to
+// lexicographic comparison. Missing trailing segments are treated as 0.
+func compareVersion(a, b string) int {
+	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
+	for i := range max(len(pa), len(pb)) {
+		var sa, sb string
+		if i < len(pa) {
+			sa = pa[i]
+		}
+		if i < len(pb) {
+			sb = pb[i]
+		}
+		na, errA := strconv.Atoi(sa)
+		nb, errB := strconv.Atoi(sb)
+		if errA == nil && errB == nil {
+			if c := cmp.Compare(na, nb); c != 0 {
+				return c
+			}
+		} else if c := cmp.Compare(sa, sb); c != 0 {
+			return c
+		}
+	}
+	return 0
+}
 
 type SongService struct {
 	songRepo *repository.SongRepository
@@ -38,6 +66,14 @@ func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 			})
 		}
 	}
+	// Default sort: Version DESC (newest first), then Difficulty DESC (hardest first)
+	slices.SortFunc(charts, func(a, b model.ChartInfo) int {
+		if c := compareVersion(a.Version, b.Version); c != 0 {
+			return -c // descending
+		}
+		return cmp.Compare(b.Difficulty.Order(), a.Difficulty.Order())
+	})
+
 	return charts, nil
 }
 
