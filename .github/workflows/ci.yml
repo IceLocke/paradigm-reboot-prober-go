@@ -53,20 +53,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Checkout submodules (optional)
-        working-directory: ${{ github.workspace }}
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          if [ -n "$PAT_TOKEN" ]; then
-            git config --global url."https://x-access-token:${PAT_TOKEN}@github.com/".insteadOf "https://github.com/"
-            git submodule update --init --recursive
-          else
-            echo "::warning::PAT_TOKEN not set, skipping private submodule checkout"
-          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -81,6 +67,8 @@ jobs:
           cache-dependency-path: web/pnpm-lock.yaml
 
       - name: Install dependencies
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: pnpm install --frozen-lockfile
 
       - name: Run ESLint
@@ -126,19 +114,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      - name: Checkout submodules (optional)
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
-        run: |
-          if [ -n "$PAT_TOKEN" ]; then
-            git config --global url."https://x-access-token:${PAT_TOKEN}@github.com/".insteadOf "https://github.com/"
-            git submodule update --init --recursive
-          else
-            echo "::warning::PAT_TOKEN not set, skipping private submodule checkout"
-          fi
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
