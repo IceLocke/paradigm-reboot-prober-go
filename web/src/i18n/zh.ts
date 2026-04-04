@@ -71,6 +71,7 @@ const zh = {
     avg_rating: '平均 Rating',
     total_rating: '总 Rating',
     scope: '范围',
+    all: '全部',
   },
   message: {
     welcome: '欢迎，{username}！',

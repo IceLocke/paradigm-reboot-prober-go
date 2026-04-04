@@ -103,15 +103,15 @@ const showQuickUpload = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
 const diffTabs = [
-  { key: 'all', label: 'All' },
-  { key: 'detected', label: 'Det' },
-  { key: 'invaded', label: 'Ivd' },
-  { key: 'massive', label: 'Msv' },
-  { key: 'reboot', label: 'Rbt' },
+  { key: 'all', label: t('term.all') },
+  { key: 'detected', label: 'DET' },
+  { key: 'invaded', label: 'IVD' },
+  { key: 'massive', label: 'MSV' },
+  { key: 'reboot', label: 'RBT' },
 ]
 
 const versionTabs = [
-  { key: 'all', label: 'All' },
+  { key: 'all', label: t('term.all') },
   { key: 'old', label: t('term.b35') },
   { key: 'new', label: t('term.b15') },
 ]

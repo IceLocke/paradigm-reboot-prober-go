@@ -17,17 +17,17 @@ const props = withDefaults(defineProps<{
 })
 
 const diffNames: Record<Difficulty, string> = {
-  detected: 'Det',
-  invaded: 'Ivd',
-  massive: 'Msv',
-  reboot: 'Rbt',
+  detected: 'DET',
+  invaded: 'IVD',
+  massive: 'MSV',
+  reboot: 'RBT',
 }
 
 const diffFullNames: Record<Difficulty, string> = {
-  detected: 'Detected',
-  invaded: 'Invaded',
-  massive: 'Massive',
-  reboot: 'Reboot',
+  detected: 'DETECTED',
+  invaded: 'INVADED',
+  massive: 'MASSIVE',
+  reboot: 'REBOOT',
 }
 
 const label = props.short

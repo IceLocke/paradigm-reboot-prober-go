@@ -29,7 +29,7 @@
 
     <!-- Stats overview -->
     <div class="stats-row">
-      <StatCard label="Best 50 Avg" :value="b50Rating" :precision="4" />
+      <StatCard label="Rating" :value="b50Rating" :precision="4" />
       <StatCard label="B35 Avg" :value="b35Rating" :precision="4" />
       <StatCard label="B15 Avg" :value="b15Rating" :precision="4" />
     </div>
