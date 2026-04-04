@@ -33,6 +33,7 @@
         size="small"
         striped
         :loading="loading"
+        @update:sorter="onSorterUpdate"
       />
     </div>
 
@@ -64,7 +65,7 @@
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import type { DataTableColumns, DataTableSortState } from 'naive-ui'
 import dayjs from 'dayjs'
 
 import { useUserStore } from '@/stores/user'
@@ -91,6 +92,8 @@ const total = ref(0)
 const records = ref<PlayRecordInfo[]>([])
 const loading = ref(false)
 
+const sortState = ref<DataTableSortState | null>(null)
+
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const showQuickUpload = ref(false)
@@ -105,6 +108,17 @@ watch(scope, () => {
   pageIndex.value = 1
   loadRecords()
 })
+
+const onSorterUpdate = (
+  sorter: DataTableSortState | DataTableSortState[] | null
+) => {
+  if (Array.isArray(sorter)) {
+    sortState.value = sorter[0] ?? null
+  } else {
+    sortState.value = sorter
+  }
+  loadRecords()
+}
 
 const onClickTitle = async (songId: number) => {
   showSongDetail.value = true
@@ -191,14 +205,14 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     key: 'difficulty',
     width: 110,
     render(row) {
-      return h(DifficultyBadge, { difficulty: row.chart.difficulty, level: row.chart.level, short: true })
+      return h(DifficultyBadge, { key: row.chart.id, difficulty: row.chart.difficulty, level: row.chart.level, short: true })
     },
   },
   {
     title: t('term.score'),
     key: 'score',
     width: 110,
-    sorter: (a, b) => a.score - b.score,
+    sorter: true,
     render(row) {
       return h('span', { class: 'mono' }, row.score.toLocaleString())
     },
@@ -207,7 +221,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     title: 'Rating',
     key: 'rating',
     width: 80,
-    sorter: (a, b) => a.rating - b.rating,
+    sorter: true,
     render(row) {
       return h('span', { class: 'mono' }, (row.rating / 100).toFixed(2))
     },
@@ -252,7 +266,10 @@ const loadRecords = async () => {
       total.value = mock.total
     } else {
       if (!userStore.logged_in) return
-      const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value)
+      const { columnKey, order } = sortState.value ?? {}
+      const sortBy = order === false ? null : columnKey
+      const sortOrder = order === 'ascend' ? 'asc' : 'desc'
+      const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value, sortBy, sortOrder)
       records.value = res.data.records
       total.value = res.data.total
     }

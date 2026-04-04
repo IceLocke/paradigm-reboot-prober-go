@@ -42,6 +42,7 @@
         size="small"
         striped
         :row-key="(row: ChartInfo) => row.id"
+        @update:sorter="onSorterUpdate"
       />
     </div>
 
@@ -69,10 +70,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, watch, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
-import type { DataTableColumns } from 'naive-ui'
+import type { DataTableColumns, DataTableSortState } from 'naive-ui'
 
 import { useAppStore } from '@/stores/app'
 import { getAllCharts, getSingleSongInfo } from '@/api/song'
@@ -94,6 +95,8 @@ const versionFilter = ref('all')
 const pageIndex = ref(1)
 const pageSize = 20
 
+const sortState = ref<DataTableSortState | null>(null)
+
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const showQuickUpload = ref(false)
@@ -113,8 +116,20 @@ const versionTabs = [
   { key: 'new', label: t('term.b15') },
 ]
 
+const compareVersions = (a: string, b: string): number => {
+  const aParts = a.split('.');
+  const bParts = b.split('.');
+  const len = Math.max(aParts.length, bParts.length);
+
+  for (let i = 0; i < len; i++) {
+    const diff = (Number(aParts[i]) || 0) - (Number(bParts[i]) || 0);
+    if (diff) return diff;
+  }
+  return 0;
+};
+
 const filteredData = computed(() => {
-  let data = appStore.charts ?? []
+  let data = Array.from(appStore.charts ?? [])
 
   if (search.value) {
     const q = search.value.toLowerCase()
@@ -128,13 +143,53 @@ const filteredData = computed(() => {
   if (versionFilter.value === 'old') data = data.filter((c) => !c.b15)
   else if (versionFilter.value === 'new') data = data.filter((c) => c.b15)
 
+  if (sortState.value && sortState.value.order) {
+    const { columnKey, order } = sortState.value
+
+    data.sort((a, b) => {
+      let result = 0
+
+      switch (columnKey) {
+        case 'title':
+          result = a.title.localeCompare(b.title)
+          break
+        case 'version':
+          result = compareVersions(a.version, b.version)
+          break
+        case 'level':
+          result = a.level - b.level
+          break
+        case 'fitting_level':
+          result = (a.fitting_level ?? 0) - (b.fitting_level ?? 0)
+          break
+      }
+
+      return order === 'ascend' ? result : -result
+    })
+  }
+
   return data
 })
+
+watch(
+  () => filteredData.value.length,
+  (length: number) => {
+    pageIndex.value = Math.min(pageIndex.value, Math.ceil(length / pageSize))
+  },
+)
 
 const paginatedData = computed(() => {
   const start = (pageIndex.value - 1) * pageSize
   return filteredData.value.slice(start, start + pageSize)
 })
+
+const onSorterUpdate = (sorter: DataTableSortState | DataTableSortState[] | null) => {
+  if (Array.isArray(sorter)) {
+    sortState.value = sorter[0]
+  } else {
+    sortState.value = sorter
+  }
+}
 
 const onClickTitle = async (songId: number) => {
   showSongDetail.value = true
@@ -209,7 +264,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     key: 'title',
     minWidth: 150,
     ellipsis: { tooltip: true },
-    sorter: (a, b) => a.title.localeCompare(b.title),
+    sorter: true,
     render(row) {
       return h('a', {
         class: 'link-text',
@@ -221,7 +276,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     title: t('term.version'),
     key: 'version',
     width: 80,
-    sorter: (a, b) => a.version.localeCompare(b.version),
+    sorter: true,
   },
   {
     title: t('term.b35orb15'),
@@ -245,7 +300,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     title: t('term.level'),
     key: 'level',
     width: 80,
-    sorter: (a, b) => a.level - b.level,
+    sorter: true,
     render(row) {
       return h('span', { class: 'mono' }, row.level.toFixed(1))
     },
@@ -254,7 +309,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     title: t('term.fitting_level'),
     key: 'fitting_level',
     width: 90,
-    sorter: (a, b) => (a.fitting_level ?? 0) - (b.fitting_level ?? 0),
+    sorter: true,
     render(row) {
       return h('span', { class: 'mono' }, row.fitting_level != null ? row.fitting_level.toFixed(1) : '-')
     },
