@@ -66,10 +66,13 @@ func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 			})
 		}
 	}
-	// Default sort: Version DESC (newest first), then Difficulty DESC (hardest first)
+	// Default sort: Version DESC (newest first), SongID ASC (as order in album), then Difficulty DESC (hardest first)
 	slices.SortFunc(charts, func(a, b model.ChartInfo) int {
 		if c := compareVersion(a.Version, b.Version); c != 0 {
 			return -c // descending
+		}
+		if c := cmp.Compare(a.SongID, b.SongID); c != 0 {
+			return c // ascending
 		}
 		return cmp.Compare(b.Difficulty.Order(), a.Difficulty.Order())
 	})
