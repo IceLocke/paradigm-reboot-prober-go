@@ -110,12 +110,12 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	// Fetch target user for nickname
 	targetUser, err := ctrl.userService.GetUser(username)
-	if targetUser == nil {
-		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
-		return
-	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+		return
+	}
+	if targetUser == nil {
+		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
 
