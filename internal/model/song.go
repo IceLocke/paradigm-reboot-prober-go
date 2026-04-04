@@ -6,7 +6,7 @@ type SongBase struct {
 	Title       string `gorm:"not null" json:"title" binding:"required" example:"Song Title"`
 	Artist      string `gorm:"not null" json:"artist" binding:"required" example:"Artist Name"`
 	Genre       string `gorm:"not null" json:"genre" example:"Pop"`
-	Cover       string `gorm:"not null" json:"cover" example:"https://example.com/cover.jpg"`
+	Cover       string `gorm:"not null" json:"cover" example:"Cover_d3d3d3.jpg"`
 	Illustrator string `gorm:"not null" json:"illustrator" example:"Artist"`
 	Version     string `gorm:"not null" json:"version" example:"1.0.0"`
 	B15         bool   `gorm:"not null" json:"b15" example:"false"`

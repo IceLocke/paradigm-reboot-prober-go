@@ -3,6 +3,15 @@
     <div class="page-header">
       <h2>{{ t('term.b50') }}</h2>
       <div class="page-actions">
+        <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
+          <template #trigger>
+            <button class="icon-btn" :title="t('term.upload_list')">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+              <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
+            </button>
+          </template>
+          <UploadCartPanel />
+        </n-popover>
         <button
           class="icon-btn"
           :title="t('common.export_image')"
@@ -76,6 +85,14 @@
 
     <!-- Song detail modal -->
     <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+    <QuickUploadModal
+      v-model:show="showQuickUpload"
+      :title="uploadTarget.title"
+      :difficulty="uploadTarget.difficulty"
+      :level="uploadTarget.level"
+      :chart-id="uploadTarget.chartId"
+      @success="loadData"
+    />
   </div>
 </template>
 
@@ -83,7 +100,7 @@
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { saveAs } from 'file-saver'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, useMessage } from 'naive-ui'
+import { NDataTable, NPopover, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
@@ -92,26 +109,32 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
 import { useUserStore } from '@/stores/user'
+import { useAppStore } from '@/stores/app'
 import { getRecords } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockB50 } from '@/api/mock'
-import type { PlayRecordInfo, Song } from '@/api/types'
+import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
 import { renderB50Image } from '@/utils/b50Canvas'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import StatCard from '@/components/business/StatCard.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
+import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
+import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
 
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
+const appStore = useAppStore()
 
 const allRecords = ref<PlayRecordInfo[]>([])
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const exporting = ref(false)
+const showQuickUpload = ref(false)
+const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
 const b35Records = computed(() =>
   allRecords.value.filter((r) => !r.chart.b15).map((r, i) => ({ ...r, _index: i + 1 }))
@@ -135,6 +158,28 @@ const b15Rating = computed(() => {
   const sum = b15Records.value.reduce((s, r) => s + r.rating, 0)
   return sum / 1500
 })
+
+const onAddToCart = (record: PlayRecordInfo) => {
+  const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.id)
+  if (exists) return
+  appStore.uploadList.push({
+    title: record.chart.title,
+    difficulty: record.chart.difficulty,
+    level: record.chart.level,
+    chart_id: record.chart.id,
+    score: 0,
+  })
+}
+
+const onQuickUpload = (record: PlayRecordInfo) => {
+  uploadTarget.value = {
+    title: record.chart.title,
+    difficulty: record.chart.difficulty,
+    level: record.chart.level,
+    chartId: record.chart.id,
+  }
+  showQuickUpload.value = true
+}
 
 const onClickSongTitle = async (songId: number) => {
   showSongDetail.value = true
@@ -199,6 +244,27 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     sorter: (a, b) => a.rating - b.rating,
     render(row) {
       return h('span', { class: 'mono' }, (row.rating / 100).toFixed(2))
+    },
+  },
+  {
+    title: '',
+    key: 'actions',
+    width: 80,
+    render(row) {
+      return h('div', { class: 'action-btns' }, [
+        h('button', {
+          class: 'action-btn',
+          title: t('message.add_to_upload_list'),
+          onClick: () => onAddToCart(row),
+          innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
+        }),
+        h('button', {
+          class: 'action-btn',
+          title: t('message.quick_upload'),
+          onClick: () => onQuickUpload(row),
+          innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+        }),
+      ])
     },
   },
 ])
@@ -341,6 +407,7 @@ onMounted(loadData)
 }
 
 .icon-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -352,6 +419,22 @@ onMounted(loadData)
   cursor: pointer;
   border-radius: 8px;
   transition: background var(--transition-fast);
+}
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
 }
 @media (hover: hover) {
   .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
@@ -365,6 +448,26 @@ onMounted(loadData)
 }
 :deep(.link-text:hover) { text-decoration: underline; }
 :deep(.mono) { font-family: var(--font-mono); font-size: var(--text-sm); }
+:deep(.action-btns) {
+  display: flex;
+  gap: 2px;
+}
+:deep(.action-btn) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+@media (hover: hover) {
+  :deep(.action-btn:hover) { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+}
 
 .icon-btn:disabled {
   opacity: 0.4;
