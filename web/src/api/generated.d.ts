@@ -28,7 +28,7 @@ export interface paths {
                     page_index?: number;
                     /** @description Sort by (rating, score, record_time, etc.) */
                     sort_by?: string;
-                    /** @description Order (desc or asce) */
+                    /** @description Order (desc or asc) */
                     order?: string;
                 };
                 header?: never;
@@ -377,44 +377,7 @@ export interface paths {
                 };
             };
         };
-        /**
-         * Create a new song
-         * @description Create a new song with its charts (Admin only)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            /** @description Song creation info */
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["request.CreateSongRequest"];
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.ChartInfo"][];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.Response"];
-                    };
-                };
-            };
-        };
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -763,13 +726,13 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description OK */
-                200: {
+                /** @description Created */
+                201: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["model.User"];
+                        "application/json": components["schemas"]["model.UserPublic"];
                     };
                 };
                 /** @description Bad Request */
@@ -856,10 +819,10 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         "model.Chart": {
-            id?: number;
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
             fitting_level?: number;
+            id?: number;
             level?: number;
             level_design?: string;
             notes?: number;
@@ -870,14 +833,12 @@ export interface components {
             /** @example First Album */
             album?: string;
             /** @example Artist Name */
-            artist?: string;
+            artist: string;
             /** @example false */
             b15?: boolean;
             /** @example 180 */
             bpm?: string;
-            /** @example 10 */
-            id?: number;
-            /** @example https://example.com/cover.jpg */
+            /** @example Cover_d3d3d3.jpg */
             cover?: string;
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
@@ -885,6 +846,8 @@ export interface components {
             fitting_level?: number;
             /** @example Pop */
             genre?: string;
+            /** @example 10 */
+            id?: number;
             /** @example Artist */
             illustrator?: string;
             /** @example 2:30 */
@@ -898,18 +861,18 @@ export interface components {
             /** @example 1 */
             song_id?: number;
             /** @example Song Title */
-            title?: string;
+            title: string;
             /** @example 1.0.0 */
             version?: string;
             /** @example w123 */
-            wiki_id?: string;
+            wiki_id: string;
         };
         "model.ChartInfoSimple": {
             b15?: boolean;
-            id?: number;
             cover?: string;
             difficulty?: components["schemas"]["model.Difficulty"];
             fitting_level?: number;
+            id?: number;
             level?: number;
             song_id?: number;
             title?: string;
@@ -917,8 +880,11 @@ export interface components {
             wiki_id?: string;
         };
         "model.ChartInput": {
-            /** @example massive */
-            difficulty?: components["schemas"]["model.Difficulty"];
+            /**
+             * @example massive
+             * @enum {unknown}
+             */
+            difficulty: "detected" | "invaded" | "massive" | "reboot";
             /** @example 14.5 */
             level?: number;
             /** @example Designer */
@@ -953,6 +919,7 @@ export interface components {
             score?: number;
         };
         "model.PlayRecordResponse": {
+            nickname?: string;
             records?: components["schemas"]["model.PlayRecordInfo"][];
             total?: number;
             username?: string;
@@ -965,27 +932,27 @@ export interface components {
             /** @example First Album */
             album?: string;
             /** @example Artist Name */
-            artist?: string;
+            artist: string;
             /** @example false */
             b15?: boolean;
             /** @example 180 */
             bpm?: string;
             charts?: components["schemas"]["model.Chart"][];
-            /** @example https://example.com/cover.jpg */
+            /** @example Cover_d3d3d3.jpg */
             cover?: string;
             /** @example Pop */
             genre?: string;
+            id?: number;
             /** @example Artist */
             illustrator?: string;
             /** @example 2:30 */
             length?: string;
-            id?: number;
             /** @example Song Title */
-            title?: string;
+            title: string;
             /** @example 1.0.0 */
             version?: string;
             /** @example w123 */
-            wiki_id?: string;
+            wiki_id: string;
         };
         "model.Token": {
             access_token?: string;
@@ -1004,6 +971,7 @@ export interface components {
             anonymous_probe?: boolean;
             /** @example user@example.com */
             email: string;
+            id?: number;
             /** @example true */
             is_active?: boolean;
             /** @example false */
@@ -1014,15 +982,34 @@ export interface components {
             qq_number?: number;
             /** @example token_xyz */
             upload_token?: string;
-            id?: number;
             /** @example user123 */
             username: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
             uuid?: string;
         };
+        "model.UserPublic": {
+            /** @example act_001 */
+            account?: string;
+            /** @example 1001 */
+            account_number?: number;
+            /** @example false */
+            anonymous_probe?: boolean;
+            /** @example user@example.com */
+            email?: string;
+            /** @example 1 */
+            id?: number;
+            /** @example 小明 */
+            nickname?: string;
+            /** @example 12345678 */
+            qq_number?: number;
+            /** @example user123 */
+            username?: string;
+            /** @example 550e8400-e29b-41d4-a716-446655440000 */
+            uuid?: string;
+        };
         "request.BatchCreatePlayRecordRequest": {
             is_replace?: boolean;
-            play_records?: components["schemas"]["model.PlayRecordBase"][];
+            play_records: components["schemas"]["model.PlayRecordBase"][];
             upload_token?: string;
         };
         "request.ChangePasswordRequest": {
@@ -1035,13 +1022,13 @@ export interface components {
             /** @example First Album */
             album?: string;
             /** @example Artist Name */
-            artist?: string;
+            artist: string;
             /** @example false */
             b15?: boolean;
             /** @example 180 */
             bpm?: string;
-            charts?: components["schemas"]["model.ChartInput"][];
-            /** @example https://example.com/cover.jpg */
+            charts: components["schemas"]["model.ChartInput"][];
+            /** @example Cover_d3d3d3.jpg */
             cover?: string;
             /** @example Pop */
             genre?: string;
@@ -1050,37 +1037,21 @@ export interface components {
             /** @example 2:30 */
             length?: string;
             /** @example Song Title */
-            title?: string;
+            title: string;
             /** @example 1.0.0 */
             version?: string;
             /** @example w123 */
-            wiki_id?: string;
+            wiki_id: string;
         };
         "request.CreateUserRequest": {
-            /** @example act_001 */
-            account?: string;
-            /** @example 1001 */
-            account_number?: number;
-            /** @example false */
-            anonymous_probe?: boolean;
             /** @example user@example.com */
             email: string;
-            /** @example true */
-            is_active?: boolean;
-            /** @example false */
-            is_admin?: boolean;
             /** @example 小明 */
             nickname?: string;
             /** @example secret123 */
             password: string;
-            /** @example 12345678 */
-            qq_number?: number;
-            /** @example token_xyz */
-            upload_token?: string;
             /** @example user123 */
             username: string;
-            /** @example 550e8400-e29b-41d4-a716-446655440000 */
-            uuid?: string;
         };
         "request.ResetPasswordRequest": {
             /** @example newpass456 */
@@ -1092,27 +1063,27 @@ export interface components {
             /** @example First Album */
             album?: string;
             /** @example Artist Name */
-            artist?: string;
+            artist: string;
             /** @example false */
             b15?: boolean;
             /** @example 180 */
             bpm?: string;
-            charts?: components["schemas"]["model.ChartInput"][];
-            /** @example https://example.com/cover.jpg */
+            charts: components["schemas"]["model.ChartInput"][];
+            /** @example Cover_d3d3d3.jpg */
             cover?: string;
             /** @example Pop */
             genre?: string;
+            id: number;
             /** @example Artist */
             illustrator?: string;
             /** @example 2:30 */
             length?: string;
-            song_id: number;
             /** @example Song Title */
-            title?: string;
+            title: string;
             /** @example 1.0.0 */
             version?: string;
             /** @example w123 */
-            wiki_id?: string;
+            wiki_id: string;
         };
         "request.UpdateUserRequest": {
             account?: string;

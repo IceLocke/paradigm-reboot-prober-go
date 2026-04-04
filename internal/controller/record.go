@@ -108,6 +108,17 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		return
 	}
 
+	// Fetch target user for nickname
+	targetUser, err := ctrl.userService.GetUser(username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+		return
+	}
+	if targetUser == nil {
+		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
+		return
+	}
+
 	switch scope {
 	case "b50":
 		records, err := ctrl.recordService.GetBest50Records(username, underflow)
@@ -121,6 +132,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    len(recordInfos),
 			Records:  recordInfos,
 		})
@@ -142,6 +154,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    int(total),
 			Records:  recordInfos,
 		})
@@ -163,6 +176,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    int(total),
 			Records:  recordInfos,
 		})
@@ -173,18 +187,9 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		user, err := ctrl.userService.GetUser(username)
-		if user == nil {
-			c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
-			return
-		}
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
-			return
-		}
 		c.JSON(http.StatusOK, model.AllChartsResponse{
 			Username: username,
-			Nickname: user.Nickname,
+			Nickname: targetUser.Nickname,
 			Charts:   charts,
 		})
 
@@ -293,6 +298,17 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 		return
 	}
 
+	// Fetch target user for nickname
+	targetUser, err := ctrl.userService.GetUser(username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+		return
+	}
+	if targetUser == nil {
+		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
+		return
+	}
+
 	switch scope {
 	case "best":
 		records, err := ctrl.recordService.GetBestRecordsBySong(username, songID)
@@ -306,6 +322,7 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    len(recordInfos),
 			Records:  recordInfos,
 		})
@@ -324,6 +341,7 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    int(total),
 			Records:  recordInfos,
 		})
@@ -365,6 +383,17 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 		return
 	}
 
+	// Fetch target user for nickname
+	targetUser, err := ctrl.userService.GetUser(username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+		return
+	}
+	if targetUser == nil {
+		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
+		return
+	}
+
 	switch scope {
 	case "best":
 		record, err := ctrl.recordService.GetBestRecordByChart(username, chartID)
@@ -378,6 +407,7 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    len(recordInfos),
 			Records:  recordInfos,
 		})
@@ -396,6 +426,7 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 		}
 		c.JSON(http.StatusOK, model.PlayRecordResponse{
 			Username: username,
+			Nickname: targetUser.Nickname,
 			Total:    int(total),
 			Records:  recordInfos,
 		})

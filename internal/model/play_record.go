@@ -85,6 +85,7 @@ type AllChartsResponse struct {
 // PlayRecordResponse represents the response for play records
 type PlayRecordResponse struct {
 	Username string           `json:"username"`
+	Nickname string           `json:"nickname"`
 	Total    int              `json:"total"`
 	Records  []PlayRecordInfo `json:"records"`
 }
