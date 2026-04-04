@@ -1,4 +1,5 @@
 import eslint from '@eslint/js'
+import globals from 'globals'
 import tseslint from 'typescript-eslint'
 import pluginVue from 'eslint-plugin-vue'
 
@@ -14,6 +15,13 @@ export default tseslint.config(
 
   // Base JS recommended rules
   eslint.configs.recommended,
+
+  // Browser globals
+  {
+    languageOptions: {
+      globals: globals.browser,
+    },
+  },
 
   // TypeScript recommended rules
   ...tseslint.configs.recommended,
