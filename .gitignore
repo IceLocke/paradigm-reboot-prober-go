@@ -40,6 +40,7 @@ Thumbs.db
 # Database (GORM common local DBs)
 *.db
 *.sqlite
+**/db_full.sql
 
 web/style-samples/*
 
