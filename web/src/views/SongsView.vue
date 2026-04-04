@@ -100,10 +100,10 @@ const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, leve
 
 const diffTabs = [
   { key: 'all', label: 'All' },
-  { key: 'detected', label: 'DT' },
-  { key: 'invaded', label: 'IN' },
-  { key: 'massive', label: 'MS' },
-  { key: 'reboot', label: 'RB' },
+  { key: 'detected', label: 'Det' },
+  { key: 'invaded', label: 'Ivd' },
+  { key: 'massive', label: 'Msv' },
+  { key: 'reboot', label: 'Rbt' },
 ]
 
 const versionTabs = [

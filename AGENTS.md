@@ -16,20 +16,20 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 
 ## Tech Stack
 
-| Component       | Technology                                    |
-|-----------------|-----------------------------------------------|
-| Language        | Go 1.24 (toolchain go1.24.4)                  |
-| Web Framework   | [Gin](https://github.com/gin-gonic/gin)       |
-| ORM             | [GORM](https://gorm.io/)                      |
-| Database        | PostgreSQL (production), SQLite (dev/testing)  |
-| Authentication  | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt    |
-| API Docs        | Swagger via `swaggo/swag` + `swaggo/gin-swagger` |
-| Testing         | `testing` stdlib + `stretchr/testify`          |
-| Linting         | golangci-lint v2.6                             |
-| CI/CD           | GitHub Actions                                 |
-| Container       | Docker (multi-stage Alpine build)              |
-| Orchestration   | Docker Compose (app + PostgreSQL 16)           |
-| Frontend        | Vue.js (legacy, as git submodule)              |
+| Component      | Technology                                       |
+|----------------|--------------------------------------------------|
+| Language       | Go 1.24 (toolchain go1.24.4)                     |
+| Web Framework  | [Gin](https://github.com/gin-gonic/gin)          |
+| ORM            | [GORM](https://gorm.io/)                         |
+| Database       | PostgreSQL (production), SQLite (dev/testing)    |
+| Authentication | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt      |
+| API Docs       | Swagger via `swaggo/swag` + `swaggo/gin-swagger` |
+| Testing        | `testing` stdlib + `stretchr/testify`            |
+| Linting        | golangci-lint v2.6                               |
+| CI/CD          | GitHub Actions                                   |
+| Container      | Docker (multi-stage Alpine build)                |
+| Orchestration  | Docker Compose (app + PostgreSQL 16)             |
+| Frontend       | Vue.js (legacy, in `web/legacy/`)                |
 
 ## Project Structure
 
@@ -82,7 +82,6 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── swagger.json
 │   └── swagger.yaml
 ├── web/                          # Frontend assets
-│   ├── legacy/                  # Vue.js legacy frontend (git submodule → prp-prober-deploy)
 │   │   ├── src/                 # Vue components, utils, styles
 │   │   └── public/              # Static assets (covers, icons)
 │   └── styles/                  # Frontend style documentation
@@ -95,7 +94,6 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 ├── Dockerfile                   # Multi-stage Docker build
 ├── docker-compose.yaml          # App + PostgreSQL compose setup
 ├── .golangci.yml                # Linter configuration
-├── .gitmodules                  # Git submodule config (web/legacy)
 ├── go.mod / go.sum              # Go module files
 └── AGENTS.md                    # This file
 ```

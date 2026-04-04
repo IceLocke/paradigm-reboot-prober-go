@@ -19,10 +19,10 @@
   --color-info: #3b82f6;
 
   /* Difficulty colors */
-  --diff-detected: #22c55e;
-  --diff-invaded: #eab308;
-  --diff-massive: #f97316;
-  --diff-reboot: #ec4899;
+  --diff-detected: #3b82f6;
+  --diff-invaded: #ef4444;
+  --diff-massive: #a855f7;
+  --diff-reboot: #f97316;
 
   /* Text */
   --text-primary: #e4e4e7;

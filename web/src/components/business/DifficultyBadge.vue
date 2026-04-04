@@ -17,10 +17,10 @@ const props = withDefaults(defineProps<{
 })
 
 const diffNames: Record<Difficulty, string> = {
-  detected: 'DT',
-  invaded: 'IN',
-  massive: 'MS',
-  reboot: 'RB',
+  detected: 'Det',
+  invaded: 'Ivd',
+  massive: 'Msv',
+  reboot: 'Rbt',
 }
 
 const diffFullNames: Record<Difficulty, string> = {
@@ -46,8 +46,8 @@ const label = props.short
   font-family: var(--font-mono);
   white-space: nowrap;
 }
-.diff-badge--detected { background: rgba(34, 197, 94, 0.15); color: var(--diff-detected); }
-.diff-badge--invaded { background: rgba(234, 179, 8, 0.15); color: var(--diff-invaded); }
-.diff-badge--massive { background: rgba(249, 115, 22, 0.15); color: var(--diff-massive); }
-.diff-badge--reboot { background: rgba(236, 72, 153, 0.15); color: var(--diff-reboot); }
+.diff-badge--detected { background: rgba(59, 130, 246, 0.15); color: var(--diff-detected); }
+.diff-badge--invaded  { background: rgba(239, 68, 68, 0.15);  color: var(--diff-invaded); }
+.diff-badge--massive  { background: rgba(168, 85, 247, 0.15); color: var(--diff-massive); }
+.diff-badge--reboot   { background: rgba(249, 115, 22, 0.15); color: var(--diff-reboot); }
 </style>

@@ -171,36 +171,36 @@ When `true`, all views call `getMockCharts()`, `getMockB50()`, `getMockRecords()
 
 ### Key Design Tokens (`src/assets/styles/variables.css`)
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--bg-primary` | `#0e0e12` | Page background |
-| `--bg-secondary` | `#16161c` | Header, sidebar, input bg |
-| `--bg-card` | `#1a1a22` | Card surfaces |
-| `--accent` | `#3b82f6` | Primary interactive color |
-| `--text-primary` | `#e4e4e7` | Main text |
-| `--text-secondary` | `#a1a1aa` | Secondary text |
-| `--text-muted` | `#52525b` | Disabled / caption text |
-| `--border` | `#27272a` | Default border color |
-| `--diff-detected` | `#22c55e` | Detected difficulty (green) |
-| `--diff-invaded` | `#eab308` | Invaded difficulty (yellow) |
-| `--diff-massive` | `#f97316` | Massive difficulty (orange) |
-| `--diff-reboot` | `#ec4899` | Reboot difficulty (pink) |
+| Token              | Value     | Usage                       |
+|--------------------|-----------|-----------------------------|
+| `--bg-primary`     | `#0e0e12` | Page background             |
+| `--bg-secondary`   | `#16161c` | Header, sidebar, input bg   |
+| `--bg-card`        | `#1a1a22` | Card surfaces               |
+| `--accent`         | `#3b82f6` | Primary interactive color   |
+| `--text-primary`   | `#e4e4e7` | Main text                   |
+| `--text-secondary` | `#a1a1aa` | Secondary text              |
+| `--text-muted`     | `#52525b` | Disabled / caption text     |
+| `--border`         | `#27272a` | Default border color        |
+| `--diff-detected`  | `#3b82f6` | Detected difficulty (blue)  |
+| `--diff-invaded`   | `#ef4444` | Invaded difficulty (red)    |
+| `--diff-massive`   | `#a855f7` | Massive difficulty (purple) |
+| `--diff-reboot`    | `#f97316` | Reboot difficulty (orange)  |
 
 ### Typography
 
-| Usage | Font Family | Variable |
-|-------|-------------|----------|
-| Body text | Inter, Noto Sans SC | `--font-sans` |
-| Numeric / code | JetBrains Mono | `--font-mono` |
+| Usage          | Font Family         | Variable      |
+|----------------|---------------------|---------------|
+| Body text      | Inter, Noto Sans SC | `--font-sans` |
+| Numeric / code | JetBrains Mono      | `--font-mono` |
 
 ### Border Radius
 
-| Context | Value |
-|---------|-------|
-| Cards, modals | `10px` |
-| Buttons, inputs, tabs | `8px` |
-| Small elements, list items | `6px` |
-| Badges, tags | `4px` |
+| Context                    | Value  |
+|----------------------------|--------|
+| Cards, modals              | `10px` |
+| Buttons, inputs, tabs      | `8px`  |
+| Small elements, list items | `6px`  |
+| Badges, tags               | `4px`  |
 
 ### Theme Sync
 
@@ -268,13 +268,13 @@ Vite proxies `/api` → `http://localhost:8080` so the frontend can call the Go 
 
 ## Routes
 
-| Path | View Component | Description |
-|------|---------------|-------------|
-| `/` | — | Redirects to `/best50` |
-| `/best50` | `Best50View.vue` | B50 stats, scatter charts, B35/B15 record tables |
-| `/songs` | `SongsView.vue` | All charts with search, difficulty/version filters, pagination |
-| `/records` | `RecordsView.vue` | Play records with scope tabs (best/all), pagination |
-| `/about` | `AboutView.vue` | Project description and GitHub link |
+| Path       | View Component    | Description                                                    |
+|------------|-------------------|----------------------------------------------------------------|
+| `/`        | —                 | Redirects to `/best50`                                         |
+| `/best50`  | `Best50View.vue`  | B50 stats, scatter charts, B35/B15 record tables               |
+| `/songs`   | `SongsView.vue`   | All charts with search, difficulty/version filters, pagination |
+| `/records` | `RecordsView.vue` | Play records with scope tabs (best/all), pagination            |
+| `/about`   | `AboutView.vue`   | Project description and GitHub link                            |
 
 All view components are **lazy-loaded** via `() => import(...)`.
 
@@ -284,13 +284,13 @@ All view components are **lazy-loaded** via `() => import(...)`.
 
 ### `userStore` (persisted to localStorage)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `username` | `string` | Current username |
-| `access_token` | `string` | Full JWT (`"Bearer xxx"`) |
-| `is_admin` | `boolean` | Admin flag |
-| `logged_in` | `boolean` | Auth state |
-| `profile` | `User \| null` | Full user profile object |
+| Field          | Type           | Description               |
+|----------------|----------------|---------------------------|
+| `username`     | `string`       | Current username          |
+| `access_token` | `string`       | Full JWT (`"Bearer xxx"`) |
+| `is_admin`     | `boolean`      | Admin flag                |
+| `logged_in`    | `boolean`      | Auth state                |
+| `profile`      | `User \| null` | Full user profile object  |
 
 ### `appStore` (not persisted)
 
