@@ -209,7 +209,11 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     title: t('term.title'),
     key: 'title',
     minWidth: 140,
-    ellipsis: { tooltip: true },
+    ellipsis: {
+      tooltip: {
+        zIndex: 1,
+      },
+    },
     render(row) {
       return h('a', {
         class: 'link-text',

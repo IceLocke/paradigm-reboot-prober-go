@@ -263,7 +263,11 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     title: t('term.title'),
     key: 'title',
     minWidth: 150,
-    ellipsis: { tooltip: true },
+    ellipsis: {
+      tooltip: {
+        zIndex: 1,
+      },
+    },
     sorter: true,
     render(row) {
       return h('a', {

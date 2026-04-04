@@ -5,6 +5,7 @@
     :title="t('auth.register')"
     style="width: 420px; max-width: 95vw;"
     :bordered="false"
+    :auto-focus="false"
     @update:show="$emit('update:show', $event)"
   >
     <div class="auth-form">

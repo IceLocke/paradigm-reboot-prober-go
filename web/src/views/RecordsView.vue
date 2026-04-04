@@ -182,7 +182,11 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     title: t('term.title'),
     key: 'title',
     minWidth: 150,
-    ellipsis: { tooltip: true },
+    ellipsis: {
+      tooltip: {
+        zIndex: 1,
+      },
+    },
     render(row) {
       return h('a', {
         class: 'link-text',
