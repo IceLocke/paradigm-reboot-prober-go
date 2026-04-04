@@ -34,9 +34,6 @@ export default tseslint.config(
   // Project-specific rule overrides
   {
     rules: {
-      // Disable no-undef for TypeScript — TS compiler handles this better
-      'no-undef': 'off',
-
       // Align with tsconfig (noUnusedLocals: false, noUnusedParameters: false)
       '@typescript-eslint/no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
