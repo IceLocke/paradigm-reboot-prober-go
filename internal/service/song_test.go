@@ -44,10 +44,10 @@ func TestSongService(t *testing.T) {
 		assert.NotNil(t, song)
 		assert.Equal(t, "Test Song", song.Title)
 
-		songByID, err := songService.GetSingleSong(song.SongID, "prp")
+		songByID, err := songService.GetSingleSong(song.ID, "prp")
 		assert.NoError(t, err)
 		assert.NotNil(t, songByID)
-		assert.Equal(t, song.SongID, songByID.SongID)
+		assert.Equal(t, song.ID, songByID.ID)
 	})
 
 	t.Run("GetAllCharts", func(t *testing.T) {
@@ -60,7 +60,7 @@ func TestSongService(t *testing.T) {
 	t.Run("UpdateSong", func(t *testing.T) {
 		song, _ := songService.GetSingleSongByWikiID("test_song")
 		req := &request.UpdateSongRequest{
-			SongID: song.SongID,
+			ID: song.ID,
 			SongBase: model.SongBase{
 				WikiID: "test_song",
 				Title:  "Updated Song",
@@ -105,15 +105,15 @@ func TestSongService_ResolveSongID(t *testing.T) {
 	song, _ := songService.GetSingleSongByWikiID("resolve_song")
 
 	t.Run("Resolve by numeric ID", func(t *testing.T) {
-		id, err := songService.ResolveSongID(fmt.Sprintf("%d", song.SongID))
+		id, err := songService.ResolveSongID(fmt.Sprintf("%d", song.ID))
 		assert.NoError(t, err)
-		assert.Equal(t, song.SongID, id)
+		assert.Equal(t, song.ID, id)
 	})
 
 	t.Run("Resolve by wiki_id", func(t *testing.T) {
 		id, err := songService.ResolveSongID("resolve_song")
 		assert.NoError(t, err)
-		assert.Equal(t, song.SongID, id)
+		assert.Equal(t, song.ID, id)
 	})
 
 	t.Run("Resolve numeric ID not found", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestSongService_ResolveChartID(t *testing.T) {
 	var massiveChartID int
 	for _, c := range charts {
 		if c.Difficulty == model.DifficultyMassive {
-			massiveChartID = c.ChartID
+			massiveChartID = c.ID
 		}
 	}
 

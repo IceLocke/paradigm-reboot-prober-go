@@ -13,7 +13,7 @@ import (
 func TestGenerateCSV(t *testing.T) {
 	records := []model.ChartWithScore{
 		{
-			ChartID:    1,
+			ID:         1,
 			Title:      "Test Song",
 			Version:    "1.0",
 			Difficulty: model.DifficultyMassive,
@@ -38,7 +38,7 @@ func TestGenerateEmptyCSVAndGetRecords(t *testing.T) {
 
 	charts := []model.Chart{
 		{
-			ChartID:    1,
+			ID:         1,
 			Difficulty: model.DifficultyMassive,
 			Level:      10.5,
 			Song: &model.Song{

@@ -55,7 +55,7 @@ function generateChartInfoList(): ChartInfo[] {
     for (let d = 0; d < diffCount; d++) {
       const level = Math.round(baseLevels[d] * 10) / 10
       charts.push({
-        chart_id: chartId++,
+        id: chartId++,
         song_id: songId,
         title: song.title,
         artist: song.artist,
@@ -102,12 +102,12 @@ function generateRecords(charts: ChartInfo[], count: number): PlayRecordInfo[] {
     date.setDate(date.getDate() - daysAgo)
 
     records.push({
-      play_record_id: i + 1,
+      id: i + 1,
       score,
       rating,
       record_time: date.toISOString(),
       chart: {
-        chart_id: chart.chart_id,
+        id: chart.id,
         song_id: chart.song_id,
         title: chart.title,
         cover: chart.cover,
@@ -135,19 +135,19 @@ function generateBest50(charts: ChartInfo[]): PlayRecordInfo[] {
   const usedNew = new Set<number>()
 
   for (const chart of oldCharts) {
-    if (usedOld.has(chart.chart_id)) continue
-    usedOld.add(chart.chart_id)
+    if (usedOld.has(chart.id)) continue
+    usedOld.add(chart.id)
     const score = 950000 + Math.floor(Math.random() * 60000)
     const daysAgo = Math.floor(Math.random() * 60)
     const date = new Date()
     date.setDate(date.getDate() - daysAgo)
     b35Records.push({
-      play_record_id: 1000 + b35Records.length,
+      id: 1000 + b35Records.length,
       score,
       rating: calculateRating(chart.level, score),
       record_time: date.toISOString(),
       chart: {
-        chart_id: chart.chart_id,
+        id: chart.id,
         song_id: chart.song_id,
         title: chart.title,
         cover: chart.cover,
@@ -163,19 +163,19 @@ function generateBest50(charts: ChartInfo[]): PlayRecordInfo[] {
   }
 
   for (const chart of newCharts) {
-    if (usedNew.has(chart.chart_id)) continue
-    usedNew.add(chart.chart_id)
+    if (usedNew.has(chart.id)) continue
+    usedNew.add(chart.id)
     const score = 950000 + Math.floor(Math.random() * 60000)
     const daysAgo = Math.floor(Math.random() * 30)
     const date = new Date()
     date.setDate(date.getDate() - daysAgo)
     b15Records.push({
-      play_record_id: 2000 + b15Records.length,
+      id: 2000 + b15Records.length,
       score,
       rating: calculateRating(chart.level, score),
       record_time: date.toISOString(),
       chart: {
-        chart_id: chart.chart_id,
+        id: chart.id,
         song_id: chart.song_id,
         title: chart.title,
         cover: chart.cover,
@@ -232,9 +232,9 @@ export function getMockRecords(
     // One record per chart, highest score
     const bestMap = new Map<number, PlayRecordInfo>()
     for (const rec of allRecords) {
-      const existing = bestMap.get(rec.chart.chart_id)
+      const existing = bestMap.get(rec.chart.id)
       if (!existing || rec.score > existing.score) {
-        bestMap.set(rec.chart.chart_id, rec)
+        bestMap.set(rec.chart.id, rec)
       }
     }
     const bestRecords = Array.from(bestMap.values()).sort((a, b) => b.rating - a.rating)
@@ -257,7 +257,7 @@ export function getMockRecords(
 
 export function getMockUser(): User {
   return {
-    user_id: 1,
+    id: 1,
     username: 'demo_user',
     nickname: 'Demo',
     email: 'demo@example.com',

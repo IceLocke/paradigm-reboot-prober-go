@@ -856,7 +856,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         "model.Chart": {
-            chart_id?: number;
+            id?: number;
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
             fitting_level?: number;
@@ -876,7 +876,7 @@ export interface components {
             /** @example 180 */
             bpm?: string;
             /** @example 10 */
-            chart_id?: number;
+            id?: number;
             /** @example https://example.com/cover.jpg */
             cover?: string;
             /** @example massive */
@@ -906,7 +906,7 @@ export interface components {
         };
         "model.ChartInfoSimple": {
             b15?: boolean;
-            chart_id?: number;
+            id?: number;
             cover?: string;
             difficulty?: components["schemas"]["model.Difficulty"];
             fitting_level?: number;
@@ -932,7 +932,7 @@ export interface components {
             chart?: components["schemas"]["model.Chart"];
             /** @example 1 */
             chart_id: number;
-            play_record_id?: number;
+            id?: number;
             rating?: number;
             record_time?: string;
             /** @example 1000000 */
@@ -947,7 +947,7 @@ export interface components {
         };
         "model.PlayRecordInfo": {
             chart?: components["schemas"]["model.ChartInfoSimple"];
-            play_record_id?: number;
+            id?: number;
             rating?: number;
             record_time?: string;
             score?: number;
@@ -979,7 +979,7 @@ export interface components {
             illustrator?: string;
             /** @example 2:30 */
             length?: string;
-            song_id?: number;
+            id?: number;
             /** @example Song Title */
             title?: string;
             /** @example 1.0.0 */
@@ -1014,7 +1014,7 @@ export interface components {
             qq_number?: number;
             /** @example token_xyz */
             upload_token?: string;
-            user_id?: number;
+            id?: number;
             /** @example user123 */
             username: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */

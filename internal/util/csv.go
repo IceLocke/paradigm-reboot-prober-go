@@ -29,7 +29,7 @@ func GenerateCSV(records []model.ChartWithScore) (string, error) {
 
 	for _, rec := range records {
 		row := []string{
-			strconv.Itoa(rec.ChartID),
+			strconv.Itoa(rec.ID),
 			rec.Title,
 			rec.Version,
 			string(rec.Difficulty),
@@ -154,7 +154,7 @@ func GenerateEmptyCSV(filePath string, charts []model.Chart) error {
 		}
 
 		row := []string{
-			strconv.Itoa(chart.ChartID),
+			strconv.Itoa(chart.ID),
 			title,
 			version,
 			string(chart.Difficulty),

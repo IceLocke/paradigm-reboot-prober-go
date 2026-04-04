@@ -10,7 +10,7 @@ type CreateSongRequest struct {
 
 // UpdateSongRequest represents the request to update an existing song
 type UpdateSongRequest struct {
-	SongID int `json:"song_id" binding:"required"`
+	ID int `json:"id" binding:"required"`
 	model.SongBase
 	Charts []model.ChartInput `json:"charts" binding:"required,min=1,dive"`
 }

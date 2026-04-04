@@ -2,14 +2,14 @@ basePath: /api/v2
 definitions:
   model.Chart:
     properties:
-      chart_id:
-        type: integer
       difficulty:
         allOf:
         - $ref: '#/definitions/model.Difficulty'
         example: massive
       fitting_level:
         type: number
+      id:
+        type: integer
       level:
         type: number
       level_design:
@@ -35,9 +35,6 @@ definitions:
       bpm:
         example: "180"
         type: string
-      chart_id:
-        example: 10
-        type: integer
       cover:
         example: https://example.com/cover.jpg
         type: string
@@ -51,6 +48,9 @@ definitions:
       genre:
         example: Pop
         type: string
+      id:
+        example: 10
+        type: integer
       illustrator:
         example: Artist
         type: string
@@ -87,14 +87,14 @@ definitions:
     properties:
       b15:
         type: boolean
-      chart_id:
-        type: integer
       cover:
         type: string
       difficulty:
         $ref: '#/definitions/model.Difficulty'
       fitting_level:
         type: number
+      id:
+        type: integer
       level:
         type: number
       song_id:
@@ -148,7 +148,7 @@ definitions:
       chart_id:
         example: 1
         type: integer
-      play_record_id:
+      id:
         type: integer
       rating:
         type: integer
@@ -181,7 +181,7 @@ definitions:
     properties:
       chart:
         $ref: '#/definitions/model.ChartInfoSimple'
-      play_record_id:
+      id:
         type: integer
       rating:
         type: integer
@@ -232,14 +232,14 @@ definitions:
       genre:
         example: Pop
         type: string
+      id:
+        type: integer
       illustrator:
         example: Artist
         type: string
       length:
         example: "2:30"
         type: string
-      song_id:
-        type: integer
       title:
         example: Song Title
         type: string
@@ -281,6 +281,8 @@ definitions:
       email:
         example: user@example.com
         type: string
+      id:
+        type: integer
       is_active:
         example: true
         type: boolean
@@ -296,8 +298,6 @@ definitions:
       upload_token:
         example: token_xyz
         type: string
-      user_id:
-        type: integer
       username:
         example: user123
         type: string
@@ -322,14 +322,14 @@ definitions:
       email:
         example: user@example.com
         type: string
+      id:
+        example: 1
+        type: integer
       nickname:
         example: 小明
         type: string
       qq_number:
         example: 12345678
-        type: integer
-      user_id:
-        example: 1
         type: integer
       username:
         example: user123
@@ -469,14 +469,14 @@ definitions:
       genre:
         example: Pop
         type: string
+      id:
+        type: integer
       illustrator:
         example: Artist
         type: string
       length:
         example: "2:30"
         type: string
-      song_id:
-        type: integer
       title:
         example: Song Title
         type: string
@@ -489,7 +489,7 @@ definitions:
     required:
     - artist
     - charts
-    - song_id
+    - id
     - title
     - wiki_id
     type: object

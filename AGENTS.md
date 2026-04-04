@@ -125,11 +125,11 @@ Request → Router → Middleware → Controller → Service → Repository → 
 
 | Table               | Model            | Primary Key       |
 |---------------------|------------------|-------------------|
-| `prober_users`      | `User`           | `user_id`         |
-| `songs`             | `Song`           | `song_id`         |
-| `charts`            | `Chart`          | `chart_id`        |
-| `play_records`      | `PlayRecord`     | `play_record_id`  |
-| `best_play_records` | `BestPlayRecord` | `best_record_id`  |
+| `prober_users`      | `User`           | `id`              |
+| `songs`             | `Song`           | `id`              |
+| `charts`            | `Chart`          | `id`              |
+| `play_records`      | `PlayRecord`     | `id`              |
+| `best_play_records` | `BestPlayRecord` | `id`              |
 
 GORM `AutoMigrate` handles schema creation/updates at startup. Foreign key constraints are disabled during migration (`DisableForeignKeyConstraintWhenMigrating: true`).
 
@@ -348,11 +348,11 @@ The `GET /records/:username/chart/:chart_addr` endpoint supports:
 
 - **Go version**: 1.25 (set in `go.mod` and CI), toolchain go1.25.5.
 - **Formatting**: Enforced by `gofmt` via golangci-lint.
-- **Naming**: Standard Go conventions. The `var-naming` revive rule is disabled to allow certain non-standard names (e.g., `ID` suffixes in model fields).
+- **Naming**: Standard Go conventions. The `var-naming` revive rule is disabled to allow certain non-standard names where needed.
 - **Error handling**: Errors are returned up the call chain. Controllers translate errors to appropriate HTTP status codes and `model.Response` JSON.
 - **Comments**: English. Controller methods have Swagger godoc annotations.
 - **SQL injection prevention**: Sort column names are validated against a whitelist (`allowedSortColumns` in `record_repo.go`).
-- **GORM conventions**: Models define explicit `TableName()` methods. Primary keys use custom column names (e.g., `user_id`, `song_id`, `chart_id`).
+- **GORM conventions**: Models define explicit `TableName()` methods. Primary keys use the standard `id` column name.
 - **Struct tags**: Models use `gorm`, `json`, `binding`, and `example` tags.
 - **Deferred cleanup**: File handles use `defer func() { _ = f.Close() }()` pattern (explicitly ignoring close errors).
 

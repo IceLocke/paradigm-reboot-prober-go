@@ -66,7 +66,7 @@ func (r *RecordRepository) BatchCreateRecords(records []*model.PlayRecord, isRep
 // createRecordInTx handles creating a single record within an existing transaction.
 func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecord, isReplaced bool) (*model.PlayRecord, error) {
 	var chart model.Chart
-	if err := tx.Where("chart_id = ?", record.ChartID).First(&chart).Error; err != nil {
+	if err := tx.Where("id = ?", record.ChartID).First(&chart).Error; err != nil {
 		return nil, errors.New("chart does not exist")
 	}
 
@@ -88,7 +88,7 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 	if result.Error == nil {
 		// Best record exists
 		if isReplaced || record.Score > bestRecord.PlayRecord.Score {
-			bestRecord.PlayRecordID = record.PlayRecordID
+			bestRecord.PlayRecordID = record.ID
 			bestRecord.PlayRecord = record
 			if err := tx.Save(&bestRecord).Error; err != nil {
 				return nil, err
@@ -99,7 +99,7 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 		newBestRecord := model.BestPlayRecord{
 			Username:     record.Username,
 			ChartID:      record.ChartID,
-			PlayRecordID: record.PlayRecordID,
+			PlayRecordID: record.ID,
 			PlayRecord:   record,
 		}
 		if err := tx.Create(&newBestRecord).Error; err != nil {
@@ -119,7 +119,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 
 	// Base query for best records
 	baseQuery := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where("play_records.username = ?", username)
@@ -127,7 +127,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
 		Where("Chart__Song.b15 = ?", false).
-		Order("rating desc, play_records.play_record_id desc").
+		Order("rating desc, play_records.id desc").
 		Limit(config.GlobalConfig.Game.B35Limit + underflow).
 		Find(&b35).Error; err != nil {
 		return nil, nil, err
@@ -136,7 +136,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	// B15: B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
 		Where("Chart__Song.b15 = ?", true).
-		Order("rating desc, play_records.play_record_id desc").
+		Order("rating desc, play_records.id desc").
 		Limit(config.GlobalConfig.Game.B15Limit + underflow).
 		Find(&b15).Error; err != nil {
 		return nil, nil, err
@@ -170,7 +170,7 @@ func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex in
 func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where("play_records.username = ?", username)
@@ -194,11 +194,11 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string) ([]model.
 	var results []model.ChartWithScore
 
 	err := r.db.Table("charts").
-		Select("charts.chart_id, songs.title, songs.version, charts.difficulty, charts.level, COALESCE(play_records.score, 0) as score").
-		Joins("JOIN songs ON charts.song_id = songs.song_id").
-		Joins("LEFT JOIN play_records ON charts.chart_id = play_records.chart_id AND play_records.username = ?", username).
-		Joins("LEFT JOIN best_play_records ON play_records.play_record_id = best_play_records.play_record_id").
-		Where("play_records.play_record_id IS NULL OR best_play_records.play_record_id IS NOT NULL").
+		Select("charts.id, songs.title, songs.version, charts.difficulty, charts.level, COALESCE(play_records.score, 0) as score").
+		Joins("JOIN songs ON charts.song_id = songs.id").
+		Joins("LEFT JOIN play_records ON charts.id = play_records.chart_id AND play_records.username = ?", username).
+		Joins("LEFT JOIN best_play_records ON play_records.id = best_play_records.play_record_id").
+		Where("play_records.id IS NULL OR best_play_records.play_record_id IS NOT NULL").
 		Scan(&results).Error
 
 	return results, err
@@ -226,7 +226,7 @@ func (r *RecordRepository) CountAllRecords(username string) (int64, error) {
 func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	err := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where("play_records.username = ? AND Chart.song_id = ?", username, songID).
@@ -259,7 +259,7 @@ func (r *RecordRepository) GetAllRecordsBySong(username string, songID int, page
 func (r *RecordRepository) CountAllRecordsBySong(username string, songID int) (int64, error) {
 	var count int64
 	err := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN charts ON charts.chart_id = play_records.chart_id").
+		Joins("JOIN charts ON charts.id = play_records.chart_id").
 		Where("play_records.username = ? AND charts.song_id = ?", username, songID).
 		Count(&count).Error
 	return count, err
@@ -269,7 +269,7 @@ func (r *RecordRepository) CountAllRecordsBySong(username string, songID int) (i
 func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*model.PlayRecord, error) {
 	var record model.PlayRecord
 	err := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where("play_records.username = ? AND play_records.chart_id = ?", username, chartID).

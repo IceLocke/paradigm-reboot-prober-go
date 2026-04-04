@@ -54,7 +54,7 @@
           <div class="charts-section">
             <span class="info-label">{{ t('term.difficulty') }}</span>
             <div class="charts-list">
-              <div v-for="chart in song.charts" :key="chart.chart_id" class="chart-row">
+              <div v-for="chart in song.charts" :key="chart.id" class="chart-row">
                 <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" />
                 <span class="chart-designer">{{ chart.level_design }}</span>
                 <span v-if="chart.notes" class="chart-notes mono">{{ chart.notes }} notes</span>

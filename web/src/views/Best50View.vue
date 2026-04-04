@@ -144,7 +144,7 @@ const onClickSongTitle = async (songId: number) => {
   try {
     if (USE_MOCK) {
       selectedSong.value = {
-        song_id: songId, title: 'Mock Song', artist: 'Mock Artist',
+        id: songId, title: 'Mock Song', artist: 'Mock Artist',
         bpm: '180', cover: '', illustrator: 'Artist', version: '1.0',
         album: 'Album', genre: 'Genre', length: '2:30', b15: false,
         wiki_id: '', charts: [],

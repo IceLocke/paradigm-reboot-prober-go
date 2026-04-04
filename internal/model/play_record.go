@@ -7,11 +7,11 @@ import (
 // PlayRecord represents a play record entity
 type PlayRecord struct {
 	PlayRecordBase
-	PlayRecordID int       `gorm:"primaryKey;column:play_record_id" json:"play_record_id"`
-	RecordTime   time.Time `gorm:"not null" json:"record_time"`
-	Username     string    `gorm:"not null;index" json:"username"`
-	Rating       int       `gorm:"not null" json:"rating"`
-	Chart        *Chart    `gorm:"foreignKey:ChartID;references:ChartID" json:"chart,omitempty"`
+	ID         int       `gorm:"primaryKey" json:"id"`
+	RecordTime time.Time `gorm:"not null" json:"record_time"`
+	Username   string    `gorm:"not null;index" json:"username"`
+	Rating     int       `gorm:"not null" json:"rating"`
+	Chart      *Chart    `gorm:"foreignKey:ChartID;references:ID" json:"chart,omitempty"`
 }
 
 // TableName specifies the table name for GORM
@@ -21,11 +21,11 @@ func (PlayRecord) TableName() string {
 
 // BestPlayRecord represents the best record for a specific chart
 type BestPlayRecord struct {
-	BestRecordID int         `gorm:"primaryKey;column:best_record_id" json:"best_record_id"`
+	ID           int         `gorm:"primaryKey" json:"id"`
 	Username     string      `gorm:"not null;uniqueIndex:idx_best_user_chart" json:"username"`
 	ChartID      int         `gorm:"not null;uniqueIndex:idx_best_user_chart" json:"chart_id"`
 	PlayRecordID int         `gorm:"column:play_record_id;not null;index" json:"play_record_id"`
-	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID;references:PlayRecordID" json:"play_record,omitempty"`
+	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID;references:ID" json:"play_record,omitempty"`
 }
 
 // TableName specifies the table name for GORM
@@ -41,24 +41,24 @@ type PlayRecordBase struct {
 
 // PlayRecordInfo represents play record details including chart information
 type PlayRecordInfo struct {
-	PlayRecordID int             `json:"play_record_id"`
-	RecordTime   time.Time       `json:"record_time"`
-	Score        int             `json:"score"`
-	Rating       int             `json:"rating"`
-	Chart        ChartInfoSimple `json:"chart"`
+	ID         int             `json:"id"`
+	RecordTime time.Time       `json:"record_time"`
+	Score      int             `json:"score"`
+	Rating     int             `json:"rating"`
+	Chart      ChartInfoSimple `json:"chart"`
 }
 
 // ToPlayRecordInfo converts a PlayRecord (with preloaded Chart.Song) to PlayRecordInfo
 func ToPlayRecordInfo(record *PlayRecord) PlayRecordInfo {
 	info := PlayRecordInfo{
-		PlayRecordID: record.PlayRecordID,
-		RecordTime:   record.RecordTime,
-		Score:        record.Score,
-		Rating:       record.Rating,
+		ID:         record.ID,
+		RecordTime: record.RecordTime,
+		Score:      record.Score,
+		Rating:     record.Rating,
 	}
 	if record.Chart != nil {
 		info.Chart = ChartInfoSimple{
-			ChartID:      record.Chart.ChartID,
+			ID:           record.Chart.ID,
 			Difficulty:   record.Chart.Difficulty,
 			Level:        record.Chart.Level,
 			FittingLevel: record.Chart.FittingLevel,
@@ -68,7 +68,7 @@ func ToPlayRecordInfo(record *PlayRecord) PlayRecordInfo {
 			info.Chart.Title = record.Chart.Song.Title
 			info.Chart.Version = record.Chart.Song.Version
 			info.Chart.B15 = record.Chart.Song.B15
-			info.Chart.SongID = record.Chart.Song.SongID
+			info.Chart.SongID = record.Chart.Song.ID
 			info.Chart.Cover = record.Chart.Song.Cover
 		}
 	}

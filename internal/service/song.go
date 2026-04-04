@@ -28,8 +28,8 @@ func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 		for _, chart := range song.Charts {
 			charts = append(charts, model.ChartInfo{
 				SongBase:     song.SongBase,
-				SongID:       song.SongID,
-				ChartID:      chart.ChartID,
+				SongID:       song.ID,
+				ID:           chart.ID,
 				Difficulty:   chart.Difficulty,
 				Level:        chart.Level,
 				FittingLevel: chart.FittingLevel,
@@ -52,7 +52,7 @@ func (s *SongService) ResolveSongID(songAddr string) (int, error) {
 		if song == nil {
 			return 0, errors.New("song not found")
 		}
-		return song.SongID, nil
+		return song.ID, nil
 	}
 
 	song, err := s.songRepo.GetSongByWikiID(songAddr)
@@ -62,7 +62,7 @@ func (s *SongService) ResolveSongID(songAddr string) (int, error) {
 	if song == nil {
 		return 0, errors.New("song not found")
 	}
-	return song.SongID, nil
+	return song.ID, nil
 }
 
 // ResolveChartID parses a chart_addr (numeric ID or "wiki_id:difficulty") and returns the chart_id.
@@ -76,7 +76,7 @@ func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
 		if chart == nil {
 			return 0, errors.New("chart not found")
 		}
-		return chart.ChartID, nil
+		return chart.ID, nil
 	}
 
 	// Split on the last ':' to handle wiki_id:difficulty format
@@ -101,7 +101,7 @@ func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
 	if chart == nil {
 		return 0, errors.New("chart not found")
 	}
-	return chart.ChartID, nil
+	return chart.ID, nil
 }
 
 func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error) {
@@ -170,8 +170,8 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 	for _, chart := range createdSong.Charts {
 		info := model.ChartInfo{
 			SongBase:     createdSong.SongBase,
-			SongID:       createdSong.SongID,
-			ChartID:      chart.ChartID,
+			SongID:       createdSong.ID,
+			ID:           chart.ID,
 			Difficulty:   chart.Difficulty,
 			Level:        chart.Level,
 			FittingLevel: chart.FittingLevel,
@@ -201,7 +201,7 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartI
 		song.Charts = append(song.Charts, chart)
 	}
 
-	updatedSong, err := s.songRepo.UpdateSong(req.SongID, song)
+	updatedSong, err := s.songRepo.UpdateSong(req.ID, song)
 	if err != nil {
 		return nil, err
 	}
@@ -211,8 +211,8 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartI
 	for _, chart := range updatedSong.Charts {
 		info := model.ChartInfo{
 			SongBase:     updatedSong.SongBase,
-			SongID:       updatedSong.SongID,
-			ChartID:      chart.ChartID,
+			SongID:       updatedSong.ID,
+			ID:           chart.ID,
 			Difficulty:   chart.Difficulty,
 			Level:        chart.Level,
 			FittingLevel: chart.FittingLevel,

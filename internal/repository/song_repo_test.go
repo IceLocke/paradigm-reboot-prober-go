@@ -29,7 +29,7 @@ func TestSongRepository_CreateSong(t *testing.T) {
 
 		created, err := repo.CreateSong(song)
 		assert.NoError(t, err)
-		assert.NotZero(t, created.SongID)
+		assert.NotZero(t, created.ID)
 		assert.Len(t, created.Charts, 1)
 		assert.Equal(t, model.DifficultyMassive, created.Charts[0].Difficulty)
 	})
@@ -71,14 +71,14 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 			},
 		}
 
-		result, err := repo.UpdateSong(song.SongID, updatedSong)
+		result, err := repo.UpdateSong(song.ID, updatedSong)
 		assert.NoError(t, err)
 		assert.Equal(t, "New Title", result.Title)
 
 		// Verify charts
 		// We need to fetch fresh from DB to be sure
 		var freshSong model.Song
-		db.Preload("Charts").First(&freshSong, song.SongID)
+		db.Preload("Charts").First(&freshSong, song.ID)
 
 		assert.Len(t, freshSong.Charts, 3) // Detected (updated), Invaded (untouched), Massive (new)
 
@@ -107,7 +107,7 @@ func TestSongRepository_GetSong(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("Get By ID", func(t *testing.T) {
-		found, err := repo.GetSongByID(song.SongID)
+		found, err := repo.GetSongByID(song.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, "Find Me", found.Title)
 	})
@@ -131,7 +131,7 @@ func TestSongRepository_GetChartByID(t *testing.T) {
 	}
 	created, err := repo.CreateSong(song)
 	assert.NoError(t, err)
-	chartID := created.Charts[0].ChartID
+	chartID := created.Charts[0].ID
 
 	t.Run("Found", func(t *testing.T) {
 		chart, err := repo.GetChartByID(chartID)

@@ -20,7 +20,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		},
 	}
 	createdSong, _ := songRepo.CreateSong(song)
-	chartID := createdSong.Charts[0].ChartID
+	chartID := createdSong.Charts[0].ID
 
 	t.Run("Create New Record", func(t *testing.T) {
 		record := &model.PlayRecord{
@@ -40,9 +40,9 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 
 		// Verify Best Record created
 		var best model.BestPlayRecord
-		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.ID).First(&best).Error
 		assert.NoError(t, err)
-		assert.Equal(t, savedRecord.PlayRecordID, best.PlayRecordID)
+		assert.Equal(t, savedRecord.ID, best.PlayRecordID)
 	})
 
 	t.Run("Update Best Record (Higher Score)", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		var best model.BestPlayRecord
 		// We need to join to find the best record for this user/level, but here we can just check if the new record ID is in best_play_records table
 		// Actually, let's query by play_record_id
-		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.ID).First(&best).Error
 		assert.NoError(t, err)
 	})
 
@@ -79,7 +79,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 
 		// Verify Best Record NOT updated (should still point to previous high score)
 		var best model.BestPlayRecord
-		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.ID).First(&best).Error
 		assert.Error(t, err) // Should not find this record as best
 		assert.Equal(t, "record not found", err.Error())
 	})
@@ -98,7 +98,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 
 		// Verify Best Record updated
 		var best model.BestPlayRecord
-		err = db.Where("play_record_id = ?", savedRecord.PlayRecordID).First(&best).Error
+		err = db.Where("play_record_id = ?", savedRecord.ID).First(&best).Error
 		assert.NoError(t, err)
 	})
 }
@@ -128,12 +128,12 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 
 	// Create Records
 	_, err := repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: createdB15.Charts[0].ChartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: createdB15.Charts[0].ID, Score: 1000000},
 		Username:       "user_b50",
 	}, false)
 	assert.NoError(t, err)
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: createdOld.Charts[0].ChartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: createdOld.Charts[0].ID, Score: 1000000},
 		Username:       "user_b50",
 	}, false)
 	assert.NoError(t, err)
@@ -173,33 +173,33 @@ func TestRecordRepository_PerSongQueries(t *testing.T) {
 
 	// Create records for user on song1 charts
 	_, err := repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[0].ChartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[0].ID, Score: 1000000},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ChartID, Score: 1005000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ID, Score: 1005000},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	// A second record on same chart (lower score)
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ChartID, Score: 900000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ID, Score: 900000},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	// Create record for user on song2 chart
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created2.Charts[0].ChartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created2.Charts[0].ID, Score: 1000000},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	t.Run("GetBestRecordsBySong", func(t *testing.T) {
-		records, err := repo.GetBestRecordsBySong("user_song", created1.SongID)
+		records, err := repo.GetBestRecordsBySong("user_song", created1.ID)
 		assert.NoError(t, err)
 		assert.Len(t, records, 2) // one per difficulty
 		// Should be ordered by rating desc
@@ -207,29 +207,29 @@ func TestRecordRepository_PerSongQueries(t *testing.T) {
 	})
 
 	t.Run("GetBestRecordsBySong - other song", func(t *testing.T) {
-		records, err := repo.GetBestRecordsBySong("user_song", created2.SongID)
+		records, err := repo.GetBestRecordsBySong("user_song", created2.ID)
 		assert.NoError(t, err)
 		assert.Len(t, records, 1)
 	})
 
 	t.Run("GetAllRecordsBySong", func(t *testing.T) {
-		records, err := repo.GetAllRecordsBySong("user_song", created1.SongID, 10, 0, "rating", true)
+		records, err := repo.GetAllRecordsBySong("user_song", created1.ID, 10, 0, "rating", true)
 		assert.NoError(t, err)
 		assert.Len(t, records, 3) // 1 on detected + 2 on massive
 	})
 
 	t.Run("CountAllRecordsBySong", func(t *testing.T) {
-		count, err := repo.CountAllRecordsBySong("user_song", created1.SongID)
+		count, err := repo.CountAllRecordsBySong("user_song", created1.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(3), count)
 
-		count2, err := repo.CountAllRecordsBySong("user_song", created2.SongID)
+		count2, err := repo.CountAllRecordsBySong("user_song", created2.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), count2)
 	})
 
 	t.Run("GetBestRecordsBySong - nonexistent user", func(t *testing.T) {
-		records, err := repo.GetBestRecordsBySong("nobody", created1.SongID)
+		records, err := repo.GetBestRecordsBySong("nobody", created1.ID)
 		assert.NoError(t, err)
 		assert.Len(t, records, 0)
 	})
@@ -248,8 +248,8 @@ func TestRecordRepository_PerChartQueries(t *testing.T) {
 		},
 	}
 	created, _ := songRepo.CreateSong(song)
-	massiveChartID := created.Charts[0].ChartID
-	detectedChartID := created.Charts[1].ChartID
+	massiveChartID := created.Charts[0].ID
+	detectedChartID := created.Charts[1].ID
 
 	// Create multiple records on massive chart
 	_, _ = repo.CreateRecord(&model.PlayRecord{

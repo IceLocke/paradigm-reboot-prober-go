@@ -765,9 +765,6 @@ const docTemplate = `{
         "model.Chart": {
             "type": "object",
             "properties": {
-                "chart_id": {
-                    "type": "integer"
-                },
                 "difficulty": {
                     "allOf": [
                         {
@@ -778,6 +775,9 @@ const docTemplate = `{
                 },
                 "fitting_level": {
                     "type": "number"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "level": {
                     "type": "number"
@@ -820,10 +820,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "180"
                 },
-                "chart_id": {
-                    "type": "integer",
-                    "example": 10
-                },
                 "cover": {
                     "type": "string",
                     "example": "https://example.com/cover.jpg"
@@ -843,6 +839,10 @@ const docTemplate = `{
                 "genre": {
                     "type": "string",
                     "example": "Pop"
+                },
+                "id": {
+                    "type": "integer",
+                    "example": 10
                 },
                 "illustrator": {
                     "type": "string",
@@ -888,9 +888,6 @@ const docTemplate = `{
                 "b15": {
                     "type": "boolean"
                 },
-                "chart_id": {
-                    "type": "integer"
-                },
                 "cover": {
                     "type": "string"
                 },
@@ -899,6 +896,9 @@ const docTemplate = `{
                 },
                 "fitting_level": {
                     "type": "number"
+                },
+                "id": {
+                    "type": "integer"
                 },
                 "level": {
                     "type": "number"
@@ -979,7 +979,7 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 1
                 },
-                "play_record_id": {
+                "id": {
                     "type": "integer"
                 },
                 "rating": {
@@ -1023,7 +1023,7 @@ const docTemplate = `{
                 "chart": {
                     "$ref": "#/definitions/model.ChartInfoSimple"
                 },
-                "play_record_id": {
+                "id": {
                     "type": "integer"
                 },
                 "rating": {
@@ -1103,6 +1103,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Pop"
                 },
+                "id": {
+                    "type": "integer"
+                },
                 "illustrator": {
                     "type": "string",
                     "example": "Artist"
@@ -1110,9 +1113,6 @@ const docTemplate = `{
                 "length": {
                     "type": "string",
                     "example": "2:30"
-                },
-                "song_id": {
-                    "type": "integer"
                 },
                 "title": {
                     "type": "string",
@@ -1171,6 +1171,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "user@example.com"
                 },
+                "id": {
+                    "type": "integer"
+                },
                 "is_active": {
                     "type": "boolean",
                     "example": true
@@ -1190,9 +1193,6 @@ const docTemplate = `{
                 "upload_token": {
                     "type": "string",
                     "example": "token_xyz"
-                },
-                "user_id": {
-                    "type": "integer"
                 },
                 "username": {
                     "type": "string",
@@ -1223,6 +1223,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "user@example.com"
                 },
+                "id": {
+                    "type": "integer",
+                    "example": 1
+                },
                 "nickname": {
                     "type": "string",
                     "example": "小明"
@@ -1230,10 +1234,6 @@ const docTemplate = `{
                 "qq_number": {
                     "type": "integer",
                     "example": 12345678
-                },
-                "user_id": {
-                    "type": "integer",
-                    "example": 1
                 },
                 "username": {
                     "type": "string",
@@ -1396,7 +1396,7 @@ const docTemplate = `{
             "required": [
                 "artist",
                 "charts",
-                "song_id",
+                "id",
                 "title",
                 "wiki_id"
             ],
@@ -1432,6 +1432,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Pop"
                 },
+                "id": {
+                    "type": "integer"
+                },
                 "illustrator": {
                     "type": "string",
                     "example": "Artist"
@@ -1439,9 +1442,6 @@ const docTemplate = `{
                 "length": {
                     "type": "string",
                     "example": "2:30"
-                },
-                "song_id": {
-                    "type": "integer"
                 },
                 "title": {
                     "type": "string",

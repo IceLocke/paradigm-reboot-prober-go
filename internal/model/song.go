@@ -17,9 +17,9 @@ type SongBase struct {
 
 // Song represents the song entity
 type Song struct {
-	SongID int `gorm:"primaryKey;column:song_id" json:"song_id"`
+	ID int `gorm:"primaryKey" json:"id"`
 	SongBase
-	Charts []Chart `gorm:"foreignKey:SongID" json:"charts"`
+	Charts []Chart `gorm:"foreignKey:SongID;references:ID" json:"charts"`
 }
 
 // TableName specifies the table name for GORM
@@ -48,14 +48,14 @@ func ValidDifficulty(s string) bool {
 
 // Chart represents a specific difficulty chart (谱面) of a song
 type Chart struct {
-	ChartID      int        `gorm:"primaryKey;column:chart_id" json:"chart_id"`
+	ID           int        `gorm:"primaryKey" json:"id"`
 	SongID       int        `gorm:"not null;uniqueIndex:idx_song_difficulty" json:"song_id"`
 	Difficulty   Difficulty `gorm:"type:varchar(20);not null;uniqueIndex:idx_song_difficulty" json:"difficulty" example:"massive"`
 	Level        float64    `gorm:"not null" json:"level"`
 	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level"`
 	LevelDesign  *string    `gorm:"column:level_design" json:"level_design"`
 	Notes        int        `gorm:"not null" json:"notes"`
-	Song         *Song      `gorm:"foreignKey:SongID;references:SongID" json:"song,omitempty"`
+	Song         *Song      `gorm:"foreignKey:SongID;references:ID" json:"song,omitempty"`
 }
 
 // TableName specifies the table name for GORM
@@ -75,7 +75,7 @@ type ChartInput struct {
 type ChartInfo struct {
 	SongBase
 	SongID       int        `json:"song_id" example:"1"`
-	ChartID      int        `json:"chart_id" example:"10"`
+	ID           int        `json:"id" example:"10"`
 	Difficulty   Difficulty `json:"difficulty" example:"massive"`
 	Level        float64    `json:"level" example:"13.2"`
 	FittingLevel *float64   `json:"fitting_level" example:"13.4"`
@@ -90,26 +90,16 @@ type ChartInfoSimple struct {
 	Version      string     `json:"version"`
 	B15          bool       `json:"b15"`
 	SongID       int        `json:"song_id"`
-	ChartID      int        `json:"chart_id"`
+	ID           int        `json:"id"`
 	Difficulty   Difficulty `json:"difficulty"`
 	Level        float64    `json:"level"`
 	Cover        string     `json:"cover"`
 	FittingLevel *float64   `json:"fitting_level"`
 }
 
-// ChartCSV represents the model for CSV import
-type ChartCSV struct {
-	ChartID    int        `json:"chart_id"`
-	Title      string     `json:"title"`
-	Version    string     `json:"version"`
-	Difficulty Difficulty `json:"difficulty"`
-	Level      float64    `json:"level"`
-	Score      *int       `json:"score"`
-}
-
 // ChartWithScore represents a chart with the user's best score
 type ChartWithScore struct {
-	ChartID    int        `json:"chart_id"`
+	ID         int        `json:"id"`
 	Title      string     `json:"title"`
 	Version    string     `json:"version"`
 	Difficulty Difficulty `json:"difficulty"`

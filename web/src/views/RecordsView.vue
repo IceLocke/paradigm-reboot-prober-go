@@ -109,12 +109,12 @@ const onClickTitle = async (songId: number) => {
       const charts = appStore.charts ?? []
       const chart = charts.find((c) => c.song_id === songId)
       selectedSong.value = {
-        song_id: songId, title: chart?.title ?? 'Song', artist: chart?.artist ?? '',
+        id: songId, title: chart?.title ?? 'Song', artist: chart?.artist ?? '',
         bpm: chart?.bpm ?? '', cover: chart?.cover ?? '', illustrator: chart?.illustrator ?? '',
         version: chart?.version ?? '', album: chart?.album ?? '', genre: chart?.genre ?? '',
         length: chart?.length ?? '', b15: chart?.b15 ?? false, wiki_id: chart?.wiki_id ?? '',
         charts: charts.filter((c) => c.song_id === songId).map((c) => ({
-          chart_id: c.chart_id, song_id: c.song_id, difficulty: c.difficulty,
+          id: c.id, song_id: c.song_id, difficulty: c.difficulty,
           level: c.level, fitting_level: c.fitting_level, level_design: c.level_design, notes: c.notes,
         })),
       }
@@ -130,19 +130,19 @@ const onQuickUpload = (record: PlayRecordInfo) => {
     title: record.chart.title,
     difficulty: record.chart.difficulty,
     level: record.chart.level,
-    chartId: record.chart.chart_id,
+    chartId: record.chart.id,
   }
   showQuickUpload.value = true
 }
 
 const onAddToCart = (record: PlayRecordInfo) => {
-  const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.chart_id)
+  const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.id)
   if (exists) return
   appStore.uploadList.push({
     title: record.chart.title,
     difficulty: record.chart.difficulty,
     level: record.chart.level,
-    chart_id: record.chart.chart_id,
+    chart_id: record.chart.id,
     score: 0,
   })
 }

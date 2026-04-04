@@ -22,7 +22,7 @@ func TestRecordService(t *testing.T) {
 		},
 	}
 	createdSong, _ := songRepo.CreateSong(song)
-	chartID := createdSong.Charts[0].ChartID
+	chartID := createdSong.Charts[0].ID
 
 	t.Run("CreateRecords", func(t *testing.T) {
 		records := []model.PlayRecordBase{

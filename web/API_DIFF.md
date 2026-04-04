@@ -19,7 +19,7 @@
 
 | v1 字段/模型 | v2 字段/模型 | 说明 |
 |-------------|-------------|------|
-| `song_level_id` | `chart_id` | 谱面唯一 ID |
+| `song_level_id` | `id` (on Chart/ChartInfo/ChartInfoSimple objects; `chart_id` retained as FK) | 谱面唯一 ID |
 | `song_levels` (数组) | `charts` (数组) | 歌曲的谱面列表 |
 | `SongLevel` | `Chart` / `ChartInfo` / `ChartInfoSimple` | 谱面模型 |
 | `difficulty_id` (number: 1,2,3,4) | `difficulty` (string: `"detected"`, `"invaded"`, `"massive"`, `"reboot"`) | 难度表示方式从数字改为字符串枚举 |
@@ -28,7 +28,7 @@
 
 ### 影响范围
 - 所有涉及谱面 ID 的 API 请求和响应
-- 前端所有引用 `song_level_id` 的地方需改为 `chart_id`
+- 前端所有引用 `song_level_id` 的地方需改为 `id`（主键）或 `chart_id`（外键）
 - 难度判断从 `difficulty_id === 1/2/3/4` 改为 `difficulty === 'detected'/'invaded'/'massive'/'reboot'`
 
 ---
@@ -95,7 +95,7 @@ v1 中不存在此功能。
 | Path | `GET /songs` | `GET /songs` |
 | 响应类型 | `SongLevel[]` (扁平列表) | `ChartInfo[]` (扁平列表) |
 | 难度字段 | `difficulty_id: number` | `difficulty: string` |
-| 谱面 ID 字段 | `song_level_id` | `chart_id` |
+| 谱面 ID 字段 | `song_level_id` | `id` |
 
 ### 4.2 获取单曲信息 — 新增 `src` 参数
 
@@ -155,12 +155,12 @@ v2 响应中使用 `chart` 子对象（`ChartInfoSimple`）：
   "username": "user",
   "total": 50,
   "records": [{
-    "play_record_id": 1,
+    "id": 1,
     "score": 1000000,
     "rating": 1500,
     "record_time": "2024-01-01T00:00:00Z",
     "chart": {
-      "chart_id": 1,
+      "id": 1,
       "song_id": 1,
       "title": "Song",
       "difficulty": "detected",
@@ -232,7 +232,7 @@ v2 请求体：
 
 新版前端已完成以下适配：
 
-- ✅ 全部 `song_level_id` → `chart_id`
+- ✅ 全部 `song_level_id` → `id`（主键字段）/ `chart_id`（外键引用）
 - ✅ 全部 `difficulty_id` (数字) → `difficulty` (字符串)
 - ✅ `PATCH` → `PUT`（用户更新、歌曲更新）
 - ✅ B50 获取方式从 `best=true` 改为 `scope=b50`

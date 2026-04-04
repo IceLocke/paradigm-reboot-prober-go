@@ -27,7 +27,7 @@ func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 // GetSongByID retrieves a song by its ID
 func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 	var song model.Song
-	if err := r.db.Preload("Charts").Where("song_id = ?", songID).First(&song).Error; err != nil {
+	if err := r.db.Preload("Charts").Where("id = ?", songID).First(&song).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -51,7 +51,7 @@ func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 // GetChartByID retrieves a chart by its numeric ID with Song preloaded
 func (r *SongRepository) GetChartByID(chartID int) (*model.Chart, error) {
 	var chart model.Chart
-	if err := r.db.Preload("Song").Where("chart_id = ?", chartID).First(&chart).Error; err != nil {
+	if err := r.db.Preload("Song").Where("id = ?", chartID).First(&chart).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -63,7 +63,7 @@ func (r *SongRepository) GetChartByID(chartID int) (*model.Chart, error) {
 // GetChartByWikiIDAndDifficulty finds a chart by the song's wiki_id and chart difficulty
 func (r *SongRepository) GetChartByWikiIDAndDifficulty(wikiID string, difficulty model.Difficulty) (*model.Chart, error) {
 	var chart model.Chart
-	if err := r.db.Joins("JOIN songs ON songs.song_id = charts.song_id").
+	if err := r.db.Joins("JOIN songs ON songs.id = charts.song_id").
 		Preload("Song").
 		Where("songs.wiki_id = ? AND charts.difficulty = ?", wikiID, difficulty).
 		First(&chart).Error; err != nil {
@@ -129,7 +129,7 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 				}
 			} else {
 				// Create new chart
-				newChart.SongID = existingSong.SongID
+				newChart.SongID = existingSong.ID
 				if err := tx.Create(&newChart).Error; err != nil {
 					return err
 				}

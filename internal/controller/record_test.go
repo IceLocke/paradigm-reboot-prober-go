@@ -98,8 +98,8 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 	}
 	env.db.Create(&song)
 
-	detectedChartID := song.Charts[0].ChartID
-	massiveChartID := song.Charts[1].ChartID
+	detectedChartID := song.Charts[0].ID
+	massiveChartID := song.Charts[1].ID
 
 	// Upload records via API
 	uploadRecords := func(chartID int, score int) {
@@ -131,7 +131,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 	})
 
 	t.Run("GetSongRecords by numeric ID scope=best", func(t *testing.T) {
-		w := performRequest(r, "GET", fmt.Sprintf("/records/recuser/song/%d?scope=best", song.SongID), nil, nil)
+		w := performRequest(r, "GET", fmt.Sprintf("/records/recuser/song/%d?scope=best", song.ID), nil, nil)
 		assert.Equal(t, http.StatusOK, w.Code)
 
 		var resp model.PlayRecordResponse

@@ -41,7 +41,7 @@
         :scroll-x="650"
         size="small"
         striped
-        :row-key="(row: ChartInfo) => row.chart_id"
+        :row-key="(row: ChartInfo) => row.id"
       />
     </div>
 
@@ -142,7 +142,7 @@ const onClickTitle = async (songId: number) => {
     if (USE_MOCK) {
       const chart = appStore.charts?.find((c) => c.song_id === songId)
       selectedSong.value = {
-        song_id: songId,
+        id: songId,
         title: chart?.title ?? '',
         artist: chart?.artist ?? '',
         bpm: chart?.bpm ?? '',
@@ -157,7 +157,7 @@ const onClickTitle = async (songId: number) => {
         charts: (appStore.charts ?? [])
           .filter((c) => c.song_id === songId)
           .map((c) => ({
-            chart_id: c.chart_id,
+            id: c.id,
             song_id: c.song_id,
             difficulty: c.difficulty,
             level: c.level,
@@ -178,19 +178,19 @@ const onQuickUpload = (chart: ChartInfo) => {
     title: chart.title,
     difficulty: chart.difficulty,
     level: chart.level,
-    chartId: chart.chart_id,
+    chartId: chart.id,
   }
   showQuickUpload.value = true
 }
 
 const onAddToCart = (chart: ChartInfo) => {
-  const exists = appStore.uploadList.some((item) => item.chart_id === chart.chart_id)
+  const exists = appStore.uploadList.some((item) => item.chart_id === chart.id)
   if (exists) return
   appStore.uploadList.push({
     title: chart.title,
     difficulty: chart.difficulty,
     level: chart.level,
-    chart_id: chart.chart_id,
+    chart_id: chart.id,
     score: 0,
   })
 }

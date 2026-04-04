@@ -17,7 +17,7 @@ type UserBase struct {
 
 // User represents the user entity in the database
 type User struct {
-	UserID int `gorm:"primaryKey;column:user_id" json:"user_id"`
+	ID int `gorm:"primaryKey" json:"id"`
 	UserBase
 	EncodedPassword string `gorm:"not null" json:"-"`
 }
@@ -29,7 +29,7 @@ func (User) TableName() string {
 
 // UserPublic represents user information safe for public responses (e.g., registration)
 type UserPublic struct {
-	UserID         int     `json:"user_id" example:"1"`
+	ID             int     `json:"id" example:"1"`
 	Username       string  `json:"username" example:"user123"`
 	Email          string  `json:"email" example:"user@example.com"`
 	Nickname       string  `json:"nickname" example:"小明"`
@@ -43,7 +43,7 @@ type UserPublic struct {
 // ToPublic converts a User to a UserPublic response (excludes upload_token, is_admin, etc.)
 func (u *User) ToPublic() UserPublic {
 	return UserPublic{
-		UserID:         u.UserID,
+		ID:             u.ID,
 		Username:       u.Username,
 		Email:          u.Email,
 		Nickname:       u.Nickname,
