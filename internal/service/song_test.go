@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSongService(t *testing.T) {
@@ -197,4 +198,95 @@ func TestSongService_ResolveChartID(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "empty wiki_id")
 	})
+}
+
+func TestCompareVersion(t *testing.T) {
+	tests := []struct {
+		a, b string
+		want int
+	}{
+		{"1.0.0", "1.0.0", 0},
+		{"2.0.0", "1.0.0", 1},
+		{"1.0.0", "2.0.0", -1},
+		// Semantic vs lexicographic: "2.11.0" > "2.2.0" numerically
+		{"2.11.0", "2.2.0", 1},
+		{"2.2.0", "2.11.0", -1},
+		// Different lengths
+		{"1.0", "1.0.0", 0},
+		{"1.1", "1.0.1", 1},
+		// Single segment
+		{"3", "2", 1},
+	}
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%s_vs_%s", tt.a, tt.b), func(t *testing.T) {
+			got := compareVersion(tt.a, tt.b)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
+	db := setupTestDB(t)
+	songRepo := repository.NewSongRepository(db)
+	songService := NewSongService(songRepo)
+
+	// Create songs in deliberately wrong order with mixed difficulties.
+	// Expected final order: version DESC, then difficulty DESC (reboot > massive > invaded > detected).
+	songs := []request.CreateSongRequest{
+		{
+			SongBase: model.SongBase{WikiID: "s1", Title: "Old Song", Artist: "A", Version: "1.0.0"},
+			Charts: []model.ChartInput{
+				{Difficulty: model.DifficultyMassive, Level: 10, Notes: 500},
+				{Difficulty: model.DifficultyDetected, Level: 5, Notes: 200},
+			},
+		},
+		{
+			SongBase: model.SongBase{WikiID: "s2", Title: "Newest Song", Artist: "A", Version: "2.11.0"},
+			Charts: []model.ChartInput{
+				{Difficulty: model.DifficultyDetected, Level: 6, Notes: 300},
+				{Difficulty: model.DifficultyReboot, Level: 15, Notes: 1200},
+				{Difficulty: model.DifficultyInvaded, Level: 9, Notes: 600},
+			},
+		},
+		{
+			SongBase: model.SongBase{WikiID: "s3", Title: "Middle Song", Artist: "A", Version: "2.2.0"},
+			Charts: []model.ChartInput{
+				{Difficulty: model.DifficultyInvaded, Level: 8, Notes: 400},
+				{Difficulty: model.DifficultyReboot, Level: 14, Notes: 1100},
+			},
+		},
+	}
+
+	for i := range songs {
+		_, err := songService.CreateSong(&songs[i])
+		require.NoError(t, err)
+	}
+
+	charts, err := songService.GetAllCharts()
+	require.NoError(t, err)
+	require.Len(t, charts, 7) // 2 + 3 + 2
+
+	// Expected order:
+	//   version 2.11.0: Reboot, Invaded, Detected
+	//   version 2.2.0:  Reboot, Invaded
+	//   version 1.0.0:  Massive, Detected
+	expected := []struct {
+		title      string
+		version    string
+		difficulty model.Difficulty
+	}{
+		{"Newest Song", "2.11.0", model.DifficultyReboot},
+		{"Newest Song", "2.11.0", model.DifficultyInvaded},
+		{"Newest Song", "2.11.0", model.DifficultyDetected},
+		{"Middle Song", "2.2.0", model.DifficultyReboot},
+		{"Middle Song", "2.2.0", model.DifficultyInvaded},
+		{"Old Song", "1.0.0", model.DifficultyMassive},
+		{"Old Song", "1.0.0", model.DifficultyDetected},
+	}
+
+	for i, e := range expected {
+		assert.Equal(t, e.title, charts[i].Title, "index %d title", i)
+		assert.Equal(t, e.version, charts[i].Version, "index %d version", i)
+		assert.Equal(t, e.difficulty, charts[i].Difficulty, "index %d difficulty", i)
+	}
 }

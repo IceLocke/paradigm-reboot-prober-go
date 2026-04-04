@@ -17,7 +17,7 @@ import (
 func compareVersion(a, b string) int {
 	pa, pb := strings.Split(a, "."), strings.Split(b, ".")
 	for i := range max(len(pa), len(pb)) {
-		var sa, sb string
+		sa, sb := "0", "0"
 		if i < len(pa) {
 			sa = pa[i]
 		}
