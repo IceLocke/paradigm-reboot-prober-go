@@ -1,5 +1,5 @@
+import type {AxiosInstance, InternalAxiosRequestConfig} from 'axios'
 import axios from 'axios'
-import type { AxiosInstance, InternalAxiosRequestConfig } from 'axios'
 import pako from 'pako'
 
 const API_BASE = import.meta.env.VITE_API_ENDPOINT || '/api/v2'
@@ -50,8 +50,7 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const json = JSON.stringify(config.data)
   if (json.length < GZIP_THRESHOLD) return config
 
-  const compressed = pako.gzip(json)
-  config.data = compressed
+  config.data = pako.gzip(json)
   config.headers['Content-Encoding'] = 'gzip'
   config.headers['Content-Type'] = 'application/json'
 
