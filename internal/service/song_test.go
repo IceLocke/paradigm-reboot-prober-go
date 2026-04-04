@@ -21,7 +21,7 @@ func TestSongService(t *testing.T) {
 				Title:  "Test Song",
 				Artist: "Test Artist",
 			},
-			Levels: []model.LevelInfo{
+			Charts: []model.ChartInput{
 				{
 					Difficulty:  model.DifficultyMassive,
 					Level:       15.0,
@@ -30,11 +30,11 @@ func TestSongService(t *testing.T) {
 				},
 			},
 		}
-		levels, err := songService.CreateSong(req)
+		charts, err := songService.CreateSong(req)
 		assert.NoError(t, err)
-		assert.Len(t, levels, 1)
-		assert.Equal(t, "Test Song", levels[0].Title)
-		assert.Equal(t, 15.0, levels[0].Level)
+		assert.Len(t, charts, 1)
+		assert.Equal(t, "Test Song", charts[0].Title)
+		assert.Equal(t, 15.0, charts[0].Level)
 	})
 
 	t.Run("GetSingleSong", func(t *testing.T) {
@@ -50,10 +50,10 @@ func TestSongService(t *testing.T) {
 	})
 
 	t.Run("GetAllCharts", func(t *testing.T) {
-		levels, err := songService.GetAllCharts()
+		charts, err := songService.GetAllCharts()
 		assert.NoError(t, err)
-		assert.NotEmpty(t, levels)
-		assert.Equal(t, "Test Song", levels[0].Title)
+		assert.NotEmpty(t, charts)
+		assert.Equal(t, "Test Song", charts[0].Title)
 	})
 
 	t.Run("UpdateSong", func(t *testing.T) {
@@ -65,7 +65,7 @@ func TestSongService(t *testing.T) {
 				Title:  "Updated Song",
 				Artist: "Test Artist",
 			},
-			Levels: []model.LevelInfo{
+			Charts: []model.ChartInput{
 				{
 					Difficulty:  model.DifficultyMassive,
 					Level:       15.5,
@@ -74,10 +74,10 @@ func TestSongService(t *testing.T) {
 				},
 			},
 		}
-		levels, err := songService.UpdateSong(req)
+		charts, err := songService.UpdateSong(req)
 		assert.NoError(t, err)
-		assert.Len(t, levels, 1)
-		assert.Equal(t, "Updated Song", levels[0].Title)
-		assert.Equal(t, 15.5, levels[0].Level)
+		assert.Len(t, charts, 1)
+		assert.Equal(t, "Updated Song", charts[0].Title)
+		assert.Equal(t, 15.5, charts[0].Level)
 	})
 }

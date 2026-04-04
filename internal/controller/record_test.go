@@ -3,7 +3,6 @@ package controller
 import (
 	"bytes"
 	"encoding/json"
-	"mime/multipart"
 	"net/http"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
@@ -64,28 +63,5 @@ func TestRecordController(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
 		assert.Equal(t, "testuser", resp["username"])
-	})
-
-	t.Run("UploadCSV Success", func(t *testing.T) {
-		// Create a dummy CSV file
-		csvContent := "song_name,difficulty,score,clear\nTest Song,Massive,1000000,Pure Memory"
-
-		body := &bytes.Buffer{}
-		writer := multipart.NewWriter(body)
-		part, err := writer.CreateFormFile("file", "test.csv")
-		assert.NoError(t, err)
-		_, err = part.Write([]byte(csvContent))
-		assert.NoError(t, err)
-		_ = writer.Close()
-
-		r.POST("/upload/csv", func(c *gin.Context) {
-			c.Set("username", "testuser")
-			env.uploadCtrl.UploadCSV(c)
-		})
-
-		w := performRequest(r, "POST", "/upload/csv", body, map[string]string{"Content-Type": writer.FormDataContentType()})
-
-		assert.Equal(t, http.StatusOK, w.Code)
-		assert.Contains(t, w.Body.String(), ".csv")
 	})
 }

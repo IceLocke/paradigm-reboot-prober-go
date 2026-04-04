@@ -7,9 +7,8 @@
 Core features:
 - **User Management**: Registration, JWT authentication, profile updates, upload tokens, password change/reset.
 - **Song Management**: CRUD for songs and their difficulty charts (admin-only for create/update).
-- **Score/Record Management**: Batch upload play records (JSON or CSV), automatic single-chart rating calculation, best record tracking.
+- **Score/Record Management**: Batch upload play records (JSON), automatic single-chart rating calculation, best record tracking.
 - **B50 Calculation**: Best 35 (old songs, `b15=false`) + Best 15 (new songs, `b15=true`) selection.
-- **Data Export**: CSV generation from chart/score data.
 - **API Documentation**: Swagger UI auto-generated from code annotations.
 
 Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
@@ -18,7 +17,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 
 | Component      | Technology                                       |
 |----------------|--------------------------------------------------|
-| Language       | Go 1.24 (toolchain go1.24.4)                     |
+| Language       | Go 1.25 (toolchain go1.25.5)                     |
 | Web Framework  | [Gin](https://github.com/gin-gonic/gin)          |
 | ORM            | [GORM](https://gorm.io/)                         |
 | Database       | PostgreSQL (production), SQLite (dev/testing)    |
@@ -45,15 +44,14 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── controller/              # HTTP handlers (Gin handlers with Swagger annotations)
 │   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword
 │   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
-│   │   ├── record.go            # GetPlayRecords, UploadRecords
-│   │   └── upload.go            # UploadCSV, UploadImg
+│   │   └── record.go            # GetPlayRecords, UploadRecords
 │   ├── middleware/
 │   │   └── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
 │   ├── model/                   # Data models (GORM entities + DTOs)
 │   │   ├── user.go              # User, UserBase, UserInDB
-│   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, LevelInfo
+│   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
 │   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, ToPlayRecordInfo()
-│   │   ├── auth.go              # Token, UploadToken, UploadFileResponse
+│   │   ├── auth.go              # Token, UploadToken
 │   │   ├── common.go            # Response (generic error/message response)
 │   │   └── request/             # Request DTOs
 │   │       ├── user.go          # CreateUserRequest, UpdateUserRequest, ChangePasswordRequest, ResetPasswordRequest
@@ -203,7 +201,7 @@ go test -v ./pkg/rating/...
 | `pkg/rating`             | Rating formula with various score ranges               |
 | `internal/repository`    | CRUD for users, songs, records; best record logic      |
 | `internal/service`       | User creation/login, song CRUD, record management      |
-| `internal/controller`    | HTTP handler integration (register, login, songs, records, uploads) |
+| `internal/controller`    | HTTP handler integration (register, login, songs, records) |
 | `internal/middleware`     | Auth middleware (valid/invalid/expired/missing tokens)  |
 | `internal/util`          | CSV generation, parsing (UTF-8, GBK encoding, BOM)     |
 
@@ -243,8 +241,6 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `auth.bcrypt_cost`           | —              | `10`                                 | bcrypt hashing cost (4–31)               |
 | `auth.upload_token_length`   | —              | `16`                                 | Upload token bytes (hex output is 2×)    |
 | `auth.username_pattern`      | —              | `^[A-Za-z][A-Za-z0-9_]{5,15}$`      | Regex for username validation            |
-| `upload.csv_path`            | `CSV_PATH`     | `./uploads/csv/`                     | CSV upload directory                     |
-| `upload.img_path`            | `IMG_PATH`     | `./uploads/img/`                     | Image upload directory                   |
 | `pagination.default_page_size` | —            | `50`                                 | Default page size for list endpoints     |
 | `pagination.max_page_size`   | —              | `200`                                | Maximum allowed page size                |
 | `game.b35_limit`             | —              | `35`                                 | B35 best record count (old songs)        |
@@ -299,8 +295,7 @@ Base path: `/api/v2`
 | PUT    | `/user/me`                  | `UserController.UpdateMe`            |
 | PUT    | `/user/me/password`         | `UserController.ChangePassword`       |
 | POST   | `/user/me/upload-token`     | `UserController.RefreshUploadToken`   |
-| POST   | `/upload/csv`               | `UploadController.UploadCSV`          |
-| POST   | `/upload/img`               | `UploadController.UploadImg`          |
+
 
 ### Admin Routes (JWT + `is_admin=true`)
 | Method | Path                    | Handler                        |
@@ -328,7 +323,7 @@ The `GET /records/:username` endpoint supports the following `scope` query param
 
 ## Code Style Guidelines
 
-- **Go version**: 1.24 (set in `go.mod` and CI), toolchain go1.24.4.
+- **Go version**: 1.25 (set in `go.mod` and CI), toolchain go1.25.5.
 - **Formatting**: Enforced by `gofmt` via golangci-lint.
 - **Naming**: Standard Go conventions. The `var-naming` revive rule is disabled to allow certain non-standard names (e.g., `ID` suffixes in model fields).
 - **Error handling**: Errors are returned up the call chain. Controllers translate errors to appropriate HTTP status codes and `model.Response` JSON.
@@ -346,8 +341,6 @@ The `GET /records/:username` endpoint supports the following `scope` query param
   - Record viewing respects `anonymous_probe` user setting; admins can view any user's records.
   - Record uploading requires JWT auth (own records) or a valid `upload_token` (third-party upload).
   - Song creation/update requires admin role.
-  - Image upload requires admin role.
   - Password reset requires admin role.
 - **SQL injection**: Sort parameters are whitelisted; all other queries use GORM's parameterized queries.
-- **File uploads**: CSV uploads are restricted to `.csv` extension. Files are saved with randomized hex-suffixed filenames to avoid collisions and path traversal.
 - **Token expiration**: JWT access tokens expire after 24 hours. Default (no duration specified) is 30 minutes.

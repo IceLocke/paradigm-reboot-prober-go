@@ -1,7 +1,7 @@
 import client from './client'
 import type { ChartInfo, Song, CreateSongRequest, UpdateSongRequest } from './types'
 
-export const getAllSongLevels = () => {
+export const getAllCharts = () => {
   return client.get<ChartInfo[]>('/songs')
 }
 

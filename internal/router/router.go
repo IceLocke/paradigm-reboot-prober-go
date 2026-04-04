@@ -33,7 +33,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	userCtrl := controller.NewUserController(userService)
 	songCtrl := controller.NewSongController(songService)
 	recordCtrl := controller.NewRecordController(recordService, userService)
-	uploadCtrl := controller.NewUploadController(userService)
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -71,10 +70,6 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 			auth.PUT("/user/me", userCtrl.UpdateMe)
 			auth.POST("/user/me/upload-token", userCtrl.RefreshUploadToken)
 			auth.PUT("/user/me/password", userCtrl.ChangePassword)
-
-			// Upload routes
-			auth.POST("/upload/csv", uploadCtrl.UploadCSV)
-			auth.POST("/upload/img", uploadCtrl.UploadImg)
 
 			// Admin routes (with admin middleware)
 			admin := auth.Group("")

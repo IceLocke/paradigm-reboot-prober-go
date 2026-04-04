@@ -11,7 +11,7 @@ func TestSongRepository_CreateSong(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewSongRepository(db)
 
-	t.Run("Create Song With Levels", func(t *testing.T) {
+	t.Run("Create Song With Charts", func(t *testing.T) {
 		song := &model.Song{
 			SongBase: model.SongBase{
 				WikiID: "song_1",
@@ -53,7 +53,7 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 	_, err := repo.CreateSong(song)
 	assert.NoError(t, err)
 
-	t.Run("Update Song Metadata and Levels", func(t *testing.T) {
+	t.Run("Update Song Metadata and Charts", func(t *testing.T) {
 		updatedSong := &model.Song{
 			SongBase: model.SongBase{
 				WikiID: "song_update",
@@ -67,7 +67,7 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 				// It iterates over updatedSong.Charts.
 				// If exists in DB, update.
 				// If not exists in DB (but in update), create.
-				// It does NOT delete levels missing from update.
+				// It does NOT delete charts missing from update.
 			},
 		}
 
@@ -75,7 +75,7 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "New Title", result.Title)
 
-		// Verify levels
+		// Verify charts
 		// We need to fetch fresh from DB to be sure
 		var freshSong model.Song
 		db.Preload("Charts").First(&freshSong, song.SongID)

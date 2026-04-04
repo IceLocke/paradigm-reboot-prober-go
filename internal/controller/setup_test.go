@@ -52,7 +52,6 @@ type testEnv struct {
 	userCtrl      *UserController
 	songCtrl      *SongController
 	recordCtrl    *RecordController
-	uploadCtrl    *UploadController
 }
 
 func setupEnv(t *testing.T) *testEnv {
@@ -77,6 +76,5 @@ func setupEnv(t *testing.T) *testEnv {
 		userCtrl:      NewUserController(userService),
 		songCtrl:      NewSongController(songService),
 		recordCtrl:    NewRecordController(recordService, userService),
-		uploadCtrl:    NewUploadController(userService),
 	}
 }

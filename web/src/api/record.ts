@@ -23,9 +23,3 @@ export const getRecords = (
 export const uploadRecords = (username: string, data: BatchCreatePlayRecordRequest) => {
   return client.post<PlayRecord[]>(`/records/${username}`, data)
 }
-
-export const exportCsv = (username: string) => {
-  return client.get(`/records/${username}/export/csv`, {
-    responseType: 'blob',
-  })
-}

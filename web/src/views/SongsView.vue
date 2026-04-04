@@ -1,7 +1,7 @@
 <template>
   <div class="page-container">
     <div class="page-header">
-      <h2>{{ t('term.song_levels') }}</h2>
+      <h2>{{ t('term.charts') }}</h2>
       <div class="page-actions">
         <div class="search-box">
           <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -75,7 +75,7 @@ import { NDataTable, NPagination, NPopover } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
 import { useAppStore } from '@/stores/app'
-import { getAllSongLevels, getSingleSongInfo } from '@/api/song'
+import { getAllCharts, getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockCharts } from '@/api/mock'
 import type { ChartInfo, Song, Difficulty } from '@/api/types'
 import BaseTabs from '@/components/ui/BaseTabs.vue'
@@ -284,7 +284,7 @@ const loadCharts = async () => {
     return
   }
   try {
-    const res = await getAllSongLevels()
+    const res = await getAllCharts()
     appStore.charts = res.data
   } catch { /* handled */ }
 }

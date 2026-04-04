@@ -336,110 +336,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/upload/csv": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Upload a CSV file containing play records",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "upload"
-                ],
-                "summary": "Upload CSV file",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "CSV file",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.UploadFileResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/upload/img": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Upload an image file (Admin only)",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "upload"
-                ],
-                "summary": "Upload image file",
-                "parameters": [
-                    {
-                        "type": "file",
-                        "description": "Image file",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/model.UploadFileResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/user/login": {
             "post": {
                 "description": "Authenticate user and return JWT token",
@@ -884,22 +780,7 @@ const docTemplate = `{
                 }
             }
         },
-        "model.Difficulty": {
-            "type": "string",
-            "enum": [
-                "detected",
-                "invaded",
-                "massive",
-                "reboot"
-            ],
-            "x-enum-varnames": [
-                "DifficultyDetected",
-                "DifficultyInvaded",
-                "DifficultyMassive",
-                "DifficultyReboot"
-            ]
-        },
-        "model.LevelInfo": {
+        "model.ChartInput": {
             "type": "object",
             "properties": {
                 "difficulty": {
@@ -923,6 +804,21 @@ const docTemplate = `{
                     "example": 1000
                 }
             }
+        },
+        "model.Difficulty": {
+            "type": "string",
+            "enum": [
+                "detected",
+                "invaded",
+                "massive",
+                "reboot"
+            ],
+            "x-enum-varnames": [
+                "DifficultyDetected",
+                "DifficultyInvaded",
+                "DifficultyMassive",
+                "DifficultyReboot"
+            ]
         },
         "model.PlayRecord": {
             "type": "object",
@@ -1091,14 +987,6 @@ const docTemplate = `{
                 }
             }
         },
-        "model.UploadFileResponse": {
-            "type": "object",
-            "properties": {
-                "filename": {
-                    "type": "string"
-                }
-            }
-        },
         "model.UploadToken": {
             "type": "object",
             "properties": {
@@ -1166,9 +1054,6 @@ const docTemplate = `{
         "request.BatchCreatePlayRecordRequest": {
             "type": "object",
             "properties": {
-                "csv_filename": {
-                    "type": "string"
-                },
                 "is_replace": {
                     "type": "boolean"
                 },
@@ -1220,6 +1105,12 @@ const docTemplate = `{
                     "type": "string",
                     "example": "180"
                 },
+                "charts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ChartInput"
+                    }
+                },
                 "cover": {
                     "type": "string",
                     "example": "https://example.com/cover.jpg"
@@ -1235,12 +1126,6 @@ const docTemplate = `{
                 "length": {
                     "type": "string",
                     "example": "2:30"
-                },
-                "levels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.LevelInfo"
-                    }
                 },
                 "title": {
                     "type": "string",
@@ -1355,6 +1240,12 @@ const docTemplate = `{
                     "type": "string",
                     "example": "180"
                 },
+                "charts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ChartInput"
+                    }
+                },
                 "cover": {
                     "type": "string",
                     "example": "https://example.com/cover.jpg"
@@ -1370,12 +1261,6 @@ const docTemplate = `{
                 "length": {
                     "type": "string",
                     "example": "2:30"
-                },
-                "levels": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/model.LevelInfo"
-                    }
                 },
                 "song_id": {
                     "type": "integer"

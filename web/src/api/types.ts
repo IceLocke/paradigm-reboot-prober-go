@@ -34,8 +34,6 @@ export type Difficulty = Schemas['model.Difficulty']
 export type Response = Schemas['model.Response']
 export type Token = DeepRequired<Schemas['model.Token']>
 export type UploadToken = DeepRequired<Schemas['model.UploadToken']>
-export type UploadFileResponse = DeepRequired<Schemas['model.UploadFileResponse']>
-
 // ─── Domain Models (response — always complete) ───────────────────
 export type User = DeepRequired<Schemas['model.User']>
 
@@ -47,7 +45,7 @@ export type Song = Omit<DeepRequired<Schemas['model.Song']>, 'charts'> & {
 }
 export type ChartInfo = DeepRequired<Schemas['model.ChartInfo']>
 export type ChartInfoSimple = DeepRequired<Schemas['model.ChartInfoSimple']>
-export type LevelInfo = DeepRequired<Schemas['model.LevelInfo']>
+export type ChartInput = DeepRequired<Schemas['model.ChartInput']>
 export type PlayRecord = Omit<DeepRequired<Schemas['model.PlayRecord']>, 'chart'> & {
   chart?: Chart
 }

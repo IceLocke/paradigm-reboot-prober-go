@@ -4,9 +4,6 @@
       <h2>{{ t('term.records') }}</h2>
       <div class="page-actions">
         <BaseTabs v-model="scope" :tabs="scopeTabs" />
-        <button class="icon-btn" :title="t('term.export_csv')" @click="onExportCsv">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
         <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
           <template #trigger>
             <button class="icon-btn" :title="t('term.upload_list')">
@@ -68,7 +65,7 @@ import dayjs from 'dayjs'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
-import { getRecords, exportCsv } from '@/api/record'
+import { getRecords } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockRecords } from '@/api/mock'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
@@ -237,20 +234,6 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     },
   },
 ])
-
-const onExportCsv = async () => {
-  if (USE_MOCK) return
-  try {
-    const res = await exportCsv(userStore.username)
-    const blob = new Blob([res.data], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'records.csv'
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch { /* handled */ }
-}
 
 const loadRecords = async () => {
   loading.value = true

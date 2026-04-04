@@ -32,10 +32,6 @@ type Config struct {
 		UploadTokenLength int    `yaml:"upload_token_length"` // bytes (hex output is 2x)
 		UsernamePattern   string `yaml:"username_pattern"`
 	} `yaml:"auth"`
-	Upload struct {
-		CSVPath string `yaml:"csv_path"`
-		ImgPath string `yaml:"img_path"`
-	} `yaml:"upload"`
 	Pagination struct {
 		DefaultPageSize int `yaml:"default_page_size"`
 		MaxPageSize     int `yaml:"max_page_size"`
@@ -66,8 +62,6 @@ func InitDefaults() {
 	GlobalConfig.Auth.BcryptCost = 10
 	GlobalConfig.Auth.UploadTokenLength = 16
 	GlobalConfig.Auth.UsernamePattern = `^[A-Za-z][A-Za-z0-9_]{5,15}$`
-	GlobalConfig.Upload.CSVPath = "./uploads/csv/"
-	GlobalConfig.Upload.ImgPath = "./uploads/img/"
 	GlobalConfig.Pagination.DefaultPageSize = 50
 	GlobalConfig.Pagination.MaxPageSize = 200
 	GlobalConfig.Game.B35Limit = 35
@@ -126,13 +120,6 @@ func LoadConfig(configPath string) {
 	if secret := os.Getenv("SECRET_KEY"); secret != "" {
 		GlobalConfig.Auth.SecretKey = secret
 	}
-	if csvPath := os.Getenv("CSV_PATH"); csvPath != "" {
-		GlobalConfig.Upload.CSVPath = csvPath
-	}
-	if imgPath := os.Getenv("IMG_PATH"); imgPath != "" {
-		GlobalConfig.Upload.ImgPath = imgPath
-	}
-
 	// Re-parse derived values after file/env overrides
 	JWTExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
 	if err != nil {

@@ -320,149 +320,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/upload/csv": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload CSV file
-         * @description Upload a CSV file containing play records
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        /**
-                         * Format: binary
-                         * @description CSV file
-                         */
-                        file: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.UploadFileResponse"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.Response"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.Response"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/upload/img": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Upload image file
-         * @description Upload an image file (Admin only)
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "multipart/form-data": {
-                        /**
-                         * Format: binary
-                         * @description Image file
-                         */
-                        file: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.UploadFileResponse"];
-                    };
-                };
-                /** @description Bad Request */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.Response"];
-                    };
-                };
-                /** @description Unauthorized */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.Response"];
-                    };
-                };
-                /** @description Forbidden */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["model.Response"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/user/login": {
         parameters: {
             query?: never;
@@ -895,9 +752,7 @@ export interface components {
             version?: string;
             wiki_id?: string;
         };
-        /** @enum {string} */
-        "model.Difficulty": "detected" | "invaded" | "massive" | "reboot";
-        "model.LevelInfo": {
+        "model.ChartInput": {
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
             /** @example 14.5 */
@@ -907,6 +762,8 @@ export interface components {
             /** @example 1000 */
             notes?: number;
         };
+        /** @enum {string} */
+        "model.Difficulty": "detected" | "invaded" | "massive" | "reboot";
         "model.PlayRecord": {
             chart?: components["schemas"]["model.Chart"];
             /** @example 1 */
@@ -971,9 +828,6 @@ export interface components {
             /** @example Bearer */
             token_type?: string;
         };
-        "model.UploadFileResponse": {
-            filename?: string;
-        };
         "model.UploadToken": {
             upload_token?: string;
         };
@@ -1003,7 +857,6 @@ export interface components {
             uuid?: string;
         };
         "request.BatchCreatePlayRecordRequest": {
-            csv_filename?: string;
             is_replace?: boolean;
             play_records?: components["schemas"]["model.PlayRecordBase"][];
             upload_token?: string;
@@ -1023,6 +876,7 @@ export interface components {
             b15?: boolean;
             /** @example 180 */
             bpm?: string;
+            charts?: components["schemas"]["model.ChartInput"][];
             /** @example https://example.com/cover.jpg */
             cover?: string;
             /** @example Pop */
@@ -1031,7 +885,6 @@ export interface components {
             illustrator?: string;
             /** @example 2:30 */
             length?: string;
-            levels?: components["schemas"]["model.LevelInfo"][];
             /** @example Song Title */
             title?: string;
             /** @example 1.0.0 */
@@ -1080,6 +933,7 @@ export interface components {
             b15?: boolean;
             /** @example 180 */
             bpm?: string;
+            charts?: components["schemas"]["model.ChartInput"][];
             /** @example https://example.com/cover.jpg */
             cover?: string;
             /** @example Pop */
@@ -1088,7 +942,6 @@ export interface components {
             illustrator?: string;
             /** @example 2:30 */
             length?: string;
-            levels?: components["schemas"]["model.LevelInfo"][];
             song_id: number;
             /** @example Song Title */
             title?: string;

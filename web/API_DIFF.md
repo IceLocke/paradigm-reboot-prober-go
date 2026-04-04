@@ -208,11 +208,11 @@ v2 请求体：
 
 | 功能 | v1 路径 | 状态 |
 |------|---------|------|
-| 导出 CSV | `GET /records/:username/export/csv` | ⚠️ 未在 Swagger 中出现 |
-| 导出 B50 图片 | `GET /records/:username/export/b50` | ⚠️ 未在 Swagger 中出现 |
+| 导出 CSV | `GET /records/:username/export/csv` | ❌ 已废除（改为前端本地渲染） |
+| 导出 B50 图片 | `GET /records/:username/export/b50` | ❌ 已废除（改为前端本地渲染） |
 | B50 趋势数据 | `GET /statistics/:username/b50` | ⚠️ 未在 Swagger 中出现（v1 路径与 v2 可能不同） |
 
-> **建议**：这些功能在新版前端中已预留接口调用代码（`api/record.ts` 中的 `exportCsv`），但由于后端可能尚未实现，当前使用 mock 数据或禁用状态。待后端补充这些接口后需要验证。
+> **说明**：CSV 导出和 B50 图片导出已废除服务端实现，改为前端本地渲染。
 
 ---
 
@@ -223,8 +223,8 @@ v2 请求体：
 | Rating 存储 | 部分接口返回已除以 100 的值，部分返回原始值（前端需手动 `/100`） | 统一返回 `int` (rating × 100)，前端统一 `/ 100` 显示 |
 | 升序参数 | `order=asce` | `order=asce` (不变) |
 | 认证头 | `Authorization: Bearer <token>` | `Authorization: Bearer <token>` (不变) |
-| 上传 CSV 路径 | `POST /upload/csv` | `POST /upload/csv` (不变) |
-| 上传图片路径 | `POST /upload/img` | `POST /upload/img` (不变) |
+| 上传 CSV 路径 | `POST /upload/csv` | ❌ 已废除 |
+| 上传图片路径 | `POST /upload/img` | ❌ 已废除 |
 
 ---
 

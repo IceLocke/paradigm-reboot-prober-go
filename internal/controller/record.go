@@ -7,8 +7,6 @@ import (
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
-	"paradigm-reboot-prober-go/internal/util"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -171,9 +169,8 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 		return
 	}
 
-	// Ambiguous data check
-	if (len(req.PlayRecords) > 0) == (req.CSVFilename != "") {
-		c.JSON(http.StatusBadRequest, model.Response{Error: "ambiguous data: provide either play_records or csv_filename"})
+	if len(req.PlayRecords) == 0 {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "play_records is required"})
 		return
 	}
 
@@ -195,25 +192,7 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 		return
 	}
 
-	var playRecords []model.PlayRecordBase
-	isReplace := req.IsReplace
-
-	if req.CSVFilename != "" {
-		// Sanitize filename to prevent path traversal
-		csvFilename := filepath.Base(req.CSVFilename)
-		csvPath := filepath.Join(config.GlobalConfig.Upload.CSVPath, csvFilename)
-		var err error
-		playRecords, err = util.GetRecordsFromCSV(csvPath)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, model.Response{Error: "failed to parse csv: " + err.Error()})
-			return
-		}
-		isReplace = true // CSV upload usually implies replacement in original code
-	} else {
-		playRecords = req.PlayRecords
-	}
-
-	records, err := ctrl.recordService.CreateRecords(username, playRecords, isReplace)
+	records, err := ctrl.recordService.CreateRecords(username, req.PlayRecords, req.IsReplace)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return

@@ -46,7 +46,7 @@ import { themeOverrides } from '@/config/naive-theme'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { getMyInfo } from '@/api/user'
-import { getAllSongLevels } from '@/api/song'
+import { getAllCharts } from '@/api/song'
 import { USE_MOCK, getMockCharts, getMockUser } from '@/api/mock'
 
 import AppHeader from '@/components/layout/AppHeader.vue'
@@ -104,7 +104,7 @@ const loadCharts = async () => {
     return
   }
   try {
-    const res = await getAllSongLevels()
+    const res = await getAllCharts()
     appStore.charts = res.data
   } catch { /* handled */ }
 }

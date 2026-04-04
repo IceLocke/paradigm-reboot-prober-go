@@ -27,12 +27,12 @@ func NewSongController(songService *service.SongService) *SongController {
 // @Failure 500 {object} model.Response
 // @Router /songs [get]
 func (ctrl *SongController) GetAllCharts(c *gin.Context) {
-	levels, err := ctrl.songService.GetAllCharts()
+	charts, err := ctrl.songService.GetAllCharts()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, levels)
+	c.JSON(http.StatusOK, charts)
 }
 
 // GetSingleSongInfo godoc
@@ -88,12 +88,12 @@ func (ctrl *SongController) CreateSong(c *gin.Context) {
 		return
 	}
 
-	levels, err := ctrl.songService.CreateSong(&req)
+	charts, err := ctrl.songService.CreateSong(&req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, levels)
+	c.JSON(http.StatusOK, charts)
 }
 
 // UpdateSong godoc
@@ -114,10 +114,10 @@ func (ctrl *SongController) UpdateSong(c *gin.Context) {
 		return
 	}
 
-	levels, err := ctrl.songService.UpdateSong(&req)
+	charts, err := ctrl.songService.UpdateSong(&req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, levels)
+	c.JSON(http.StatusOK, charts)
 }

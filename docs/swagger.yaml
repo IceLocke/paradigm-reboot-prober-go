@@ -102,19 +102,7 @@ definitions:
       wiki_id:
         type: string
     type: object
-  model.Difficulty:
-    enum:
-    - detected
-    - invaded
-    - massive
-    - reboot
-    type: string
-    x-enum-varnames:
-    - DifficultyDetected
-    - DifficultyInvaded
-    - DifficultyMassive
-    - DifficultyReboot
-  model.LevelInfo:
+  model.ChartInput:
     properties:
       difficulty:
         allOf:
@@ -130,6 +118,18 @@ definitions:
         example: 1000
         type: integer
     type: object
+  model.Difficulty:
+    enum:
+    - detected
+    - invaded
+    - massive
+    - reboot
+    type: string
+    x-enum-varnames:
+    - DifficultyDetected
+    - DifficultyInvaded
+    - DifficultyMassive
+    - DifficultyReboot
   model.PlayRecord:
     properties:
       chart:
@@ -245,11 +245,6 @@ definitions:
         example: Bearer
         type: string
     type: object
-  model.UploadFileResponse:
-    properties:
-      filename:
-        type: string
-    type: object
   model.UploadToken:
     properties:
       upload_token:
@@ -298,8 +293,6 @@ definitions:
     type: object
   request.BatchCreatePlayRecordRequest:
     properties:
-      csv_filename:
-        type: string
       is_replace:
         type: boolean
       play_records:
@@ -336,6 +329,10 @@ definitions:
       bpm:
         example: "180"
         type: string
+      charts:
+        items:
+          $ref: '#/definitions/model.ChartInput'
+        type: array
       cover:
         example: https://example.com/cover.jpg
         type: string
@@ -348,10 +345,6 @@ definitions:
       length:
         example: "2:30"
         type: string
-      levels:
-        items:
-          $ref: '#/definitions/model.LevelInfo'
-        type: array
       title:
         example: Song Title
         type: string
@@ -433,6 +426,10 @@ definitions:
       bpm:
         example: "180"
         type: string
+      charts:
+        items:
+          $ref: '#/definitions/model.ChartInput'
+        type: array
       cover:
         example: https://example.com/cover.jpg
         type: string
@@ -445,10 +442,6 @@ definitions:
       length:
         example: "2:30"
         type: string
-      levels:
-        items:
-          $ref: '#/definitions/model.LevelInfo'
-        type: array
       song_id:
         type: integer
       title:
@@ -699,72 +692,6 @@ paths:
       summary: Get single song info
       tags:
       - song
-  /upload/csv:
-    post:
-      consumes:
-      - multipart/form-data
-      description: Upload a CSV file containing play records
-      parameters:
-      - description: CSV file
-        in: formData
-        name: file
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.UploadFileResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.Response'
-      security:
-      - BearerAuth: []
-      summary: Upload CSV file
-      tags:
-      - upload
-  /upload/img:
-    post:
-      consumes:
-      - multipart/form-data
-      description: Upload an image file (Admin only)
-      parameters:
-      - description: Image file
-        in: formData
-        name: file
-        required: true
-        type: file
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/model.UploadFileResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/model.Response'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/model.Response'
-      security:
-      - BearerAuth: []
-      summary: Upload image file
-      tags:
-      - upload
   /user/login:
     post:
       consumes:

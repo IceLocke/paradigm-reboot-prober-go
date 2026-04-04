@@ -85,14 +85,14 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 
 		// Update Charts
 		// Strategy: Map existing charts by Difficulty, update if exists, create if new
-		existingLevelsMap := make(map[model.Difficulty]*model.Chart)
+		existingChartsMap := make(map[model.Difficulty]*model.Chart)
 		for i := range existingSong.Charts {
 			chart := &existingSong.Charts[i]
-			existingLevelsMap[chart.Difficulty] = chart
+			existingChartsMap[chart.Difficulty] = chart
 		}
 
 		for _, newChart := range updatedSong.Charts {
-			if existingChart, exists := existingLevelsMap[newChart.Difficulty]; exists {
+			if existingChart, exists := existingChartsMap[newChart.Difficulty]; exists {
 				// Update existing chart
 				existingChart.Level = newChart.Level
 				existingChart.LevelDesign = newChart.LevelDesign

@@ -54,8 +54,8 @@ func (Chart) TableName() string {
 	return "charts"
 }
 
-// LevelInfo represents the details of a difficulty level for create/update requests
-type LevelInfo struct {
+// ChartInput represents the details of a chart for create/update requests
+type ChartInput struct {
 	Difficulty  Difficulty `json:"difficulty" example:"massive"`
 	Level       float64    `json:"level" example:"14.5"`
 	LevelDesign string     `json:"level_design" example:"Designer"`

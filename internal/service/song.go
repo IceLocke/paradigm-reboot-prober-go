@@ -23,16 +23,16 @@ func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 
 	var charts []model.ChartInfo
 	for _, song := range songs {
-		for _, level := range song.Charts {
+		for _, chart := range song.Charts {
 			charts = append(charts, model.ChartInfo{
 				SongBase:     song.SongBase,
 				SongID:       song.SongID,
-				ChartID:      level.ChartID,
-				Difficulty:   level.Difficulty,
-				Level:        level.Level,
-				FittingLevel: level.FittingLevel,
-				LevelDesign:  level.LevelDesign,
-				Notes:        level.Notes,
+				ChartID:      chart.ChartID,
+				Difficulty:   chart.Difficulty,
+				Level:        chart.Level,
+				FittingLevel: chart.FittingLevel,
+				LevelDesign:  chart.LevelDesign,
+				Notes:        chart.Notes,
 			})
 		}
 	}
@@ -84,13 +84,13 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 		SongBase: req.SongBase,
 	}
 
-	// Map levels
-	for _, levelInfo := range req.Levels {
+	// Map charts
+	for _, chartInput := range req.Charts {
 		chart := model.Chart{
-			Difficulty:  levelInfo.Difficulty,
-			Level:       levelInfo.Level,
-			LevelDesign: &levelInfo.LevelDesign,
-			Notes:       levelInfo.Notes,
+			Difficulty:  chartInput.Difficulty,
+			Level:       chartInput.Level,
+			LevelDesign: &chartInput.LevelDesign,
+			Notes:       chartInput.Notes,
 		}
 		song.Charts = append(song.Charts, chart)
 	}
@@ -102,16 +102,16 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 
 	// Convert to response format
 	var charts []model.ChartInfo
-	for _, level := range createdSong.Charts {
+	for _, chart := range createdSong.Charts {
 		info := model.ChartInfo{
 			SongBase:     createdSong.SongBase,
 			SongID:       createdSong.SongID,
-			ChartID:      level.ChartID,
-			Difficulty:   level.Difficulty,
-			Level:        level.Level,
-			FittingLevel: level.FittingLevel,
-			LevelDesign:  level.LevelDesign,
-			Notes:        level.Notes,
+			ChartID:      chart.ChartID,
+			Difficulty:   chart.Difficulty,
+			Level:        chart.Level,
+			FittingLevel: chart.FittingLevel,
+			LevelDesign:  chart.LevelDesign,
+			Notes:        chart.Notes,
 		}
 		charts = append(charts, info)
 	}
@@ -125,13 +125,13 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartI
 		SongBase: req.SongBase,
 	}
 
-	// Map levels
-	for _, levelInfo := range req.Levels {
+	// Map charts
+	for _, chartInput := range req.Charts {
 		chart := model.Chart{
-			Difficulty:  levelInfo.Difficulty,
-			Level:       levelInfo.Level,
-			LevelDesign: &levelInfo.LevelDesign,
-			Notes:       levelInfo.Notes,
+			Difficulty:  chartInput.Difficulty,
+			Level:       chartInput.Level,
+			LevelDesign: &chartInput.LevelDesign,
+			Notes:       chartInput.Notes,
 		}
 		song.Charts = append(song.Charts, chart)
 	}
@@ -143,16 +143,16 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartI
 
 	// Convert to response format
 	var charts []model.ChartInfo
-	for _, level := range updatedSong.Charts {
+	for _, chart := range updatedSong.Charts {
 		info := model.ChartInfo{
 			SongBase:     updatedSong.SongBase,
 			SongID:       updatedSong.SongID,
-			ChartID:      level.ChartID,
-			Difficulty:   level.Difficulty,
-			Level:        level.Level,
-			FittingLevel: level.FittingLevel,
-			LevelDesign:  level.LevelDesign,
-			Notes:        level.Notes,
+			ChartID:      chart.ChartID,
+			Difficulty:   chart.Difficulty,
+			Level:        chart.Level,
+			FittingLevel: chart.FittingLevel,
+			LevelDesign:  chart.LevelDesign,
+			Notes:        chart.Notes,
 		}
 		charts = append(charts, info)
 	}

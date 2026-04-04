@@ -12,7 +12,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 	repo := NewRecordRepository(db)
 	songRepo := NewSongRepository(db)
 
-	// Setup Song and Level
+	// Setup Song and Chart
 	song := &model.Song{
 		SongBase: model.SongBase{WikiID: "rec_song", Title: "Record Song"},
 		Charts: []model.Chart{
@@ -20,12 +20,12 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		},
 	}
 	createdSong, _ := songRepo.CreateSong(song)
-	levelID := createdSong.Charts[0].ChartID
+	chartID := createdSong.Charts[0].ChartID
 
 	t.Run("Create New Record", func(t *testing.T) {
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				ChartID: levelID,
+				ChartID: chartID,
 				Score:   1000000,
 			},
 			Username: "testuser",
@@ -49,7 +49,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		// Previous best was 1000000
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				ChartID: levelID,
+				ChartID: chartID,
 				Score:   1000001,
 			},
 			Username: "testuser",
@@ -69,7 +69,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		// Previous best was 1000001
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				ChartID: levelID,
+				ChartID: chartID,
 				Score:   900000,
 			},
 			Username: "testuser",
@@ -88,7 +88,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		// Previous best was 1000001. New score is lower but forced.
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
-				ChartID: levelID,
+				ChartID: chartID,
 				Score:   800000,
 			},
 			Username: "testuser",

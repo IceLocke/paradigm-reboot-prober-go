@@ -69,8 +69,7 @@ web/
 │   │   ├── client.ts             # Axios instance (base URL, JWT interceptor)
 │   │   ├── user.ts               # User API (login, register, profile, token)
 │   │   ├── song.ts               # Song API (list charts, song detail, CRUD)
-│   │   ├── record.ts             # Record API (query, upload, export CSV)
-│   │   ├── upload.ts             # Upload API (CSV file, image file)
+│   │   ├── record.ts             # Record API (query, upload)
 │   │   └── mock.ts               # Mock data generator + USE_MOCK flag
 │   │
 │   ├── stores/
@@ -317,7 +316,7 @@ Types are **auto-generated** from `docs/swagger.json` via `pnpm generate:api`, t
 | Category | Types |
 |----------|-------|
 | **Enums** | `Difficulty` |
-| **Response models** (wrapped with `DeepRequired`) | `User`, `Song`, `Chart`, `ChartInfo`, `ChartInfoSimple`, `LevelInfo`, `PlayRecord`, `PlayRecordBase`, `PlayRecordInfo`, `PlayRecordResponse`, `Token`, `UploadToken`, `UploadFileResponse` |
+| **Response models** (wrapped with `DeepRequired`) | `User`, `Song`, `Chart`, `ChartInfo`, `ChartInfoSimple`, `ChartInput`, `PlayRecord`, `PlayRecordBase`, `PlayRecordInfo`, `PlayRecordResponse`, `Token`, `UploadToken` |
 | **Request DTOs** (keep optional fields) | `CreateUserRequest`, `UpdateUserRequest`, `ChangePasswordRequest`, `ResetPasswordRequest`, `BatchCreatePlayRecordRequest`, `CreateSongRequest`, `UpdateSongRequest` |
 | **API response wrapper** | `Response` |
 
@@ -327,8 +326,7 @@ Types are **auto-generated** from `docs/swagger.json` via `pnpm generate:api`, t
 |--------|-----------|
 | `user.ts` | `login`, `register`, `getMyInfo`, `updateMyInfo`, `changePassword`, `refreshUploadToken`, `resetPassword` |
 | `song.ts` | `getAllSongLevels`, `getSingleSongInfo`, `createSong`, `updateSong` |
-| `record.ts` | `getRecords`, `uploadRecords`, `exportCsv` |
-| `upload.ts` | `uploadCsv`, `uploadImg` |
+| `record.ts` | `getRecords`, `uploadRecords` |
 
 ### v1 → v2 Breaking Changes
 

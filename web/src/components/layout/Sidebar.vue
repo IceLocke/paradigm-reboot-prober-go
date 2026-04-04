@@ -63,7 +63,7 @@ const icons = {
 
 const navItems = computed(() => [
   { path: '/best50', label: t('term.b50'), icon: icons.b50 },
-  { path: '/songs', label: t('term.song_levels'), icon: icons.songs },
+  { path: '/songs', label: t('term.charts'), icon: icons.songs },
   { path: '/records', label: t('term.records'), icon: icons.records },
   { path: '/about', label: t('common.about'), icon: icons.about },
 ])
