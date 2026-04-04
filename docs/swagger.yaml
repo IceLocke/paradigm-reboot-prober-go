@@ -36,7 +36,7 @@ definitions:
         example: "180"
         type: string
       cover:
-        example: https://example.com/cover.jpg
+        example: Cover_d3d3d3.jpg
         type: string
       difficulty:
         allOf:
@@ -227,7 +227,7 @@ definitions:
           $ref: '#/definitions/model.Chart'
         type: array
       cover:
-        example: https://example.com/cover.jpg
+        example: Cover_d3d3d3.jpg
         type: string
       genre:
         example: Pop
@@ -385,7 +385,7 @@ definitions:
         minItems: 1
         type: array
       cover:
-        example: https://example.com/cover.jpg
+        example: Cover_d3d3d3.jpg
         type: string
       genre:
         example: Pop
@@ -464,7 +464,7 @@ definitions:
         minItems: 1
         type: array
       cover:
-        example: https://example.com/cover.jpg
+        example: Cover_d3d3d3.jpg
         type: string
       genre:
         example: Pop

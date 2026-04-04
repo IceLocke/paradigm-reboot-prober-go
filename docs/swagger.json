@@ -819,7 +819,7 @@
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "difficulty": {
                     "allOf": [
@@ -1094,7 +1094,7 @@
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "genre": {
                     "type": "string",
@@ -1315,7 +1315,7 @@
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "genre": {
                     "type": "string",
@@ -1423,7 +1423,7 @@
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "genre": {
                     "type": "string",

@@ -822,7 +822,7 @@ const docTemplate = `{
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "difficulty": {
                     "allOf": [
@@ -1097,7 +1097,7 @@ const docTemplate = `{
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "genre": {
                     "type": "string",
@@ -1318,7 +1318,7 @@ const docTemplate = `{
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "genre": {
                     "type": "string",
@@ -1426,7 +1426,7 @@ const docTemplate = `{
                 },
                 "cover": {
                     "type": "string",
-                    "example": "https://example.com/cover.jpg"
+                    "example": "Cover_d3d3d3.jpg"
                 },
                 "genre": {
                     "type": "string",
