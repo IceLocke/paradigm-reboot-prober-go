@@ -45,6 +45,7 @@ jobs:
   test:
     name: Unit Tests
     runs-on: ubuntu-slim
+    needs: [lint, frontend-lint]
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
