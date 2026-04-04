@@ -50,8 +50,7 @@ web/
 ├── API_DIFF.md                   # v1 → v2 API migration reference
 │
 ├── public/                       # Git submodule → github.com/IceLocke/prp-resource
-│   ├── favicon.ico
-│   ├── b50-bg.jpg
+│   ├── b50-bg.jpg               # B50 image export background
 │   └── cover/                   # Song cover art assets
 │
 ├── src/
@@ -121,7 +120,7 @@ web/
 │       ├── RecordsView.vue       # Play records: scope tabs, table, pagination
 │       └── AboutView.vue         # About page: description, GitHub link
 │
-├── legacy/                       # Old frontend (git submodule, DO NOT MODIFY)
+├── dist/                         # Production build output (also a Git submodule for deployment)
 └── styles/                       # Design spec documents (reference only)
     ├── vue-style-pattern.md      # Design philosophy overview
     └── rules/
@@ -281,11 +280,11 @@ Vite proxies `/api` → `http://localhost:8080` so the frontend can call the Go 
 
 Vite loads variables from `.env` files at build time. Variables prefixed with `VITE_` are exposed to client code via `import.meta.env`.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `VITE_API_ENDPOINT` | `/api/v2` | API base URL used by Axios client |
+| Variable | `.env` Default | Description |
+|----------|----------------|-------------|
+| `VITE_API_ENDPOINT` | `https://api.prp.icel.site/api/v2` | API base URL used by Axios client |
 
-Override per environment with `.env.local`, `.env.production`, `.env.development`, etc. (`.env.local` and `.env.*.local` are gitignored).
+The code fallback (when no env var is set) is `/api/v2`. Override per environment with `.env.local`, `.env.production`, `.env.development`, etc. (`.env.local` and `.env.*.local` are gitignored). For local development, `.env.local` typically sets `VITE_API_ENDPOINT=http://localhost:8000/api/v2`.
 
 ---
 
@@ -329,8 +328,9 @@ All view components are **lazy-loaded** via `() => import(...)`.
 
 ### Client (`src/api/client.ts`)
 
-- Base URL: `/api/v2`
+- Base URL: `import.meta.env.VITE_API_ENDPOINT || '/api/v2'` (exported as `API_BASE`)
 - Request interceptor: reads `userStore` from `localStorage` and attaches `Authorization` header
+- Response interceptor: catches `401` errors (token expired) — components handle the actual logout flow
 - The token format is `"Bearer <jwt>"`, stored as-is in `userStore.access_token`
 
 ### Type Definitions (`src/api/types.ts`)
