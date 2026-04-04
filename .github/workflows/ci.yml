@@ -53,18 +53,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN || github.token }}
 
       - name: Checkout submodules (optional)
         working-directory: ${{ github.workspace }}
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          if [ -n "$PAT_TOKEN" ]; then
-            git config url."https://x-access-token:${PAT_TOKEN}@github.com/".insteadOf "https://github.com/"
-            git submodule update --init --recursive
-          else
-            echo "PAT_TOKEN not set, skipping private submodule checkout"
-          fi
+          git submodule update --init --recursive 2>&1 || echo "::warning::Submodule checkout skipped (private repo requires PAT_TOKEN secret)"
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -124,17 +119,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN || github.token }}
 
       - name: Checkout submodules (optional)
-        env:
-          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
         run: |
-          if [ -n "$PAT_TOKEN" ]; then
-            git config url."https://x-access-token:${PAT_TOKEN}@github.com/".insteadOf "https://github.com/"
-            git submodule update --init --recursive
-          else
-            echo "PAT_TOKEN not set, skipping private submodule checkout"
-          fi
+          git submodule update --init --recursive 2>&1 || echo "::warning::Submodule checkout skipped (private repo requires PAT_TOKEN secret)"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -199,27 +189,15 @@ jobs:
         if: always()
         run: docker compose down -v
 
-  deploy:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: [docker-build]
-    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-    steps:
-      - name: Simulate Deployment
-        run: |
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-          echo "Starting deployment simulation..."
-          echo "Image: ghcr.io/${REPO_LOWER}:latest"
-          echo "Deployment successful (Simulated)!"
-
-      # - name: Deploy via SSH (Commented out for future use)
-      #   uses: appleboy/ssh-action@v1.0.3
-      #   with:
-      #     host: ${{ secrets.DEPLOY_HOST }}
-      #     username: ${{ secrets.DEPLOY_USER }}
-      #     key: ${{ secrets.DEPLOY_KEY }}
-      #     script: |
-      #       cd /path/to/your/project
-      #       docker compose pull
-      #       docker compose up -d
-      #       docker image prune -f
+#  deploy:
+#    name: Deploy to Production
+#    runs-on: ubuntu-latest
+#    needs: [docker-build]
+#    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+#    steps:
+#      - name: Simulate Deployment
+#        run: |
+#          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+#          echo "Starting deployment simulation..."
+#          echo "Image: ghcr.io/${REPO_LOWER}:latest"
+#          echo "Deployment successful (Simulated)!"
