@@ -77,3 +77,27 @@ func (s *RecordService) CountBestRecords(username string) (int64, error) {
 func (s *RecordService) CountAllRecords(username string) (int64, error) {
 	return s.recordRepo.CountAllRecords(username)
 }
+
+func (s *RecordService) GetBestRecordsBySong(username string, songID int) ([]model.PlayRecord, error) {
+	return s.recordRepo.GetBestRecordsBySong(username, songID)
+}
+
+func (s *RecordService) GetAllRecordsBySong(username string, songID int, pageSize, pageIndex int, sortBy, order string) ([]model.PlayRecord, error) {
+	return s.recordRepo.GetAllRecordsBySong(username, songID, pageSize, pageIndex, sortBy, order == "desc")
+}
+
+func (s *RecordService) CountAllRecordsBySong(username string, songID int) (int64, error) {
+	return s.recordRepo.CountAllRecordsBySong(username, songID)
+}
+
+func (s *RecordService) GetBestRecordByChart(username string, chartID int) (*model.PlayRecord, error) {
+	return s.recordRepo.GetBestRecordByChart(username, chartID)
+}
+
+func (s *RecordService) GetAllRecordsByChart(username string, chartID int, pageSize, pageIndex int, sortBy, order string) ([]model.PlayRecord, error) {
+	return s.recordRepo.GetAllRecordsByChart(username, chartID, pageSize, pageIndex, sortBy, order == "desc")
+}
+
+func (s *RecordService) CountAllRecordsByChart(username string, chartID int) (int64, error) {
+	return s.recordRepo.CountAllRecordsByChart(username, chartID)
+}

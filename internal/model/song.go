@@ -37,6 +37,15 @@ const (
 	DifficultyReboot   Difficulty = "reboot"
 )
 
+// ValidDifficulty checks if a string is a valid Difficulty value
+func ValidDifficulty(s string) bool {
+	switch Difficulty(s) {
+	case DifficultyDetected, DifficultyInvaded, DifficultyMassive, DifficultyReboot:
+		return true
+	}
+	return false
+}
+
 // Chart represents a specific difficulty chart (谱面) of a song
 type Chart struct {
 	ChartID      int        `gorm:"primaryKey;column:chart_id" json:"chart_id"`

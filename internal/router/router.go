@@ -32,7 +32,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Initialize Controllers
 	userCtrl := controller.NewUserController(userService)
 	songCtrl := controller.NewSongController(songService)
-	recordCtrl := controller.NewRecordController(recordService, userService)
+	recordCtrl := controller.NewRecordController(recordService, userService, songService)
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -55,6 +55,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		optionalAuth.Use(middleware.OptionalAuthMiddleware())
 		{
 			optionalAuth.GET("/records/:username", recordCtrl.GetPlayRecords)
+			optionalAuth.GET("/records/:username/song/:song_addr", recordCtrl.GetSongRecords)
+			optionalAuth.GET("/records/:username/chart/:chart_addr", recordCtrl.GetChartRecords)
 
 			// Record upload: under optional auth so upload-token-based auth works
 			// (handler performs its own authorization check)

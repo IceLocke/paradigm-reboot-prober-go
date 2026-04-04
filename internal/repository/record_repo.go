@@ -197,3 +197,92 @@ func (r *RecordRepository) CountAllRecords(username string) (int64, error) {
 		Count(&count).Error
 	return count, err
 }
+
+// GetBestRecordsBySong retrieves the best record per difficulty for a specific song
+func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]model.PlayRecord, error) {
+	var records []model.PlayRecord
+	err := r.db.Model(&model.PlayRecord{}).
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("Chart").
+		Joins("Chart.Song").
+		Where("play_records.username = ? AND Chart.song_id = ?", username, songID).
+		Order("rating desc").
+		Find(&records).Error
+	return records, err
+}
+
+// GetAllRecordsBySong retrieves all records for a specific song with pagination and sorting
+func (r *RecordRepository) GetAllRecordsBySong(username string, songID int, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+	var records []model.PlayRecord
+	query := r.db.Where("play_records.username = ?", username).
+		Joins("Chart").
+		Joins("Chart.Song").
+		Where("Chart.song_id = ?", songID)
+
+	orderStr := "desc"
+	if !order {
+		orderStr = "asc"
+	}
+
+	safeSortBy := validateSortBy(sortBy)
+	query = query.Order(safeSortBy + " " + orderStr)
+
+	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
+	return records, err
+}
+
+// CountAllRecordsBySong counts the total number of records for a specific song
+func (r *RecordRepository) CountAllRecordsBySong(username string, songID int) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.PlayRecord{}).
+		Joins("JOIN charts ON charts.chart_id = play_records.chart_id").
+		Where("play_records.username = ? AND charts.song_id = ?", username, songID).
+		Count(&count).Error
+	return count, err
+}
+
+// GetBestRecordByChart retrieves the best record for a specific chart
+func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*model.PlayRecord, error) {
+	var record model.PlayRecord
+	err := r.db.Model(&model.PlayRecord{}).
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.play_record_id").
+		Joins("Chart").
+		Joins("Chart.Song").
+		Where("play_records.username = ? AND play_records.chart_id = ?", username, chartID).
+		First(&record).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &record, nil
+}
+
+// GetAllRecordsByChart retrieves all records for a specific chart with pagination and sorting
+func (r *RecordRepository) GetAllRecordsByChart(username string, chartID int, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+	var records []model.PlayRecord
+	query := r.db.Where("play_records.username = ? AND play_records.chart_id = ?", username, chartID).
+		Joins("Chart").
+		Joins("Chart.Song")
+
+	orderStr := "desc"
+	if !order {
+		orderStr = "asc"
+	}
+
+	safeSortBy := validateSortBy(sortBy)
+	query = query.Order(safeSortBy + " " + orderStr)
+
+	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
+	return records, err
+}
+
+// CountAllRecordsByChart counts the total number of records for a specific chart
+func (r *RecordRepository) CountAllRecordsByChart(username string, chartID int) (int64, error) {
+	var count int64
+	err := r.db.Model(&model.PlayRecord{}).
+		Where("username = ? AND chart_id = ?", username, chartID).
+		Count(&count).Error
+	return count, err
+}

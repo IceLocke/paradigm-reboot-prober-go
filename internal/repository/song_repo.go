@@ -48,6 +48,33 @@ func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 	return &song, nil
 }
 
+// GetChartByID retrieves a chart by its numeric ID with Song preloaded
+func (r *SongRepository) GetChartByID(chartID int) (*model.Chart, error) {
+	var chart model.Chart
+	if err := r.db.Preload("Song").Where("chart_id = ?", chartID).First(&chart).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &chart, nil
+}
+
+// GetChartByWikiIDAndDifficulty finds a chart by the song's wiki_id and chart difficulty
+func (r *SongRepository) GetChartByWikiIDAndDifficulty(wikiID string, difficulty model.Difficulty) (*model.Chart, error) {
+	var chart model.Chart
+	if err := r.db.Joins("JOIN songs ON songs.song_id = charts.song_id").
+		Preload("Song").
+		Where("songs.wiki_id = ? AND charts.difficulty = ?", wikiID, difficulty).
+		First(&chart).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &chart, nil
+}
+
 // CreateSong creates a new song with its charts
 func (r *SongRepository) CreateSong(song *model.Song) (*model.Song, error) {
 	// GORM handles association creation automatically if configured correctly

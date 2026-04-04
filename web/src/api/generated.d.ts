@@ -135,6 +135,170 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/records/{username}/chart/{chart_addr}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get play records for a specific chart
+         * @description Retrieve play records for a user scoped to a specific chart. chart_addr can be numeric chart_id or wiki_id:difficulty (e.g. felys:massive).
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Scope (best, all) */
+                    scope?: string;
+                    /** @description Page size (scope=all only) */
+                    page_size?: number;
+                    /** @description Page index (scope=all only) */
+                    page_index?: number;
+                    /** @description Sort by (rating, score, record_time) */
+                    sort_by?: string;
+                    /** @description Order (desc or asc) */
+                    order?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Username */
+                    username: string;
+                    /** @description Chart address (numeric chart_id or wiki_id:difficulty) */
+                    chart_addr: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.PlayRecordResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/records/{username}/song/{song_addr}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get play records for a specific song
+         * @description Retrieve play records for a user scoped to a specific song. song_addr can be numeric song_id or wiki_id.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Scope (best, all) */
+                    scope?: string;
+                    /** @description Page size (scope=all only) */
+                    page_size?: number;
+                    /** @description Page index (scope=all only) */
+                    page_index?: number;
+                    /** @description Sort by (rating, score, record_time) */
+                    sort_by?: string;
+                    /** @description Order (desc or asc) */
+                    order?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Username */
+                    username: string;
+                    /** @description Song address (numeric song_id or wiki_id) */
+                    song_addr: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.PlayRecordResponse"];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+                /** @description Forbidden */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/songs": {
         parameters: {
             query?: never;

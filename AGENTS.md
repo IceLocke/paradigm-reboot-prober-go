@@ -283,10 +283,12 @@ Base path: `/api/v2`
 | GET    | `/songs/:song_id`     | `SongController.GetSingleSongInfo` |
 
 ### Optional Auth Routes (accessible without login, but auth checked for permissions)
-| Method | Path                                  | Handler                        |
-|--------|---------------------------------------|--------------------------------|
-| GET    | `/records/:username`                  | `RecordController.GetPlayRecords` |
-| POST   | `/records/:username`                  | `RecordController.UploadRecords`  |
+| Method | Path                                          | Handler                            |
+|--------|-----------------------------------------------|------------------------------------|  
+| GET    | `/records/:username`                          | `RecordController.GetPlayRecords`  |
+| GET    | `/records/:username/song/:song_addr`          | `RecordController.GetSongRecords`  |
+| GET    | `/records/:username/chart/:chart_addr`        | `RecordController.GetChartRecords` |
+| POST   | `/records/:username`                          | `RecordController.UploadRecords`   |
 
 ### Authenticated Routes (JWT required)
 | Method | Path                        | Handler                              |
@@ -320,6 +322,27 @@ The `GET /records/:username` endpoint supports the following `scope` query param
 | `best`       | All best records (one per chart per user)                 | Yes        |
 | `all`        | All play records                                          | Yes        |
 | `all-charts` | All charts with user's best score (0 if not played)       | No         |
+
+### Per-Song and Per-Chart Record Queries
+
+**Song address (`song_addr`)**: Numeric `song_id` or `wiki_id` string (e.g. `felys`).
+
+**Chart address (`chart_addr`)**: Numeric `chart_id` or `wiki_id:difficulty` string (e.g. `felys:massive`).
+Valid difficulties: `detected`, `invaded`, `massive`, `reboot`.
+
+The `GET /records/:username/song/:song_addr` endpoint supports:
+
+| Scope  | Description                                    | Pagination |
+|--------|------------------------------------------------|------------|
+| `best` | Best record per difficulty for the song         | No         |
+| `all`  | All play records for the song                   | Yes        |
+
+The `GET /records/:username/chart/:chart_addr` endpoint supports:
+
+| Scope  | Description                                    | Pagination |
+|--------|------------------------------------------------|------------|
+| `best` | Single best record for the chart                | No         |
+| `all`  | All play records for the chart                  | Yes        |
 
 ## Code Style Guidelines
 

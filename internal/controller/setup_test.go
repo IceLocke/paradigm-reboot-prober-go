@@ -75,6 +75,6 @@ func setupEnv(t *testing.T) *testEnv {
 		recordService: recordService,
 		userCtrl:      NewUserController(userService),
 		songCtrl:      NewSongController(songService),
-		recordCtrl:    NewRecordController(recordService, userService),
+		recordCtrl:    NewRecordController(recordService, userService, songService),
 	}
 }

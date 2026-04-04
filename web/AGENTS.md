@@ -325,7 +325,7 @@ Types are **auto-generated** from `docs/swagger.json` via `pnpm generate:api`, t
 | Module | Functions |
 |--------|-----------|
 | `user.ts` | `login`, `register`, `getMyInfo`, `updateMyInfo`, `changePassword`, `refreshUploadToken`, `resetPassword` |
-| `song.ts` | `getAllSongLevels`, `getSingleSongInfo`, `createSong`, `updateSong` |
+| `song.ts` | `getAllCharts`, `getSingleSongInfo`, `createSong`, `updateSong` |
 | `record.ts` | `getRecords`, `uploadRecords` |
 
 ### v1 → v2 Breaking Changes

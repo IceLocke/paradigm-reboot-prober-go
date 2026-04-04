@@ -5,6 +5,8 @@ import (
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
+	"strconv"
+	"strings"
 )
 
 type SongService struct {
@@ -37,6 +39,69 @@ func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 		}
 	}
 	return charts, nil
+}
+
+// ResolveSongID parses a song_addr (numeric ID or wiki_id) and returns the song_id.
+// Returns an error if the song doesn't exist.
+func (s *SongService) ResolveSongID(songAddr string) (int, error) {
+	if id, err := strconv.Atoi(songAddr); err == nil {
+		song, err := s.songRepo.GetSongByID(id)
+		if err != nil {
+			return 0, err
+		}
+		if song == nil {
+			return 0, errors.New("song not found")
+		}
+		return song.SongID, nil
+	}
+
+	song, err := s.songRepo.GetSongByWikiID(songAddr)
+	if err != nil {
+		return 0, err
+	}
+	if song == nil {
+		return 0, errors.New("song not found")
+	}
+	return song.SongID, nil
+}
+
+// ResolveChartID parses a chart_addr (numeric ID or "wiki_id:difficulty") and returns the chart_id.
+// Returns an error if the chart doesn't exist or the difficulty is invalid.
+func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
+	if id, err := strconv.Atoi(chartAddr); err == nil {
+		chart, err := s.songRepo.GetChartByID(id)
+		if err != nil {
+			return 0, err
+		}
+		if chart == nil {
+			return 0, errors.New("chart not found")
+		}
+		return chart.ChartID, nil
+	}
+
+	// Split on the last ':' to handle wiki_id:difficulty format
+	lastColon := strings.LastIndex(chartAddr, ":")
+	if lastColon < 0 {
+		return 0, errors.New("invalid chart address format, expected wiki_id:difficulty")
+	}
+	wikiID := chartAddr[:lastColon]
+	diffStr := chartAddr[lastColon+1:]
+
+	if wikiID == "" {
+		return 0, errors.New("invalid chart address: empty wiki_id")
+	}
+	if !model.ValidDifficulty(diffStr) {
+		return 0, errors.New("invalid difficulty: " + diffStr)
+	}
+
+	chart, err := s.songRepo.GetChartByWikiIDAndDifficulty(wikiID, model.Difficulty(diffStr))
+	if err != nil {
+		return 0, err
+	}
+	if chart == nil {
+		return 0, errors.New("chart not found")
+	}
+	return chart.ChartID, nil
 }
 
 func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error) {

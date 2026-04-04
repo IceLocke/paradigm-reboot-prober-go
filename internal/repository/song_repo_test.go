@@ -118,3 +118,70 @@ func TestSongRepository_GetSong(t *testing.T) {
 		assert.Equal(t, "Find Me", found.Title)
 	})
 }
+
+func TestSongRepository_GetChartByID(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewSongRepository(db)
+
+	song := &model.Song{
+		SongBase: model.SongBase{WikiID: "chart_test", Title: "Chart Test"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
+		},
+	}
+	created, err := repo.CreateSong(song)
+	assert.NoError(t, err)
+	chartID := created.Charts[0].ChartID
+
+	t.Run("Found", func(t *testing.T) {
+		chart, err := repo.GetChartByID(chartID)
+		assert.NoError(t, err)
+		assert.NotNil(t, chart)
+		assert.Equal(t, model.DifficultyMassive, chart.Difficulty)
+		assert.NotNil(t, chart.Song)
+		assert.Equal(t, "Chart Test", chart.Song.Title)
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		chart, err := repo.GetChartByID(99999)
+		assert.NoError(t, err)
+		assert.Nil(t, chart)
+	})
+}
+
+func TestSongRepository_GetChartByWikiIDAndDifficulty(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewSongRepository(db)
+
+	song := &model.Song{
+		SongBase: model.SongBase{WikiID: "felys", Title: "Felys"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyDetected, Level: 5.0, Notes: 200},
+			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
+		},
+	}
+	_, err := repo.CreateSong(song)
+	assert.NoError(t, err)
+
+	t.Run("Found", func(t *testing.T) {
+		chart, err := repo.GetChartByWikiIDAndDifficulty("felys", model.DifficultyMassive)
+		assert.NoError(t, err)
+		assert.NotNil(t, chart)
+		assert.Equal(t, model.DifficultyMassive, chart.Difficulty)
+		assert.Equal(t, 15.0, chart.Level)
+		assert.NotNil(t, chart.Song)
+		assert.Equal(t, "Felys", chart.Song.Title)
+	})
+
+	t.Run("Wrong Difficulty", func(t *testing.T) {
+		chart, err := repo.GetChartByWikiIDAndDifficulty("felys", model.DifficultyReboot)
+		assert.NoError(t, err)
+		assert.Nil(t, chart)
+	})
+
+	t.Run("Wrong WikiID", func(t *testing.T) {
+		chart, err := repo.GetChartByWikiIDAndDifficulty("nonexistent", model.DifficultyMassive)
+		assert.NoError(t, err)
+		assert.Nil(t, chart)
+	})
+}
