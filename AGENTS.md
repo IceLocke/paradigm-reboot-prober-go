@@ -21,7 +21,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | Component      | Technology                                                    |
 |----------------|---------------------------------------------------------------|
 | Language       | Go 1.25 (toolchain go1.25.5)                                 |
-| Web Framework  | [Gin](https://github.com/gin-gonic/gin) + gin-contrib/cors   |
+| Web Framework  | [Gin](https://github.com/gin-gonic/gin) + gin-contrib/cors + gin-contrib/gzip |
 | ORM            | [GORM](https://gorm.io/)                                     |
 | Database       | PostgreSQL (production), SQLite (dev/testing)                 |
 | Authentication | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt                   |
@@ -31,7 +31,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | CI/CD          | GitHub Actions                                                |
 | Container      | Docker (multi-stage Alpine build)                             |
 | Orchestration  | Docker Compose (app + PostgreSQL 16)                          |
-| Frontend       | Vue 3 + TypeScript + Vite + Naive UI (in `web/`)             |
+| Frontend       | Vue 3 + TypeScript + Vite + Naive UI (in `web/`), pako (gzip request body) |
 | Frontend Lint  | ESLint 10 + typescript-eslint + eslint-plugin-vue              |
 
 ## Project Structure
@@ -55,7 +55,8 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
 │   │   └── record.go            # GetPlayRecords, GetSongRecords, GetChartRecords, UploadRecords
 │   ├── middleware/
-│   │   └── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
+│   │   ├── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
+│   │   └── gzip.go              # GzipResponseMiddleware (compress responses), GzipRequestMiddleware (decompress request bodies)
 │   ├── model/                   # Data models (GORM entities + DTOs)
 │   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
@@ -118,11 +119,12 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 The application follows a **layered architecture**:
 
 ```
-Request → Router → CORS → Middleware → Controller → Service → Repository → Database
+Request → Router → CORS → Gzip(request decompress + response compress) → Middleware → Controller → Service → Repository → Database
 ```
 
 - **Router** (`internal/router/`): Registers all routes, sets up CORS and middleware, wires dependencies (manual DI, no framework).
 - **CORS**: Configured via `gin-contrib/cors` — allows all origins, standard methods and headers.
+- **Gzip** (`internal/middleware/`): `GzipRequestMiddleware` transparently decompresses `Content-Encoding: gzip` request bodies; `GzipResponseMiddleware` (via `gin-contrib/gzip`) compresses responses when the client sends `Accept-Encoding: gzip`.
 - **Middleware** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`).
 - **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services.
 - **Service** (`internal/service/`): Business logic. Orchestrates repository calls.

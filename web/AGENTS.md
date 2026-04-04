@@ -21,7 +21,7 @@ Frontend root: `web/`
 | UI Components      | Naive UI 2.40 (complex) + custom (basic)          |
 | State Management   | Pinia 2 + pinia-plugin-persistedstate 3           |
 | Routing            | Vue Router 4 (hash mode)                          |
-| HTTP Client        | Axios 1.7                                         |
+| HTTP Client        | Axios 1.7 + pako (gzip request body compression)  |
 | Charting           | ECharts 5 + vue-echarts 7                         |
 | Internationalization | vue-i18n 11 (Composition API mode)              |
 | Date Handling      | dayjs                                             |
@@ -69,7 +69,7 @@ web/
 │   │   ├── generated.d.ts        # Auto-generated types (DO NOT EDIT)
 │   │   ├── openapi3.json         # Converted OpenAPI 3.0 spec (gitignored)
 │   │   ├── types.ts              # Re-exports from generated.d.ts + DeepRequired
-│   │   ├── client.ts             # Axios instance (base URL, JWT interceptor)
+│   │   ├── client.ts             # Axios instance (base URL, JWT interceptor, gzip request compression)
 │   │   ├── user.ts               # User API (login, register, profile, token)
 │   │   ├── song.ts               # Song API (list charts, song detail, CRUD)
 │   │   ├── record.ts             # Record API (query, upload)

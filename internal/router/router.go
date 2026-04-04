@@ -24,10 +24,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		ExposeHeaders:    []string{"Content-Length"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Content-Encoding"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Encoding"},
 		AllowCredentials: false,
 	}))
+
+	// Gzip middleware – decompress incoming gzip request bodies and
+	// compress outgoing responses when the client supports it.
+	r.Use(middleware.GzipRequestMiddleware())
+	r.Use(middleware.GzipResponseMiddleware())
 
 	// Initialize Repositories
 	userRepo := repository.NewUserRepository(db)
