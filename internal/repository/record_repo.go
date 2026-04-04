@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/pkg/rating"
 	"time"
@@ -102,7 +103,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	if err := baseQuery.Session(&gorm.Session{}).
 		Where("Chart__Song.b15 = ?", false).
 		Order("rating desc").
-		Limit(35 + underflow).
+		Limit(config.GlobalConfig.Game.B35Limit + underflow).
 		Find(&b35).Error; err != nil {
 		return nil, nil, err
 	}
@@ -111,7 +112,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	if err := baseQuery.Session(&gorm.Session{}).
 		Where("Chart__Song.b15 = ?", true).
 		Order("rating desc").
-		Limit(15 + underflow).
+		Limit(config.GlobalConfig.Game.B15Limit + underflow).
 		Find(&b15).Error; err != nil {
 		return nil, nil, err
 	}

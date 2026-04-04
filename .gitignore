@@ -45,3 +45,5 @@ Thumbs.db
 **/uploads/*
 
 web/style-samples/*
+
+.playwright-mcp/*

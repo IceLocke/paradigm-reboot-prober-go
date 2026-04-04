@@ -17,7 +17,7 @@ func VerifyPassword(plainPassword, encodedPassword string) bool {
 
 // EncodePassword hashes the password using bcrypt.
 func EncodePassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), config.GlobalConfig.Auth.BcryptCost)
 	return string(bytes), err
 }
 
@@ -27,7 +27,7 @@ func GenerateJWT(claims jwt.MapClaims, expiresDelta *time.Duration) (string, err
 	if expiresDelta != nil {
 		expire = time.Now().Add(*expiresDelta)
 	} else {
-		expire = time.Now().Add(30 * time.Minute)
+		expire = time.Now().Add(config.JWTExpirationDuration)
 	}
 
 	claims["exp"] = expire.Unix()

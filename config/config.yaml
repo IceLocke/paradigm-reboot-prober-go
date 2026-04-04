@@ -15,7 +15,19 @@ database:
 auth:
   secret_key: "your_secret_key_here"
   jwt_algorithm: "HS256"
+  jwt_expiration: "24h"             # access token lifetime, e.g. "24h", "30m"
+  bcrypt_cost: 10                   # bcrypt hashing cost (4-31)
+  upload_token_length: 16           # bytes; hex output is 2x this value
+  username_pattern: "^[A-Za-z][A-Za-z0-9_]{5,15}$"
 
 upload:
   csv_path: "./uploads/csv/"
   img_path: "./uploads/img/"
+
+pagination:
+  default_page_size: 50
+  max_page_size: 200
+
+game:
+  b35_limit: 35
+  b15_limit: 15

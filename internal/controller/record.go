@@ -48,8 +48,9 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	username := c.Param("username")
 	username = strings.ToLower(username)
 	scope := c.DefaultQuery("scope", "b50")
+	defaultPageSize := strconv.Itoa(config.GlobalConfig.Pagination.DefaultPageSize)
 	underflow, _ := strconv.Atoi(c.DefaultQuery("underflow", "0"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "50"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", defaultPageSize))
 	pageIndex, _ := strconv.Atoi(c.DefaultQuery("page_index", "1"))
 
 	// Validate pagination parameters to prevent abuse
@@ -57,10 +58,10 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		underflow = 0
 	}
 	if pageSize <= 0 {
-		pageSize = 50
+		pageSize = config.GlobalConfig.Pagination.DefaultPageSize
 	}
-	if pageSize > 200 {
-		pageSize = 200
+	if pageSize > config.GlobalConfig.Pagination.MaxPageSize {
+		pageSize = config.GlobalConfig.Pagination.MaxPageSize
 	}
 	if pageIndex < 1 {
 		pageIndex = 1

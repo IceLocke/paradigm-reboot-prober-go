@@ -1,6 +1,7 @@
 package service
 
 import (
+	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"testing"
 
@@ -9,6 +10,9 @@ import (
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
+	config.InitDefaults()
+	config.GlobalConfig.Auth.SecretKey = "testsecret"
+
 	db, err := gorm.Open(sqlite.Open("file::memory:?cache=shared"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to connect database: %v", err)

@@ -228,23 +228,31 @@ golangci-lint run
 
 Configuration is loaded from `config/config.yaml`, with **environment variable overrides** taking precedence.
 
-| Config Key               | Env Var        | Default                 | Description                    |
-|--------------------------|----------------|-------------------------|--------------------------------|
-| `server.port`            | `SERVER_PORT`  | `:8080`                 | Server listen address          |
-| `database.type`          | `DB_TYPE`      | `sqlite`                | `sqlite` or `postgres`         |
-| `database.dsn`           | `DB_DSN`       | `prober.db`             | SQLite file path               |
-| `database.host`          | `DB_HOST`      | —                       | PostgreSQL host                |
-| `database.port`          | `DB_PORT`      | —                       | PostgreSQL port                |
-| `database.user`          | `DB_USER`      | —                       | PostgreSQL user                |
-| `database.password`      | `DB_PASSWORD`  | —                       | PostgreSQL password            |
-| `database.dbname`        | `DB_NAME`      | —                       | PostgreSQL database name       |
-| `database.sslmode`       | `DB_SSLMODE`   | —                       | PostgreSQL SSL mode            |
-| `auth.secret_key`        | `SECRET_KEY`   | `your_secret_key_here`  | JWT signing secret (**must change**) |
-| `auth.jwt_algorithm`     | —              | `HS256`                 | JWT algorithm (hardcoded HS256)|
-| `upload.csv_path`        | —              | `./uploads/csv/`        | CSV upload directory           |
-| `upload.img_path`        | —              | `./uploads/img/`        | Image upload directory         |
+| Config Key                   | Env Var        | Default                              | Description                              |
+|------------------------------|----------------|--------------------------------------|------------------------------------------|
+| `server.port`                | `SERVER_PORT`  | `:8080`                              | Server listen address                    |
+| `database.type`              | `DB_TYPE`      | `sqlite`                             | `sqlite` or `postgres`                   |
+| `database.dsn`               | `DB_DSN`       | `prober.db`                          | SQLite file path                         |
+| `database.host`              | `DB_HOST`      | —                                    | PostgreSQL host                          |
+| `database.port`              | `DB_PORT`      | —                                    | PostgreSQL port                          |
+| `database.user`              | `DB_USER`      | —                                    | PostgreSQL user                          |
+| `database.password`          | `DB_PASSWORD`  | —                                    | PostgreSQL password                      |
+| `database.dbname`            | `DB_NAME`      | —                                    | PostgreSQL database name                 |
+| `database.sslmode`           | `DB_SSLMODE`   | —                                    | PostgreSQL SSL mode                      |
+| `auth.secret_key`            | `SECRET_KEY`   | `your_secret_key_here`               | JWT signing secret (**must change**)     |
+| `auth.jwt_algorithm`         | —              | `HS256`                              | JWT algorithm (hardcoded HS256)          |
+| `auth.jwt_expiration`        | —              | `24h`                                | Access token lifetime (Go duration)      |
+| `auth.bcrypt_cost`           | —              | `10`                                 | bcrypt hashing cost (4–31)               |
+| `auth.upload_token_length`   | —              | `16`                                 | Upload token bytes (hex output is 2×)    |
+| `auth.username_pattern`      | —              | `^[A-Za-z][A-Za-z0-9_]{5,15}$`      | Regex for username validation            |
+| `upload.csv_path`            | `CSV_PATH`     | `./uploads/csv/`                     | CSV upload directory                     |
+| `upload.img_path`            | `IMG_PATH`     | `./uploads/img/`                     | Image upload directory                   |
+| `pagination.default_page_size` | —            | `50`                                 | Default page size for list endpoints     |
+| `pagination.max_page_size`   | —              | `200`                                | Maximum allowed page size                |
+| `game.b35_limit`             | —              | `35`                                 | B35 best record count (old songs)        |
+| `game.b15_limit`             | —              | `15`                                 | B15 best record count (new songs)        |
 
-**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`.
+**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range.
 
 ## CI/CD Pipeline
 

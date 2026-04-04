@@ -5,16 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/pkg/auth"
-	"regexp"
 	"strings"
-	"time"
 )
-
-var usernameRegex = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{5,15}$`)
 
 type UserService struct {
 	userRepo *repository.UserRepository
@@ -40,7 +37,7 @@ func (s *UserService) Login(username, plainPassword string) (string, error) {
 		return "", errors.New("incorrect username or password")
 	}
 
-	duration := time.Hour * 24 // Default expiration
+	duration := config.JWTExpirationDuration
 	return auth.GenerateAccessJWT(username, &duration)
 }
 
@@ -63,7 +60,7 @@ func generateHexToken(n int) (string, error) {
 func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, error) {
 	req.Username = strings.ToLower(req.Username)
 
-	if !usernameRegex.MatchString(req.Username) {
+	if !config.UsernameRegex.MatchString(req.Username) {
 		return nil, errors.New("invalid username format")
 	}
 
@@ -81,7 +78,7 @@ func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, e
 	}
 
 	// Generate a random upload token
-	uploadToken, err := generateHexToken(16)
+	uploadToken, err := generateHexToken(config.GlobalConfig.Auth.UploadTokenLength)
 	if err != nil {
 		return nil, errors.New("generate token failed")
 	}
@@ -106,7 +103,7 @@ func (s *UserService) RefreshUploadToken(username string) (string, error) {
 		return "", errors.New("user not found")
 	}
 
-	uploadToken, err := generateHexToken(16)
+	uploadToken, err := generateHexToken(config.GlobalConfig.Auth.UploadTokenLength)
 	if err != nil {
 		return "", errors.New("generate token failed")
 	}

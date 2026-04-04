@@ -56,9 +56,8 @@ type testEnv struct {
 }
 
 func setupEnv(t *testing.T) *testEnv {
-	// Initialize config for tests
-	config.GlobalConfig.Upload.CSVPath = "./uploads/csv"
-	config.GlobalConfig.Upload.ImgPath = "./uploads/img"
+	// Initialize config defaults for tests
+	config.InitDefaults()
 	config.GlobalConfig.Auth.SecretKey = "testsecret"
 
 	db := setupTestDB(t)

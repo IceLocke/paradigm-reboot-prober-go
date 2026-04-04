@@ -3,7 +3,9 @@ package config
 import (
 	"log"
 	"os"
+	"regexp"
 	"strconv"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -23,26 +25,62 @@ type Config struct {
 		SSLMode  string `yaml:"sslmode"`
 	} `yaml:"database"`
 	Auth struct {
-		SecretKey    string `yaml:"secret_key"`
-		JWTAlgorithm string `yaml:"jwt_algorithm"`
+		SecretKey         string `yaml:"secret_key"`
+		JWTAlgorithm      string `yaml:"jwt_algorithm"`
+		JWTExpiration     string `yaml:"jwt_expiration"` // duration string, e.g. "24h", "30m"
+		BcryptCost        int    `yaml:"bcrypt_cost"`
+		UploadTokenLength int    `yaml:"upload_token_length"` // bytes (hex output is 2x)
+		UsernamePattern   string `yaml:"username_pattern"`
 	} `yaml:"auth"`
 	Upload struct {
 		CSVPath string `yaml:"csv_path"`
 		ImgPath string `yaml:"img_path"`
 	} `yaml:"upload"`
+	Pagination struct {
+		DefaultPageSize int `yaml:"default_page_size"`
+		MaxPageSize     int `yaml:"max_page_size"`
+	} `yaml:"pagination"`
+	Game struct {
+		B35Limit int `yaml:"b35_limit"`
+		B15Limit int `yaml:"b15_limit"`
+	} `yaml:"game"`
 }
 
 var GlobalConfig Config
 
-func LoadConfig(configPath string) {
-	// Set defaults
+// Parsed values derived from config strings
+var (
+	JWTExpirationDuration time.Duration
+	UsernameRegex         *regexp.Regexp
+)
+
+// InitDefaults sets all config fields to their default values and parses derived values.
+// Useful for testing scenarios where LoadConfig is not called.
+func InitDefaults() {
 	GlobalConfig.Server.Port = ":8080"
 	GlobalConfig.Database.Type = "sqlite"
 	GlobalConfig.Database.DSN = "prober.db"
 	GlobalConfig.Auth.SecretKey = "your_secret_key_here"
 	GlobalConfig.Auth.JWTAlgorithm = "HS256"
+	GlobalConfig.Auth.JWTExpiration = "24h"
+	GlobalConfig.Auth.BcryptCost = 10
+	GlobalConfig.Auth.UploadTokenLength = 16
+	GlobalConfig.Auth.UsernamePattern = `^[A-Za-z][A-Za-z0-9_]{5,15}$`
 	GlobalConfig.Upload.CSVPath = "./uploads/csv/"
 	GlobalConfig.Upload.ImgPath = "./uploads/img/"
+	GlobalConfig.Pagination.DefaultPageSize = 50
+	GlobalConfig.Pagination.MaxPageSize = 200
+	GlobalConfig.Game.B35Limit = 35
+	GlobalConfig.Game.B15Limit = 15
+
+	// Parse derived values (defaults are always valid, no error expected)
+	JWTExpirationDuration, _ = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
+	UsernameRegex = regexp.MustCompile(GlobalConfig.Auth.UsernamePattern)
+}
+
+func LoadConfig(configPath string) {
+	// Set defaults
+	InitDefaults()
 
 	// Read from file
 	file, err := os.ReadFile(configPath)
@@ -87,5 +125,27 @@ func LoadConfig(configPath string) {
 	}
 	if secret := os.Getenv("SECRET_KEY"); secret != "" {
 		GlobalConfig.Auth.SecretKey = secret
+	}
+	if csvPath := os.Getenv("CSV_PATH"); csvPath != "" {
+		GlobalConfig.Upload.CSVPath = csvPath
+	}
+	if imgPath := os.Getenv("IMG_PATH"); imgPath != "" {
+		GlobalConfig.Upload.ImgPath = imgPath
+	}
+
+	// Re-parse derived values after file/env overrides
+	JWTExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
+	if err != nil {
+		log.Fatalf("Invalid jwt_expiration value %q: %v", GlobalConfig.Auth.JWTExpiration, err)
+	}
+
+	UsernameRegex, err = regexp.Compile(GlobalConfig.Auth.UsernamePattern)
+	if err != nil {
+		log.Fatalf("Invalid username_pattern %q: %v", GlobalConfig.Auth.UsernamePattern, err)
+	}
+
+	// Validate bcrypt cost
+	if GlobalConfig.Auth.BcryptCost < 4 || GlobalConfig.Auth.BcryptCost > 31 {
+		log.Fatalf("Invalid bcrypt_cost %d: must be between 4 and 31", GlobalConfig.Auth.BcryptCost)
 	}
 }
