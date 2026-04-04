@@ -2,52 +2,61 @@
 
 ## Project Overview
 
-**Paradigm: Reboot Prober** (`paradigm-reboot-prober-go`) is a backend REST API service for the rhythm game **Paradigm: Reboot**. It provides score tracking, rating calculation, and Best 50 (B50) computation. The project is a Go rewrite (WIP) of a previous implementation.
+**Paradigm: Reboot Prober** (`paradigm-reboot-prober-go`) is a backend REST API service with a Vue 3 frontend for the rhythm game **Paradigm: Reboot**. It provides score tracking, rating calculation, and Best 50 (B50) computation. The project is a Go rewrite (WIP) of a previous Python implementation.
 
 Core features:
 - **User Management**: Registration, JWT authentication, profile updates, upload tokens, password change/reset.
 - **Song Management**: CRUD for songs and their difficulty charts (admin-only for create/update).
 - **Score/Record Management**: Batch upload play records (JSON), automatic single-chart rating calculation, best record tracking.
 - **B50 Calculation**: Best 35 (old songs, `b15=false`) + Best 15 (new songs, `b15=true`) selection.
+- **Web Frontend**: Dark-themed Vue 3 + TypeScript + Naive UI single-page application.
 - **API Documentation**: Swagger UI auto-generated from code annotations.
+
+Go module: `paradigm-reboot-prober-go`
 
 Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 
 ## Tech Stack
 
-| Component      | Technology                                       |
-|----------------|--------------------------------------------------|
-| Language       | Go 1.25 (toolchain go1.25.5)                     |
-| Web Framework  | [Gin](https://github.com/gin-gonic/gin)          |
-| ORM            | [GORM](https://gorm.io/)                         |
-| Database       | PostgreSQL (production), SQLite (dev/testing)    |
-| Authentication | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt      |
-| API Docs       | Swagger via `swaggo/swag` + `swaggo/gin-swagger` |
-| Testing        | `testing` stdlib + `stretchr/testify`            |
-| Linting        | golangci-lint v2.6                               |
-| CI/CD          | GitHub Actions                                   |
-| Container      | Docker (multi-stage Alpine build)                |
-| Orchestration  | Docker Compose (app + PostgreSQL 16)             |
-| Frontend       | Vue.js (legacy, in `web/legacy/`)                |
-| Frontend Lint  | ESLint 10 + typescript-eslint + eslint-plugin-vue |
+| Component      | Technology                                                    |
+|----------------|---------------------------------------------------------------|
+| Language       | Go 1.25 (toolchain go1.25.5)                                 |
+| Web Framework  | [Gin](https://github.com/gin-gonic/gin) + gin-contrib/cors + gin-contrib/gzip |
+| ORM            | [GORM](https://gorm.io/)                                     |
+| Database       | PostgreSQL (production), SQLite (dev/testing)                 |
+| Authentication | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt                   |
+| API Docs       | Swagger via `swaggo/swag` + `swaggo/gin-swagger`              |
+| Testing        | `testing` stdlib + `stretchr/testify`                         |
+| Linting        | golangci-lint v2.6                                            |
+| CI/CD          | GitHub Actions                                                |
+| Container      | Docker (multi-stage Alpine build)                             |
+| Orchestration  | Docker Compose (app + PostgreSQL 16)                          |
+| Frontend       | Vue 3 + TypeScript + Vite + Naive UI (in `web/`), pako (gzip request body) |
+| Frontend Lint  | ESLint 10 + typescript-eslint + eslint-plugin-vue              |
 
 ## Project Structure
 
 ```
 .
 ├── cmd/
-│   └── server/
-│       └── main.go              # Application entry point, Swagger annotations
+│   ├── server/
+│   │   └── main.go              # Application entry point, Swagger annotations
+│   └── migrate/
+│       ├── main.go              # Legacy → Go schema migration tool (PostgreSQL)
+│       └── verify/
+│           └── main.go          # Post-migration verification tool
 ├── config/
 │   ├── config.go                # Config struct, YAML loading, env var overrides
-│   └── config.yaml              # Default configuration file
+│   ├── config.yaml              # Local configuration file (gitignored for secrets)
+│   └── config.yaml.example      # Example configuration (safe to commit)
 ├── internal/
 │   ├── controller/              # HTTP handlers (Gin handlers with Swagger annotations)
 │   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword
 │   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
-│   │   └── record.go            # GetPlayRecords, UploadRecords
+│   │   └── record.go            # GetPlayRecords, GetSongRecords, GetChartRecords, UploadRecords
 │   ├── middleware/
-│   │   └── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
+│   │   ├── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
+│   │   └── gzip.go              # GzipResponseMiddleware (compress responses), GzipRequestMiddleware (decompress request bodies)
 │   ├── model/                   # Data models (GORM entities + DTOs)
 │   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
@@ -63,7 +72,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── song_repo.go
 │   │   └── record_repo.go       # Includes rating calculation on record creation
 │   ├── router/
-│   │   └── router.go            # Route definitions, dependency wiring, middleware setup
+│   │   └── router.go            # Route definitions, dependency wiring, CORS, middleware setup
 │   ├── service/                  # Business logic layer
 │   │   ├── user.go
 │   │   ├── song.go
@@ -80,16 +89,24 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── docs.go
 │   ├── swagger.json
 │   └── swagger.yaml
-├── web/                          # Frontend assets
-│   │   ├── src/                 # Vue components, utils, styles
-│   │   └── public/              # Git submodule → github.com/IceLocke/prp-resource (covers, icons)
-│   └── styles/                  # Frontend style documentation
-│       ├── vue-style-pattern.md
-│       └── rules/               # Style rules (components, naive-ui, responsive, tokens)
+├── web/                          # Vue 3 frontend (has its own AGENTS.md)
+│   ├── src/                     # Vue components, stores, utils, styles
+│   ├── public/                  # Static assets (Git submodule → prp-resource)
+│   ├── dist/                    # Build output
+│   ├── styles/                  # Frontend style documentation
+│   ├── AGENTS.md                # Frontend-specific agent instructions
+│   └── API_DIFF.md              # v1 → v2 API migration reference
+├── legacy/                       # Legacy migration resources
+│   ├── MIGRATION.md             # Step-by-step migration guide
+│   ├── migration.sql            # Schema migration SQL (Python → Go)
+│   ├── db_schema.sql            # Legacy database schema
+│   ├── db_full.sql              # Legacy full database dump
+│   └── openapi.json             # Legacy OpenAPI specification
+├── scripts/
+│   └── setup-submodules.sh      # Git submodule setup (private repos with GH_TOKEN)
 ├── .github/workflows/
 │   └── ci.yml                   # CI/CD pipeline
 ├── .claude/                      # Claude AI settings
-├── config/config.yaml           # Default config
 ├── Dockerfile                   # Multi-stage Docker build
 ├── docker-compose.yaml          # App + PostgreSQL compose setup
 ├── .golangci.yml                # Linter configuration
@@ -102,10 +119,12 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 The application follows a **layered architecture**:
 
 ```
-Request → Router → Middleware → Controller → Service → Repository → Database
+Request → Router → CORS → Gzip(request decompress + response compress) → Middleware → Controller → Service → Repository → Database
 ```
 
-- **Router** (`internal/router/`): Registers all routes, sets up middleware, wires dependencies (manual DI, no framework).
+- **Router** (`internal/router/`): Registers all routes, sets up CORS and middleware, wires dependencies (manual DI, no framework).
+- **CORS**: Configured via `gin-contrib/cors` — allows all origins, standard methods and headers.
+- **Gzip** (`internal/middleware/`): `GzipRequestMiddleware` transparently decompresses `Content-Encoding: gzip` request bodies; `GzipResponseMiddleware` (via `gin-contrib/gzip`) compresses responses when the client sends `Accept-Encoding: gzip`.
 - **Middleware** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`).
 - **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services.
 - **Service** (`internal/service/`): Business logic. Orchestrates repository calls.
@@ -146,6 +165,16 @@ go run cmd/server/main.go
 go build -o server ./cmd/server/main.go
 ```
 
+### Frontend Development
+
+```bash
+cd web
+pnpm install
+pnpm dev          # Dev server with API proxy to :8080
+pnpm build        # Production build → web/dist/
+pnpm lint         # ESLint
+```
+
 ### Docker
 
 ```bash
@@ -157,6 +186,21 @@ docker build -t prprober-app .
 ```
 
 The server listens on port **8080** by default. Health check: `GET /health`.
+
+### Database Migration (Legacy → Go)
+
+```bash
+# Run migration from legacy Python schema to Go schema
+go run cmd/migrate/main.go -config config/config.yaml
+
+# Dry run (print SQL without executing)
+go run cmd/migrate/main.go -config config/config.yaml -dry-run
+
+# Verify migration
+go run cmd/migrate/verify/main.go
+```
+
+See `legacy/MIGRATION.md` for the full step-by-step guide.
 
 ### Swagger Documentation
 
@@ -204,7 +248,9 @@ go test -v ./pkg/rating/...
 | `internal/service`       | User creation/login, song CRUD, record management      |
 | `internal/controller`    | HTTP handler integration (register, login, songs, records) |
 | `internal/middleware`     | Auth middleware (valid/invalid/expired/missing tokens)  |
+| `internal/model`         | Model validation and enum logic                        |
 | `internal/util`          | CSV generation, parsing (UTF-8, GBK encoding, BOM)     |
+
 
 ## Linting
 
@@ -223,7 +269,7 @@ golangci-lint run
 
 ## Configuration
 
-Configuration is loaded from `config/config.yaml`, with **environment variable overrides** taking precedence.
+Configuration is loaded from `config/config.yaml`, with **environment variable overrides** taking precedence. A `config/config.yaml.example` is provided as a safe-to-commit template.
 
 | Config Key                   | Env Var        | Default                              | Description                              |
 |------------------------------|----------------|--------------------------------------|------------------------------------------|
@@ -251,26 +297,23 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 
 ## CI/CD Pipeline
 
-Defined in `.github/workflows/ci.yml`. Triggers on push/PR to `master` and `dev` branches.
+Defined in `.github/workflows/ci.yml`. Triggers on push/PR to `master` and `dev` branches, and on version tags (`v*`).
 
 ### Pipeline Stages
 
-All CI jobs use `actions/checkout@v4` with `submodules: recursive` to fetch the `web/public` submodule.
-
-1. **Lint**: Runs `golangci-lint` v2.6.
-2. **Frontend Lint**: Runs `pnpm lint` (ESLint) in `web/` directory.
-3. **Unit Tests**: Runs `go test -v ./...`.
-4. **Swagger Consistency Check**: Regenerates Swagger docs and fails if `docs/` directory has changes (drift detection).
-5. **Docker Build & Push** (depends on lint + test + swagger-check + frontend-lint):
+1. **Lint & Swagger Check** (`lint`): Runs `golangci-lint` v2.6, regenerates Swagger docs, and fails if `docs/` has uncommitted changes (drift detection). Uses `actions/checkout@v6` and `actions/setup-go@v6`.
+2. **Frontend Lint** (`frontend-lint`): Runs `pnpm lint` (ESLint) in `web/` directory on `ubuntu-slim`. Uses pnpm 10 and Node.js 22.
+3. **Unit Tests** (`test`): Runs `go test -v ./...`. Depends on `lint` and `frontend-lint`.
+4. **Docker Build & Push** (`docker-build`, depends on lint + test + frontend-lint):
    - Builds Docker image and pushes to `ghcr.io`.
    - Runs Docker Compose integration test (health check on `/health`).
-6. **Deploy** (master branch only, after docker-build): Currently a simulated deployment step. SSH-based deploy is commented out for future use.
+   - Only runs on push events (not PRs).
 
 ### Docker Image Tags
 
-- Branch name (e.g., `master`, `dev`)
-- Short SHA (e.g., `sha-abc1234`)
-- `latest` (only on `master`)
+- `debug` (on non-tag pushes, e.g. branch pushes)
+- Version tag (e.g., `v1.0.0`, when pushing a Git tag)
+- `latest` (only on version tag pushes)
 
 Registry: `ghcr.io/icelocke/paradigm-reboot-prober-go`
 
@@ -301,7 +344,6 @@ Base path: `/api/v2`
 | PUT    | `/user/me`                  | `UserController.UpdateMe`            |
 | PUT    | `/user/me/password`         | `UserController.ChangePassword`       |
 | POST   | `/user/me/upload-token`     | `UserController.RefreshUploadToken`   |
-
 
 ### Admin Routes (JWT + `is_admin=true`)
 | Method | Path                    | Handler                        |
@@ -369,5 +411,6 @@ The `GET /records/:username/chart/:chart_addr` endpoint supports:
   - Record uploading requires JWT auth (own records) or a valid `upload_token` (third-party upload).
   - Song creation/update requires admin role.
   - Password reset requires admin role.
+- **CORS**: Configured to allow all origins (`AllowAllOrigins: true`) with standard methods and headers.
 - **SQL injection**: Sort parameters are whitelisted; all other queries use GORM's parameterized queries.
 - **Token expiration**: JWT access tokens expire after 24 hours. Default (no duration specified) is 30 minutes.

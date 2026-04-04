@@ -65,7 +65,7 @@ jobs:
 
   frontend-lint:
     name: Frontend Lint
-    runs-on: ubuntu-slim
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: web
@@ -167,16 +167,3 @@ jobs:
       - name: Stop Services
         if: always()
         run: docker compose down -v
-
-#  deploy:
-#    name: Deploy to Production
-#    runs-on: ubuntu-latest
-#    needs: [docker-build]
-#    if: github.ref == 'refs/heads/master' && github.event_name == 'push'
-#    steps:
-#      - name: Simulate Deployment
-#        run: |
-#          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
-#          echo "Starting deployment simulation..."
-#          echo "Image: ghcr.io/${REPO_LOWER}:latest"
-#          echo "Deployment successful (Simulated)!"
