@@ -40,7 +40,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { darkTheme, NConfigProvider, NMessageProvider, NNotificationProvider } from 'naive-ui'
-import { useI18n } from 'vue-i18n'
 
 import { themeOverrides } from '@/config/naive-theme'
 import { useUserStore } from '@/stores/user'
@@ -55,7 +54,6 @@ import LoginModal from '@/components/business/LoginModal.vue'
 import RegisterModal from '@/components/business/RegisterModal.vue'
 import ProfileModal from '@/components/business/ProfileModal.vue'
 
-const { t } = useI18n()
 const userStore = useUserStore()
 const appStore = useAppStore()
 

@@ -3,7 +3,6 @@
     <div class="page-header">
       <h2>{{ t('term.records') }}</h2>
       <div class="page-actions">
-        <BaseTabs v-model="scope" :tabs="scopeTabs" />
         <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
           <template #trigger>
             <button class="icon-btn" :title="t('term.upload_list')">
@@ -17,6 +16,11 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>
+    </div>
+
+    <!-- Scope filter -->
+    <div class="filters-row">
+      <BaseTabs v-model="scope" :tabs="scopeTabs" />
     </div>
 
     <!-- Table -->
@@ -59,7 +63,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, NPopover } from 'naive-ui'
+import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import dayjs from 'dayjs'
 
@@ -76,6 +80,7 @@ import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 const userStore = useUserStore()
 const appStore = useAppStore()
 
@@ -122,7 +127,10 @@ const onClickTitle = async (songId: number) => {
       const res = await getSingleSongInfo(songId)
       selectedSong.value = res.data
     }
-  } catch { /* handled */ }
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+  }
 }
 
 const onQuickUpload = (record: PlayRecordInfo) => {
@@ -248,15 +256,28 @@ const loadRecords = async () => {
       records.value = res.data.records
       total.value = res.data.total
     }
-  } catch { /* handled */ } finally {
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.get_record_failed') + (e.response?.data?.error ?? ''))
+  } finally {
     loading.value = false
   }
 }
+
+watch(() => userStore.logged_in, (loggedIn) => {
+  if (loggedIn) loadRecords()
+})
 
 onMounted(loadRecords)
 </script>
 
 <style scoped>
+.filters-row {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
 .table-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;

@@ -121,11 +121,18 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 		for _, newChart := range updatedSong.Charts {
 			if existingChart, exists := existingChartsMap[newChart.Difficulty]; exists {
 				// Update existing chart
+				levelChanged := existingChart.Level != newChart.Level
 				existingChart.Level = newChart.Level
 				existingChart.LevelDesign = newChart.LevelDesign
 				existingChart.Notes = newChart.Notes
 				if err := tx.Save(existingChart).Error; err != nil {
 					return err
+				}
+				// Recalculate ratings for all play records when level changes
+				if levelChanged {
+					if err := RecalculateRatingsByChart(tx, existingChart.ID, newChart.Level); err != nil {
+						return err
+					}
 				}
 			} else {
 				// Create new chart

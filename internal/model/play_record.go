@@ -78,6 +78,7 @@ func ToPlayRecordInfo(record *PlayRecord) PlayRecordInfo {
 // AllChartsResponse represents the response for the all-charts scope
 type AllChartsResponse struct {
 	Username string           `json:"username"`
+	Nickname string           `json:"nickname"`
 	Charts   []ChartWithScore `json:"charts"`
 }
 

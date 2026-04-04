@@ -31,6 +31,9 @@
           :label="t('auth.upload_token')"
           :readonly="true"
         />
+        <button class="icon-btn token-refresh" @click="onCopyToken" :title="t('common.copy')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        </button>
         <button class="icon-btn token-refresh" @click="onRefreshToken" :title="t('common.refresh')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
@@ -64,7 +67,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, computed } from 'vue'
-import { NModal } from 'naive-ui'
+import { NModal, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { updateMyInfo, refreshUploadToken } from '@/api/user'
@@ -72,6 +75,7 @@ import { USE_MOCK } from '@/api/mock'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 const userStore = useUserStore()
 
 const props = defineProps<{ show: boolean }>()
@@ -115,10 +119,21 @@ const onSave = async () => {
       userStore.profile = res.data
     }
     successMsg.value = t('message.update_profile_success')
+    message.success(t('message.update_profile_success'))
   } catch {
     errorMsg.value = t('message.update_profile_failed')
+    message.error(t('message.update_profile_failed'))
   } finally {
     loading.value = false
+  }
+}
+
+const onCopyToken = async () => {
+  try {
+    await navigator.clipboard.writeText(tokenDisplay.value)
+    message.success(t('message.copy_success'))
+  } catch {
+    message.error('Copy failed')
   }
 }
 
@@ -134,7 +149,10 @@ const onRefreshToken = async () => {
         userStore.profile.upload_token = res.data.upload_token
       }
     }
-  } catch { /* handled */ }
+    message.success(t('message.refresh_upload_token_success'))
+  } catch {
+    message.error(t('message.refresh_upload_token_failed'))
+  }
 }
 </script>
 

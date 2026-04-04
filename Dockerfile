@@ -17,7 +17,6 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app/
 
 COPY --from=builder /app/server .
-COPY --from=builder /app/config/config.yaml ./config/config.yaml
 
 RUN mkdir -p uploads/csv uploads/img
 

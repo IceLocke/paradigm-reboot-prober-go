@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"paradigm-reboot-prober-go/internal/model"
 	"testing"
 
@@ -151,5 +152,55 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		updatedUser, _ := repo.GetUserByUsername("update_target")
 		assert.Equal(t, "new_account", *updatedUser.Account)
 		assert.Equal(t, "Updated Nick", updatedUser.Nickname) // Should persist from previous update
+	})
+}
+
+func TestUserRepository_WithTransaction(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewUserRepository(db)
+
+	t.Run("Successful transaction commits", func(t *testing.T) {
+		err := repo.WithTransaction(func(txRepo *UserRepository) error {
+			user := &model.User{
+				UserBase: model.UserBase{
+					Username:    "tx_commit",
+					Email:       "txcommit@example.com",
+					UploadToken: "token_tx_commit",
+				},
+				EncodedPassword: "pass",
+			}
+			_, err := txRepo.CreateUser(user)
+			return err
+		})
+		assert.NoError(t, err)
+
+		found, err := repo.GetUserByUsername("tx_commit")
+		assert.NoError(t, err)
+		assert.NotNil(t, found)
+		assert.Equal(t, "tx_commit", found.Username)
+	})
+
+	t.Run("Error rolls back transaction", func(t *testing.T) {
+		err := repo.WithTransaction(func(txRepo *UserRepository) error {
+			user := &model.User{
+				UserBase: model.UserBase{
+					Username:    "tx_rollback",
+					Email:       "txrb@example.com",
+					UploadToken: "token_tx_rollback",
+				},
+				EncodedPassword: "pass",
+			}
+			if _, err := txRepo.CreateUser(user); err != nil {
+				return err
+			}
+			return errors.New("forced rollback")
+		})
+		assert.Error(t, err)
+		assert.Equal(t, "forced rollback", err.Error())
+
+		// User should NOT exist after rollback
+		found, err := repo.GetUserByUsername("tx_rollback")
+		assert.NoError(t, err)
+		assert.Nil(t, found)
 	})
 }

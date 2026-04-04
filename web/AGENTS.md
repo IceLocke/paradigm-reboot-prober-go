@@ -29,6 +29,7 @@ Frontend root: `web/`
 | Utilities          | @vueuse/core                                      |
 | Fonts              | Inter, Noto Sans SC, JetBrains Mono (Google Fonts)|
 | Package Manager    | pnpm 10                                           |
+| Linting            | ESLint 10 + typescript-eslint + eslint-plugin-vue  |
 | API Type Generation| openapi-typescript 7 + swagger2openapi 7           |
 | Design             | Custom dark theme, CSS custom properties           |
 
@@ -43,12 +44,15 @@ web/
 ├── tsconfig.json                 # TypeScript config (strict, bundler resolution)
 ├── tsconfig.node.json            # TS config for vite.config.ts
 ├── vite.config.ts                # Vite config (alias @, proxy /api → :8080)
+├── eslint.config.js              # ESLint flat config (TS + Vue)
 ├── env.d.ts                      # Global type declarations
 ├── .gitignore
 ├── API_DIFF.md                   # v1 → v2 API migration reference
 │
-├── public/
-│   └── favicon.ico
+├── public/                       # Git submodule → github.com/IceLocke/prp-resource
+│   ├── favicon.ico
+│   ├── b50-bg.jpg
+│   └── cover/                   # Song cover art assets
 │
 ├── src/
 │   ├── main.ts                   # App entry: Pinia, Router, I18n, CSS imports
@@ -235,7 +239,7 @@ When changing any color, **update both files** to keep them in sync.
 ## Build and Run Commands
 
 ```bash
-# Install dependencies
+# Install dependencies (automatically runs `git submodule update --init --recursive` via prepare hook)
 pnpm install
 
 # Start dev server (http://localhost:3000)
@@ -246,6 +250,12 @@ pnpm build
 
 # Preview production build
 pnpm preview
+
+# Lint TypeScript and Vue files
+pnpm lint
+
+# Lint with auto-fix
+pnpm lint:fix
 
 # Regenerate API types from backend Swagger spec
 pnpm generate:api
@@ -266,6 +276,16 @@ docs/swagger.json  ──swagger2openapi──▶  src/api/openapi3.json  ──
 ### Dev Server Proxy
 
 Vite proxies `/api` → `http://localhost:8080` so the frontend can call the Go backend during development. In mock mode (`USE_MOCK = true`), no backend is needed.
+
+### Environment Variables
+
+Vite loads variables from `.env` files at build time. Variables prefixed with `VITE_` are exposed to client code via `import.meta.env`.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `VITE_API_ENDPOINT` | `/api/v2` | API base URL used by Axios client |
+
+Override per environment with `.env.local`, `.env.production`, `.env.development`, etc. (`.env.local` and `.env.*.local` are gitignored).
 
 ---
 

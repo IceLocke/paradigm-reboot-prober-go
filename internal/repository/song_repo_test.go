@@ -2,6 +2,7 @@ package repository
 
 import (
 	"paradigm-reboot-prober-go/internal/model"
+	"paradigm-reboot-prober-go/pkg/rating"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -183,5 +184,78 @@ func TestSongRepository_GetChartByWikiIDAndDifficulty(t *testing.T) {
 		chart, err := repo.GetChartByWikiIDAndDifficulty("nonexistent", model.DifficultyMassive)
 		assert.NoError(t, err)
 		assert.Nil(t, chart)
+	})
+}
+
+func TestSongRepository_UpdateSong_RecalculatesRatings(t *testing.T) {
+	db := setupTestDB(t)
+	songRepo := NewSongRepository(db)
+	recordRepo := NewRecordRepository(db)
+
+	// Create song with chart at level 15.0
+	song := &model.Song{
+		SongBase: model.SongBase{WikiID: "lvl_change", Title: "Level Change Song"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
+		},
+	}
+	created, err := songRepo.CreateSong(song)
+	assert.NoError(t, err)
+	chartID := created.Charts[0].ID
+
+	// Create play records
+	_, err = recordRepo.CreateRecord(&model.PlayRecord{
+		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: 1000000},
+		Username:       "user_lvlchg",
+	}, false)
+	assert.NoError(t, err)
+	_, err = recordRepo.CreateRecord(&model.PlayRecord{
+		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: 1005000},
+		Username:       "user_lvlchg",
+	}, false)
+	assert.NoError(t, err)
+
+	t.Run("Level change triggers rating recalculation", func(t *testing.T) {
+		newLevel := 16.0
+		updatedSong := &model.Song{
+			SongBase: model.SongBase{WikiID: "lvl_change", Title: "Level Change Song"},
+			Charts: []model.Chart{
+				{Difficulty: model.DifficultyMassive, Level: newLevel, Notes: 1000},
+			},
+		}
+		_, err := songRepo.UpdateSong(created.ID, updatedSong)
+		assert.NoError(t, err)
+
+		// Verify ratings updated to new level
+		var records []model.PlayRecord
+		db.Where("chart_id = ?", chartID).Find(&records)
+		assert.Len(t, records, 2)
+		for _, r := range records {
+			expected := rating.SingleRating(newLevel, r.Score)
+			assert.Equal(t, expected, r.Rating, "score=%d should have rating=%d", r.Score, expected)
+		}
+	})
+
+	t.Run("No level change does not recalculate", func(t *testing.T) {
+		// Capture current ratings
+		var before []model.PlayRecord
+		db.Where("chart_id = ?", chartID).Order("id").Find(&before)
+
+		// Update with same level but different notes
+		updatedSong := &model.Song{
+			SongBase: model.SongBase{WikiID: "lvl_change", Title: "Level Change Song V2"},
+			Charts: []model.Chart{
+				{Difficulty: model.DifficultyMassive, Level: 16.0, Notes: 1200},
+			},
+		}
+		_, err := songRepo.UpdateSong(created.ID, updatedSong)
+		assert.NoError(t, err)
+
+		var after []model.PlayRecord
+		db.Where("chart_id = ?", chartID).Order("id").Find(&after)
+		assert.Len(t, after, len(before))
+		for i := range before {
+			assert.Equal(t, before[i].Rating, after[i].Rating, "rating should not change when level is unchanged")
+		}
 	})
 }

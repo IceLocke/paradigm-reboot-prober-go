@@ -29,6 +29,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | Container      | Docker (multi-stage Alpine build)                |
 | Orchestration  | Docker Compose (app + PostgreSQL 16)             |
 | Frontend       | Vue.js (legacy, in `web/legacy/`)                |
+| Frontend Lint  | ESLint 10 + typescript-eslint + eslint-plugin-vue |
 
 ## Project Structure
 
@@ -81,7 +82,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   └── swagger.yaml
 ├── web/                          # Frontend assets
 │   │   ├── src/                 # Vue components, utils, styles
-│   │   └── public/              # Static assets (covers, icons)
+│   │   └── public/              # Git submodule → github.com/IceLocke/prp-resource (covers, icons)
 │   └── styles/                  # Frontend style documentation
 │       ├── vue-style-pattern.md
 │       └── rules/               # Style rules (components, naive-ui, responsive, tokens)
@@ -254,13 +255,16 @@ Defined in `.github/workflows/ci.yml`. Triggers on push/PR to `master` and `dev`
 
 ### Pipeline Stages
 
+All CI jobs use `actions/checkout@v4` with `submodules: recursive` to fetch the `web/public` submodule.
+
 1. **Lint**: Runs `golangci-lint` v2.6.
-2. **Unit Tests**: Runs `go test -v ./...`.
-3. **Swagger Consistency Check**: Regenerates Swagger docs and fails if `docs/` directory has changes (drift detection).
-4. **Docker Build & Push** (depends on lint + test + swagger-check):
+2. **Frontend Lint**: Runs `pnpm lint` (ESLint) in `web/` directory.
+3. **Unit Tests**: Runs `go test -v ./...`.
+4. **Swagger Consistency Check**: Regenerates Swagger docs and fails if `docs/` directory has changes (drift detection).
+5. **Docker Build & Push** (depends on lint + test + swagger-check + frontend-lint):
    - Builds Docker image and pushes to `ghcr.io`.
    - Runs Docker Compose integration test (health check on `/health`).
-5. **Deploy** (master branch only, after docker-build): Currently a simulated deployment step. SSH-based deploy is commented out for future use.
+6. **Deploy** (master branch only, after docker-build): Currently a simulated deployment step. SSH-based deploy is commented out for future use.
 
 ### Docker Image Tags
 

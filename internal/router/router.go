@@ -7,6 +7,7 @@ import (
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/internal/service"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -18,6 +19,15 @@ import (
 // SetupRouter initializes the routes for the application
 func SetupRouter(db *gorm.DB) *gin.Engine {
 	r := gin.Default() // gin.Default() already includes Logger and Recovery middleware
+
+	// CORS middleware
+	r.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: false,
+	}))
 
 	// Initialize Repositories
 	userRepo := repository.NewUserRepository(db)

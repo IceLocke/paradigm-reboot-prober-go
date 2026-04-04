@@ -44,13 +44,14 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { NModal } from 'naive-ui'
+import { NModal, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { register } from '@/api/user'
 import { USE_MOCK } from '@/api/mock'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 
 defineProps<{ show: boolean }>()
 const emit = defineEmits<{
@@ -93,10 +94,13 @@ const onSubmit = async () => {
     form.email = ''
     form.password = ''
     form.confirmPassword = ''
+    message.success(t('message.register_success'))
     emit('success')
   } catch (err: unknown) {
     const error = err as { response?: { data?: { error?: string } } }
-    errorMsg.value = t('message.register_failed') + (error.response?.data?.error ?? '')
+    const msg = t('message.register_failed') + (error.response?.data?.error ?? '')
+    errorMsg.value = msg
+    message.error(msg)
   } finally {
     loading.value = false
   }

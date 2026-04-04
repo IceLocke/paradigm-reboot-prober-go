@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
@@ -45,6 +46,7 @@ import { USE_MOCK } from '@/api/mock'
 import DifficultyBadge from './DifficultyBadge.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const loading = ref(false)
@@ -65,8 +67,10 @@ const onSubmit = async () => {
       await uploadRecords(userStore.username, { play_records: records })
     }
     appStore.uploadList = []
-  } catch {
-    // Error handled
+    message.success(t('message.post_record_success'))
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.post_record_failed') + (e.response?.data?.error ?? ''))
   } finally {
     loading.value = false
   }

@@ -126,7 +126,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
-		Where("Chart__Song.b15 = ?", false).
+		Where(`"Chart__Song".b15 = ?`, false).
 		Order("rating desc, play_records.id desc").
 		Limit(config.GlobalConfig.Game.B35Limit + underflow).
 		Find(&b35).Error; err != nil {
@@ -135,7 +135,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 
 	// B15: B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
-		Where("Chart__Song.b15 = ?", true).
+		Where(`"Chart__Song".b15 = ?`, true).
 		Order("rating desc, play_records.id desc").
 		Limit(config.GlobalConfig.Game.B15Limit + underflow).
 		Find(&b15).Error; err != nil {
@@ -229,7 +229,7 @@ func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
-		Where("play_records.username = ? AND Chart.song_id = ?", username, songID).
+		Where(`play_records.username = ? AND "Chart".song_id = ?`, username, songID).
 		Order("rating desc").
 		Find(&records).Error
 	return records, err
@@ -241,7 +241,7 @@ func (r *RecordRepository) GetAllRecordsBySong(username string, songID int, page
 	query := r.db.Where("play_records.username = ?", username).
 		Joins("Chart").
 		Joins("Chart.Song").
-		Where("Chart.song_id = ?", songID)
+		Where(`"Chart".song_id = ?`, songID)
 
 	orderStr := "desc"
 	if !order {
@@ -309,4 +309,32 @@ func (r *RecordRepository) CountAllRecordsByChart(username string, chartID int) 
 		Where("username = ? AND chart_id = ?", username, chartID).
 		Count(&count).Error
 	return count, err
+}
+
+// RecalculateRatingsByChart recalculates ratings for all play records of a given chart.
+// Designed to be called within an existing transaction when a chart's level changes.
+func RecalculateRatingsByChart(tx *gorm.DB, chartID int, newLevel float64) error {
+	var records []model.PlayRecord
+	if err := tx.Where("chart_id = ?", chartID).Find(&records).Error; err != nil {
+		return err
+	}
+	if len(records) == 0 {
+		return nil
+	}
+
+	// Group record IDs by their new rating to minimize UPDATE queries.
+	// DB ops: 1 SELECT + M UPDATEs (M = distinct rating values, typically << N records)
+	ratingGroups := make(map[int][]int) // newRating -> []playRecordID
+	for _, r := range records {
+		newRating := rating.SingleRating(newLevel, r.Score)
+		ratingGroups[newRating] = append(ratingGroups[newRating], r.ID)
+	}
+	for newRating, ids := range ratingGroups {
+		if err := tx.Model(&model.PlayRecord{}).
+			Where("id IN ?", ids).
+			Update("rating", newRating).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -173,8 +173,18 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
+		user, err := ctrl.userService.GetUser(username)
+		if user == nil {
+			c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
+			return
+		}
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
 		c.JSON(http.StatusOK, model.AllChartsResponse{
 			Username: username,
+			Nickname: user.Nickname,
 			Charts:   charts,
 		})
 

@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { NModal } from 'naive-ui'
+import { NModal, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { login } from '@/api/user'
@@ -41,6 +41,7 @@ import { USE_MOCK } from '@/api/mock'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 const userStore = useUserStore()
 
 defineProps<{ show: boolean }>()
@@ -80,10 +81,13 @@ const onSubmit = async () => {
     }
     form.username = ''
     form.password = ''
+    message.success(t('message.login_success'))
     emit('success')
   } catch (err: unknown) {
     const error = err as { response?: { data?: { error?: string } } }
-    errorMsg.value = t('message.login_failed') + (error.response?.data?.error ?? '')
+    const msg = t('message.login_failed') + (error.response?.data?.error ?? '')
+    errorMsg.value = msg
+    message.error(msg)
   } finally {
     loading.value = false
   }

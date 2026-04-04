@@ -2,6 +2,7 @@ package repository
 
 import (
 	"paradigm-reboot-prober-go/internal/model"
+	"paradigm-reboot-prober-go/pkg/rating"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -312,5 +313,59 @@ func TestRecordRepository_PerChartQueries(t *testing.T) {
 		count2, err := repo.CountAllRecordsByChart("user_chart", detectedChartID)
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), count2)
+	})
+}
+
+func TestRecalculateRatingsByChart(t *testing.T) {
+	db := setupTestDB(t)
+	songRepo := NewSongRepository(db)
+	recordRepo := NewRecordRepository(db)
+
+	// Create song with chart at level 15.0
+	song := &model.Song{
+		SongBase: model.SongBase{WikiID: "recalc_song", Title: "Recalc Song"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
+		},
+	}
+	created, err := songRepo.CreateSong(song)
+	assert.NoError(t, err)
+	chartID := created.Charts[0].ID
+
+	// Create multiple records with different scores
+	scores := []int{1000000, 1005000, 900000}
+	for _, score := range scores {
+		_, err := recordRepo.CreateRecord(&model.PlayRecord{
+			PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: score},
+			Username:       "user_recalc",
+		}, false)
+		assert.NoError(t, err)
+	}
+
+	// Verify initial ratings at level 15.0
+	var before []model.PlayRecord
+	db.Where("chart_id = ? AND username = ?", chartID, "user_recalc").Find(&before)
+	assert.Len(t, before, 3)
+	for _, r := range before {
+		assert.Equal(t, rating.SingleRating(15.0, r.Score), r.Rating)
+	}
+
+	t.Run("Recalculate with new level", func(t *testing.T) {
+		newLevel := 16.0
+		err := RecalculateRatingsByChart(db, chartID, newLevel)
+		assert.NoError(t, err)
+
+		var after []model.PlayRecord
+		db.Where("chart_id = ? AND username = ?", chartID, "user_recalc").Find(&after)
+		assert.Len(t, after, 3)
+		for _, r := range after {
+			expected := rating.SingleRating(newLevel, r.Score)
+			assert.Equal(t, expected, r.Rating, "score=%d should have rating=%d, got=%d", r.Score, expected, r.Rating)
+		}
+	})
+
+	t.Run("No records for chart", func(t *testing.T) {
+		err := RecalculateRatingsByChart(db, 99999, 16.0)
+		assert.NoError(t, err)
 	})
 }

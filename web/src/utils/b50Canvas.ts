@@ -2,7 +2,7 @@
  * B50 image canvas renderer.
  * Generates a B50 best records image using Canvas 2D API.
  */
-import type { PlayRecordInfo, Difficulty } from '@/api/types'
+import type { PlayRecordInfo } from '@/api/types'
 
 // ─── Render Options ────────────────────────────────────────────
 
@@ -17,15 +17,15 @@ export interface B50RenderOptions {
 
 // ─── Layout Constants ──────────────────────────────────────────
 
-const CANVAS_WIDTH = 1440
+const CANVAS_WIDTH = 1200
 const PADDING_X = 32
 const PADDING_TOP = 32
 const PADDING_BOTTOM = 24
 
 const COLS = 5
-const CARD_GAP = 8
+const CARD_GAP = 16
 const CARD_WIDTH = (CANVAS_WIDTH - 2 * PADDING_X - (COLS - 1) * CARD_GAP) / COLS
-const CARD_HEIGHT = 160
+const CARD_HEIGHT = 136
 const CARD_RADIUS = 8
 
 const HEADER_HEIGHT = 68
@@ -45,10 +45,10 @@ const DIFF_COLORS: Record<string, string> = {
 }
 
 const DIFF_NAMES: Record<string, string> = {
-  detected: 'DETECTED',
-  invaded: 'INVADED',
-  massive: 'MASSIVE',
-  reboot: 'REBOOT',
+  detected: "Detected",
+  invaded: 'Invaded',
+  massive: 'Massive',
+  reboot: 'Reboot',
 }
 
 // ─── Fonts ─────────────────────────────────────────────────────
@@ -131,6 +131,13 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
   })
 }
 
+/** Build the URL for a cover thumbnail (Cover_xxx.jpg → Cover_xxx_thumb.jpg). */
+function coverThumbUrl(cover: string): string {
+  const dot = cover.lastIndexOf('.')
+  if (dot === -1) return `/cover/${cover}`
+  return `/cover/${cover.substring(0, dot)}_thumb${cover.substring(dot)}`
+}
+
 async function preloadImages(
   records: PlayRecordInfo[],
 ): Promise<Map<string, HTMLImageElement>> {
@@ -141,7 +148,9 @@ async function preloadImages(
 
   const map = new Map<string, HTMLImageElement>()
   const tasks = Array.from(covers).map(async (cover) => {
-    const img = await loadImage(`/cover/${cover}`)
+    // Load thumbnail variant for B50 cards (each card is ~268×160px, no need for full-size)
+    const img = await loadImage(coverThumbUrl(cover))
+      ?? await loadImage(`/cover/${cover}`) // fallback to full-size if thumb not found
     if (img) map.set(cover, img)
   })
   await Promise.all(tasks)
@@ -155,21 +164,25 @@ function drawBackground(
   width: number, height: number,
   bgImage: HTMLImageElement | null,
 ) {
-  // Solid dark base
-  ctx.fillStyle = '#0e0e12'
-  ctx.fillRect(0, 0, width, height)
-
   if (bgImage) {
+    // Dark base beneath the blurred cover
+    ctx.fillStyle = '#0e0e12'
+    ctx.fillRect(0, 0, width, height)
+
     ctx.save()
-    ctx.filter = 'blur(30px)'
+    ctx.filter = 'blur(20px)'
     // Draw larger than canvas to prevent white edges from blur
     drawImageCover(ctx, bgImage, -40, -40, width + 80, height + 80)
     ctx.restore()
-  }
 
-  // Dark overlay to ensure readability
-  ctx.fillStyle = 'rgba(14, 14, 18, 0.65)'
-  ctx.fillRect(0, 0, width, height)
+    // Semi-transparent overlay to ensure text readability
+    ctx.fillStyle = 'rgba(14, 14, 18, 0.45)'
+    ctx.fillRect(0, 0, width, height)
+  } else {
+    // No cover image — use a slightly lighter tinted background
+    ctx.fillStyle = '#1a1a2e'
+    ctx.fillRect(0, 0, width, height)
+  }
 }
 
 function drawHeader(
@@ -185,7 +198,7 @@ function drawHeader(
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText('Paradigm: Reboot Player Bests', leftX, y)
+  ctx.fillText('Paradigm: Reboot Best Records', leftX, y)
 
   // Left: date/time
   ctx.font = `16px ${FONT_SANS}`
@@ -247,16 +260,26 @@ function drawRecordCard(
   rank: number,
   coverImage: HTMLImageElement | null,
 ) {
+  // ── Card shadow (drawn before clip so it's visible outside) ──
   ctx.save()
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.45)'
+  ctx.shadowBlur = 10
+  ctx.shadowOffsetX = 0
+  ctx.shadowOffsetY = 3
+  roundedRectPath(ctx, x, y, w, h, CARD_RADIUS)
+  ctx.fillStyle = '#000'
+  ctx.fill()
+  ctx.restore()
 
-  // Clip to rounded rect
+  // ── Clip to rounded rect for content ──
+  ctx.save()
   roundedRectPath(ctx, x, y, w, h, CARD_RADIUS)
   ctx.clip()
 
   // ── Background: blurred cover or fallback ──
   if (coverImage) {
     ctx.save()
-    ctx.filter = 'blur(6px)'
+    ctx.filter = 'blur(3px)'
     const bleed = 20 // extra pixels to avoid blur edge artifacts
     drawImageCover(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed)
     ctx.restore()
@@ -288,7 +311,7 @@ function drawRecordCard(
   const rankStr = `#${rank}`
   ctx.font = `bold 13px ${FONT_MONO}`
   const rankWidth = ctx.measureText(rankStr).width
-  ctx.font = `bold 16px ${FONT_SANS}`
+  ctx.font = `bold 18px ${FONT_SANS}`
   const title = truncateText(ctx, record.chart.title, contentW - rankWidth - 8)
   ctx.fillText(title, contentX, y + pad)
 
@@ -318,17 +341,17 @@ function drawRecordCard(
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
-  ctx.fillText(`${levelVal} > ${ratingVal}`, contentX, y + h - pad)
+  ctx.fillText(`${levelVal} → ${ratingVal}`, contentX, y + h - pad)
 
   // Score (left-aligned, vertically centered)
   ctx.shadowBlur = 5
   ctx.shadowOffsetY = 2
-  ctx.font = `bold 32px ${FONT_MONO}`
+  ctx.font = `bold 28px ${FONT_MONO}`
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
   const scoreStr = String(record.score).padStart(7, '0')
-  ctx.fillText(scoreStr, contentX, y + h - pad - 16)
+  ctx.fillText(scoreStr, contentX, y + h - pad - 14)
 
   // Reset shadow
   ctx.shadowColor = 'transparent'
@@ -407,9 +430,8 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
   const allRecords = [...b15Records, ...b35Records]
   const imageMap = await preloadImages(allRecords)
 
-  // ── Background ──
-  const bgCover = b15Records[0]?.chart.cover || b35Records[0]?.chart.cover
-  const bgImage = bgCover ? imageMap.get(bgCover) ?? null : null
+  // ── Background (fixed image) ──
+  const bgImage = await loadImage('/b50-bg.jpg')
   drawBackground(ctx, CANVAS_WIDTH, canvasHeight, bgImage)
 
   // ── Header ──

@@ -273,4 +273,4 @@ export function getMockUser(): User {
 }
 
 // Flag for mock mode
-export const USE_MOCK = true
+export const USE_MOCK = false

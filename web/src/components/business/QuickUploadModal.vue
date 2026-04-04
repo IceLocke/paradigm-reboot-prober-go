@@ -50,7 +50,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NModal } from 'naive-ui'
+import { NModal, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { uploadRecords } from '@/api/record'
@@ -60,6 +60,7 @@ import DifficultyBadge from './DifficultyBadge.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 const userStore = useUserStore()
 
 const props = defineProps<{
@@ -93,11 +94,13 @@ const onSubmit = async () => {
         is_replace: isReplace.value,
       })
     }
+    message.success(t('message.post_record_success'))
     emit('success')
     emit('update:show', false)
     scoreStr.value = ''
-  } catch {
-    // Error handled by interceptor
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.post_record_failed') + (e.response?.data?.error ?? ''))
   } finally {
     loading.value = false
   }

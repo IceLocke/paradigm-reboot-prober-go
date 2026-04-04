@@ -80,10 +80,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, h } from 'vue'
+import { ref, computed, onMounted, watch, h } from 'vue'
 import { saveAs } from 'file-saver'
 import { useI18n } from 'vue-i18n'
-import { NDataTable } from 'naive-ui'
+import { NDataTable, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
@@ -105,6 +105,7 @@ import SongDetailModal from '@/components/business/SongDetailModal.vue'
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const { t } = useI18n()
+const message = useMessage()
 const userStore = useUserStore()
 
 const allRecords = ref<PlayRecordInfo[]>([])
@@ -121,21 +122,18 @@ const b15Records = computed(() =>
 )
 
 const b50Rating = computed(() => {
-  if (allRecords.value.length === 0) return 0
   const sum = allRecords.value.reduce((s, r) => s + r.rating, 0)
-  return sum / 100 / allRecords.value.length
+  return sum / 5000 // integer sum / (100 * 50), precision = 0.0002
 })
 
 const b35Rating = computed(() => {
-  if (b35Records.value.length === 0) return 0
   const sum = b35Records.value.reduce((s, r) => s + r.rating, 0)
-  return sum / 100 / b35Records.value.length
+  return sum / 3500
 })
 
 const b15Rating = computed(() => {
-  if (b15Records.value.length === 0) return 0
   const sum = b15Records.value.reduce((s, r) => s + r.rating, 0)
-  return sum / 100 / b15Records.value.length
+  return sum / 1500
 })
 
 const onClickSongTitle = async (songId: number) => {
@@ -153,7 +151,10 @@ const onClickSongTitle = async (songId: number) => {
       const res = await getSingleSongInfo(songId)
       selectedSong.value = res.data
     }
-  } catch { /* handled */ }
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+  }
 }
 
 const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: number }>>(() => [
@@ -204,12 +205,22 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
 
 const scatterOption = (records: PlayRecordInfo[]) => {
   const data = records.map((r) => [r.chart.level, r.rating / 100])
+  const levels = data.map((d) => d[0])
+  const ratings = data.map((d) => d[1])
+  const lvMin = Math.floor(Math.min(...levels) - 0.5)
+  const lvMax = Math.ceil(Math.max(...levels) + 0.5)
+  const rtMin = Math.floor(Math.min(...ratings) - 1)
+  const rtMax = Math.ceil(Math.max(...ratings) + 1)
   return {
     backgroundColor: 'transparent',
-    grid: { left: 50, right: 20, top: 20, bottom: 40 },
+    grid: { left: 50, right: 30, top: 36, bottom: 45 },
     xAxis: {
       type: 'value',
       name: 'Level',
+      min: lvMin,
+      max: lvMax,
+      nameLocation: 'center',
+      nameGap: 28,
       nameTextStyle: { color: '#a1a1aa' },
       axisLabel: { color: '#a1a1aa' },
       splitLine: { lineStyle: { color: '#27272a' } },
@@ -217,6 +228,10 @@ const scatterOption = (records: PlayRecordInfo[]) => {
     yAxis: {
       type: 'value',
       name: 'Rating',
+      min: rtMin,
+      max: rtMax,
+      nameLocation: 'center',
+      nameGap: 38,
       nameTextStyle: { color: '#a1a1aa' },
       axisLabel: { color: '#a1a1aa' },
       splitLine: { lineStyle: { color: '#27272a' } },
@@ -249,7 +264,10 @@ const loadData = async () => {
   try {
     const res = await getRecords(userStore.username, 'b50')
     allRecords.value = res.data.records
-  } catch { /* handled */ }
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.get_record_failed') + (e.response?.data?.error ?? ''))
+  }
 }
 
 const exportImage = async () => {
@@ -265,12 +283,17 @@ const exportImage = async () => {
       b35Avg: b35Rating.value,
     })
     saveAs(blob, `b50_${Date.now()}.jpg`)
-  } catch (e) {
-    console.error('B50 image export failed:', e)
+    message.success(t('message.export_image_success'))
+  } catch {
+    message.error(t('message.export_image_failed'))
   } finally {
     exporting.value = false
   }
 }
+
+watch(() => userStore.logged_in, (loggedIn) => {
+  if (loggedIn) loadData()
+})
 
 onMounted(loadData)
 </script>
@@ -308,7 +331,7 @@ onMounted(loadData)
   margin-bottom: var(--space-4);
 }
 .scatter-chart {
-  height: 250px;
+  height: 280px;
   width: 100%;
 }
 

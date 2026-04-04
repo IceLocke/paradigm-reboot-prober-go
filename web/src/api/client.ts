@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance } from 'axios'
 
-const API_BASE = '/api/v2'
+const API_BASE = import.meta.env.VITE_API_ENDPOINT || '/api/v2'
 
 const client: AxiosInstance = axios.create({
   baseURL: API_BASE,

@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, NPopover } from 'naive-ui'
+import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 
 import { useAppStore } from '@/stores/app'
@@ -85,6 +85,7 @@ import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
 
 const { t } = useI18n()
+const message = useMessage()
 const appStore = useAppStore()
 
 const search = ref('')
@@ -170,7 +171,10 @@ const onClickTitle = async (songId: number) => {
       const res = await getSingleSongInfo(songId)
       selectedSong.value = res.data
     }
-  } catch { /* handled */ }
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+  }
 }
 
 const onQuickUpload = (chart: ChartInfo) => {
@@ -250,9 +254,9 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     title: t('term.fitting_level'),
     key: 'fitting_level',
     width: 90,
-    sorter: (a, b) => a.fitting_level - b.fitting_level,
+    sorter: (a, b) => (a.fitting_level ?? 0) - (b.fitting_level ?? 0),
     render(row) {
-      return h('span', { class: 'mono' }, row.fitting_level.toFixed(1))
+      return h('span', { class: 'mono' }, row.fitting_level != null ? row.fitting_level.toFixed(1) : '-')
     },
   },
   {
@@ -286,7 +290,10 @@ const loadCharts = async () => {
   try {
     const res = await getAllCharts()
     appStore.charts = res.data
-  } catch { /* handled */ }
+  } catch (err: unknown) {
+    const e = err as { response?: { data?: { error?: string } } }
+    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+  }
 }
 
 onMounted(() => {
