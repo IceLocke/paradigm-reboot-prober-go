@@ -231,7 +231,8 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 	songService := NewSongService(songRepo)
 
 	// Create songs in deliberately wrong order with mixed difficulties.
-	// Expected final order: version DESC, then difficulty DESC (reboot > massive > invaded > detected).
+	// Expected final order: Version DESC, SongID ASC (album order), Difficulty DESC.
+	// s2 and s4 share the same version to verify the SongID tiebreaker.
 	songs := []request.CreateSongRequest{
 		{
 			SongBase: model.SongBase{WikiID: "s1", Title: "Old Song", Artist: "A", Version: "1.0.0"},
@@ -241,7 +242,7 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 			},
 		},
 		{
-			SongBase: model.SongBase{WikiID: "s2", Title: "Newest Song", Artist: "A", Version: "2.11.0"},
+			SongBase: model.SongBase{WikiID: "s2", Title: "Newest Song A", Artist: "A", Version: "2.11.0"},
 			Charts: []model.ChartInput{
 				{Difficulty: model.DifficultyDetected, Level: 6, Notes: 300},
 				{Difficulty: model.DifficultyReboot, Level: 15, Notes: 1200},
@@ -255,6 +256,13 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 				{Difficulty: model.DifficultyReboot, Level: 14, Notes: 1100},
 			},
 		},
+		{
+			SongBase: model.SongBase{WikiID: "s4", Title: "Newest Song B", Artist: "A", Version: "2.11.0"},
+			Charts: []model.ChartInput{
+				{Difficulty: model.DifficultyMassive, Level: 13, Notes: 900},
+				{Difficulty: model.DifficultyDetected, Level: 7, Notes: 350},
+			},
+		},
 	}
 
 	for i := range songs {
@@ -264,20 +272,23 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 
 	charts, err := songService.GetAllCharts()
 	require.NoError(t, err)
-	require.Len(t, charts, 7) // 2 + 3 + 2
+	require.Len(t, charts, 9) // 2 + 3 + 2 + 2
 
-	// Expected order:
-	//   version 2.11.0: Reboot, Invaded, Detected
-	//   version 2.2.0:  Reboot, Invaded
-	//   version 1.0.0:  Massive, Detected
+	// Expected order (Version DESC → SongID ASC → Difficulty DESC):
+	//   version 2.11.0, s2 (lower SongID): Reboot, Invaded, Detected
+	//   version 2.11.0, s4 (higher SongID): Massive, Detected
+	//   version 2.2.0,  s3:                 Reboot, Invaded
+	//   version 1.0.0,  s1:                 Massive, Detected
 	expected := []struct {
 		title      string
 		version    string
 		difficulty model.Difficulty
 	}{
-		{"Newest Song", "2.11.0", model.DifficultyReboot},
-		{"Newest Song", "2.11.0", model.DifficultyInvaded},
-		{"Newest Song", "2.11.0", model.DifficultyDetected},
+		{"Newest Song A", "2.11.0", model.DifficultyReboot},
+		{"Newest Song A", "2.11.0", model.DifficultyInvaded},
+		{"Newest Song A", "2.11.0", model.DifficultyDetected},
+		{"Newest Song B", "2.11.0", model.DifficultyMassive},
+		{"Newest Song B", "2.11.0", model.DifficultyDetected},
 		{"Middle Song", "2.2.0", model.DifficultyReboot},
 		{"Middle Song", "2.2.0", model.DifficultyInvaded},
 		{"Old Song", "1.0.0", model.DifficultyMassive},
