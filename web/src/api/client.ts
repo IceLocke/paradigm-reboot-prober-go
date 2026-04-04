@@ -48,9 +48,10 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (!isJsonPayload) return config
 
   const json = JSON.stringify(config.data)
-  if (json.length < GZIP_THRESHOLD) return config
+  const encoded = new TextEncoder().encode(json)
+  if (encoded.byteLength < GZIP_THRESHOLD) return config
 
-  config.data = pako.gzip(json)
+  config.data = pako.gzip(encoded)
   config.headers['Content-Encoding'] = 'gzip'
   config.headers['Content-Type'] = 'application/json'
 
