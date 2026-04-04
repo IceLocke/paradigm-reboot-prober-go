@@ -192,6 +192,8 @@ definitions:
     type: object
   model.PlayRecordResponse:
     properties:
+      nickname:
+        type: string
       records:
         items:
           $ref: '#/definitions/model.PlayRecordInfo'

@@ -10,6 +10,7 @@ export interface B50RenderOptions {
   b15Records: PlayRecordInfo[]
   b35Records: PlayRecordInfo[]
   username: string
+  nickname: string
   rating: number   // Player overall rating (avg B50, already /100)
   b15Avg: number   // B15 avg rating (already /100)
   b35Avg: number   // B35 avg rating (already /100)
@@ -205,11 +206,11 @@ function drawHeader(
   ctx.fillStyle = '#a1a1aa'
   ctx.fillText(formatDate(), leftX, y + 38)
 
-  // Right: username
+  // Right: nickname (display name)
   ctx.font = `bold 28px ${FONT_SANS}`
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'right'
-  ctx.fillText(options.username, rightX, y)
+  ctx.fillText(options.nickname || options.username, rightX, y)
 
   // Right: rating
   ctx.font = `16px ${FONT_MONO}`

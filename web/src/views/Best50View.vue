@@ -130,6 +130,7 @@ const userStore = useUserStore()
 const appStore = useAppStore()
 
 const allRecords = ref<PlayRecordInfo[]>([])
+const nickname = ref('')
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const exporting = ref(false)
@@ -323,6 +324,7 @@ const loadData = async () => {
   if (USE_MOCK) {
     const mock = getMockB50()
     allRecords.value = mock.records
+    nickname.value = mock.nickname
     return
   }
 
@@ -330,6 +332,7 @@ const loadData = async () => {
   try {
     const res = await getRecords(userStore.username, 'b50')
     allRecords.value = res.data.records
+    nickname.value = res.data.nickname
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     message.error(t('message.get_record_failed') + (e.response?.data?.error ?? ''))
@@ -344,6 +347,7 @@ const exportImage = async () => {
       b15Records: b15Records.value,
       b35Records: b35Records.value,
       username: USE_MOCK ? 'demo_user' : userStore.username,
+      nickname: nickname.value,
       rating: b50Rating.value,
       b15Avg: b15Rating.value,
       b35Avg: b35Rating.value,

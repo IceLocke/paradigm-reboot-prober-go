@@ -1040,6 +1040,9 @@ const docTemplate = `{
         "model.PlayRecordResponse": {
             "type": "object",
             "properties": {
+                "nickname": {
+                    "type": "string"
+                },
                 "records": {
                     "type": "array",
                     "items": {

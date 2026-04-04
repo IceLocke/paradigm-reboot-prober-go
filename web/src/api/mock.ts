@@ -211,6 +211,7 @@ export function getMockB50(): PlayRecordResponse {
   if (!_b50Records) _b50Records = generateBest50(charts)
   return {
     username: 'demo_user',
+    nickname: 'Demo',
     total: _b50Records.length,
     records: _b50Records,
   }
@@ -241,6 +242,7 @@ export function getMockRecords(
     const start = (pageIndex - 1) * pageSize
     return {
       username: 'demo_user',
+      nickname: 'Demo',
       total: bestRecords.length,
       records: bestRecords.slice(start, start + pageSize),
     }
@@ -250,6 +252,7 @@ export function getMockRecords(
   const start = (pageIndex - 1) * pageSize
   return {
     username: 'demo_user',
+    nickname: 'Demo',
     total: allRecords.length,
     records: allRecords.slice(start, start + pageSize),
   }

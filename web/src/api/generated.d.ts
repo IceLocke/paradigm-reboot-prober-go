@@ -919,6 +919,7 @@ export interface components {
             score?: number;
         };
         "model.PlayRecordResponse": {
+            nickname?: string;
             records?: components["schemas"]["model.PlayRecordInfo"][];
             total?: number;
             username?: string;
