@@ -22,16 +22,14 @@ func TestUserController(t *testing.T) {
 
 	t.Run("Register Success", func(t *testing.T) {
 		reqBody := request.CreateUserRequest{
-			UserBase: model.UserBase{
-				Username: "testuser",
-				Email:    "test@example.com",
-			},
+			Username: "testuser",
+			Email:    "test@example.com",
 			Password: "password123",
 		}
 		body, _ := json.Marshal(reqBody)
 		w := performRequest(r, "POST", "/register", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
 
-		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
 		var user model.User
 		err := json.Unmarshal(w.Body.Bytes(), &user)
 		assert.NoError(t, err)

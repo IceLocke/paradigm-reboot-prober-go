@@ -38,7 +38,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			UserBase: model.UserBase{
 				Username:    "user_no_nick",
 				Email:       "nonick@example.com",
-				UploadToken: "token",
+				UploadToken: "token_nonick",
 			},
 			EncodedPassword: "pass",
 		}
@@ -52,7 +52,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			UserBase: model.UserBase{
 				Username:    "duplicate",
 				Email:       "dup@example.com",
-				UploadToken: "token",
+				UploadToken: "token_dup1",
 			},
 			EncodedPassword: "pass",
 		}
@@ -63,7 +63,7 @@ func TestUserRepository_CreateUser(t *testing.T) {
 			UserBase: model.UserBase{
 				Username:    "duplicate",
 				Email:       "dup@example.com",
-				UploadToken: "token",
+				UploadToken: "token_dup2",
 			},
 			EncodedPassword: "pass",
 		}
@@ -81,7 +81,7 @@ func TestUserRepository_GetUserByUsername(t *testing.T) {
 		UserBase: model.UserBase{
 			Username:    "findme",
 			Email:       "find@example.com",
-			UploadToken: "token",
+			UploadToken: "token_findme",
 		},
 		EncodedPassword: "pass",
 	}
@@ -112,7 +112,7 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 			Username:    "update_target",
 			Email:       "update@example.com",
 			Nickname:    "Original",
-			UploadToken: "token",
+			UploadToken: "token_update",
 		},
 		EncodedPassword: "pass",
 	}

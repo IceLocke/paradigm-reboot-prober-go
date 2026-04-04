@@ -25,7 +25,7 @@ func NewUserController(userService *service.UserService) *UserController {
 // @Accept json
 // @Produce json
 // @Param user body request.CreateUserRequest true "User registration info"
-// @Success 200 {object} model.User
+// @Success 201 {object} model.UserPublic
 // @Failure 400 {object} model.Response
 // @Router /user/register [post]
 func (ctrl *UserController) Register(c *gin.Context) {
@@ -43,7 +43,7 @@ func (ctrl *UserController) Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusCreated, user.ToPublic())
 }
 
 // Login godoc
@@ -61,6 +61,11 @@ func (ctrl *UserController) Login(c *gin.Context) {
 	username := c.PostForm("username")
 	username = strings.ToLower(username)
 	password := c.PostForm("password")
+
+	if username == "" || password == "" {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "username and password are required"})
+		return
+	}
 
 	token, err := ctrl.userService.Login(username, password)
 	if err != nil {
@@ -139,7 +144,11 @@ func (ctrl *UserController) UpdateMe(c *gin.Context) {
 
 	user, err := ctrl.userService.UpdateUser(username, &req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
+		} else {
+			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		}
 		return
 	}
 
@@ -166,7 +175,11 @@ func (ctrl *UserController) ChangePassword(c *gin.Context) {
 		return
 	}
 	if err := ctrl.userService.ChangePassword(username, &req); err != nil {
-		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		if strings.Contains(err.Error(), "incorrect old password") {
+			c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
+		} else {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+		}
 		return
 	}
 	c.JSON(http.StatusOK, model.Response{Message: "password changed successfully"})
@@ -191,7 +204,11 @@ func (ctrl *UserController) ResetPassword(c *gin.Context) {
 		return
 	}
 	if err := ctrl.userService.ResetPassword(&req); err != nil {
-		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
+		} else {
+			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		}
 		return
 	}
 	c.JSON(http.StatusOK, model.Response{Message: "password reset successfully"})

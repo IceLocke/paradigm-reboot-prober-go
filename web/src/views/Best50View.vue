@@ -3,6 +3,15 @@
     <div class="page-header">
       <h2>{{ t('term.b50') }}</h2>
       <div class="page-actions">
+        <button
+          class="icon-btn"
+          :title="t('common.export_image')"
+          :disabled="exporting || allRecords.length === 0"
+          @click="exportImage"
+        >
+          <svg v-if="!exporting" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        </button>
         <button class="icon-btn" :title="t('common.refresh')" @click="loadData">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
@@ -72,6 +81,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, h } from 'vue'
+import { saveAs } from 'file-saver'
 import { useI18n } from 'vue-i18n'
 import { NDataTable } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
@@ -86,6 +96,7 @@ import { getRecords } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockB50 } from '@/api/mock'
 import type { PlayRecordInfo, Song } from '@/api/types'
+import { renderB50Image } from '@/utils/b50Canvas'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import StatCard from '@/components/business/StatCard.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
@@ -99,6 +110,7 @@ const userStore = useUserStore()
 const allRecords = ref<PlayRecordInfo[]>([])
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
+const exporting = ref(false)
 
 const b35Records = computed(() =>
   allRecords.value.filter((r) => !r.chart.b15).map((r, i) => ({ ...r, _index: i + 1 }))
@@ -240,6 +252,26 @@ const loadData = async () => {
   } catch { /* handled */ }
 }
 
+const exportImage = async () => {
+  if (exporting.value || allRecords.value.length === 0) return
+  exporting.value = true
+  try {
+    const blob = await renderB50Image({
+      b15Records: b15Records.value,
+      b35Records: b35Records.value,
+      username: USE_MOCK ? 'demo_user' : userStore.username,
+      rating: b50Rating.value,
+      b15Avg: b15Rating.value,
+      b35Avg: b35Rating.value,
+    })
+    saveAs(blob, `b50_${Date.now()}.jpg`)
+  } catch (e) {
+    console.error('B50 image export failed:', e)
+  } finally {
+    exporting.value = false
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -310,4 +342,17 @@ onMounted(loadData)
 }
 :deep(.link-text:hover) { text-decoration: underline; }
 :deep(.mono) { font-family: var(--font-mono); font-size: var(--text-sm); }
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
 </style>

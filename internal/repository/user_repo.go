@@ -59,3 +59,11 @@ func (r *UserRepository) UpdateUser(user *model.User) (*model.User, error) {
 	}
 	return user, nil
 }
+
+// WithTransaction executes fn within a database transaction, passing a transactional
+// copy of UserRepository. If fn returns an error the transaction is rolled back.
+func (r *UserRepository) WithTransaction(fn func(txRepo *UserRepository) error) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		return fn(&UserRepository{db: tx})
+	})
+}

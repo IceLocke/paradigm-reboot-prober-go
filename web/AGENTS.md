@@ -76,6 +76,9 @@ web/
 │   │   ├── user.ts               # User state (username, token, profile) — persisted
 │   │   └── app.ts                # App state (charts cache, upload cart, sidebar)
 │   │
+│   ├── utils/
+│   │   └── b50Canvas.ts          # B50 image Canvas renderer (export as JPEG)
+│   │
 │   ├── composables/
 │   │   └── useBreakpoint.ts      # Reactive viewport width / isMobile / isDesktop
 │   │
@@ -144,6 +147,7 @@ User Interaction → View → (API / Mock) → Store → View re-renders
 | **Layout Components** | `src/components/layout/` | App shell (header, sidebar/drawer) |
 | **API Layer** | `src/api/` | Axios client, typed API functions, mock data |
 | **Stores** | `src/stores/` | Pinia reactive state (user session, app cache) |
+| **Utilities** | `src/utils/` | Pure helper modules (B50 canvas renderer) |
 | **Composables** | `src/composables/` | Reusable reactive logic (breakpoint detection) |
 | **Design System** | `src/assets/styles/` + `src/config/` | CSS variables + Naive UI theme overrides |
 
@@ -270,7 +274,7 @@ Vite proxies `/api` → `http://localhost:8080` so the frontend can call the Go 
 | Path       | View Component    | Description                                                    |
 |------------|-------------------|----------------------------------------------------------------|
 | `/`        | —                 | Redirects to `/best50`                                         |
-| `/best50`  | `Best50View.vue`  | B50 stats, scatter charts, B35/B15 record tables               |
+| `/best50`  | `Best50View.vue`  | B50 stats, scatter charts, B35/B15 record tables, image export  |
 | `/songs`   | `SongsView.vue`   | All charts with search, difficulty/version filters, pagination |
 | `/records` | `RecordsView.vue` | Play records with scope tabs (best/all), pagination            |
 | `/about`   | `AboutView.vue`   | Project description and GitHub link                            |

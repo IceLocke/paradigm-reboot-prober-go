@@ -70,7 +70,7 @@ func parsePaginationParams(c *gin.Context) paginationParams {
 // @Param page_size query int false "Page size" default(50)
 // @Param page_index query int false "Page index" default(1)
 // @Param sort_by query string false "Sort by (rating, score, record_time, etc.)" default(rating)
-// @Param order query string false "Order (desc or asce)" default(desc)
+// @Param order query string false "Order (desc or asc)" default(desc)
 // @Success 200 {object} model.PlayRecordResponse
 // @Failure 400 {object} model.Response
 // @Failure 401 {object} model.Response
@@ -87,6 +87,9 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	if underflow < 0 {
 		underflow = 0
 	}
+	if underflow > config.GlobalConfig.Game.B35Limit {
+		underflow = config.GlobalConfig.Game.B35Limit
+	}
 
 	// Get current user from context (if authenticated)
 	var currentUser *model.User
@@ -97,7 +100,11 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	// Check authority
 	if err := ctrl.userService.CheckProbeAuthority(username, currentUser); err != nil {
-		c.JSON(http.StatusForbidden, model.Response{Error: err.Error()})
+		if strings.Contains(err.Error(), "not found") {
+			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
+		} else {
+			c.JSON(http.StatusForbidden, model.Response{Error: err.Error()})
+		}
 		return
 	}
 
@@ -108,7 +115,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		var recordInfos []model.PlayRecordInfo
+		recordInfos := make([]model.PlayRecordInfo, 0, len(records))
 		for _, r := range records {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(r))
 		}
@@ -124,8 +131,12 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		total, _ := ctrl.recordService.CountBestRecords(username)
-		var recordInfos []model.PlayRecordInfo
+		total, err := ctrl.recordService.CountBestRecords(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		recordInfos := make([]model.PlayRecordInfo, 0, len(records))
 		for i := range records {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
 		}
@@ -141,8 +152,12 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		total, _ := ctrl.recordService.CountAllRecords(username)
-		var recordInfos []model.PlayRecordInfo
+		total, err := ctrl.recordService.CountAllRecords(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		recordInfos := make([]model.PlayRecordInfo, 0, len(records))
 		for i := range records {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
 		}
@@ -158,9 +173,9 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"username": username,
-			"charts":   charts,
+		c.JSON(http.StatusOK, model.AllChartsResponse{
+			Username: username,
+			Charts:   charts,
 		})
 
 	default:

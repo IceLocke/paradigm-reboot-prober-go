@@ -2,9 +2,9 @@ package model
 
 // SongBase represents the basic information of a song
 type SongBase struct {
-	WikiID      string `gorm:"unique;not null" json:"wiki_id" example:"w123"`
-	Title       string `gorm:"not null" json:"title" example:"Song Title"`
-	Artist      string `gorm:"not null" json:"artist" example:"Artist Name"`
+	WikiID      string `gorm:"unique;not null" json:"wiki_id" binding:"required" example:"w123"`
+	Title       string `gorm:"not null" json:"title" binding:"required" example:"Song Title"`
+	Artist      string `gorm:"not null" json:"artist" binding:"required" example:"Artist Name"`
 	Genre       string `gorm:"not null" json:"genre" example:"Pop"`
 	Cover       string `gorm:"not null" json:"cover" example:"https://example.com/cover.jpg"`
 	Illustrator string `gorm:"not null" json:"illustrator" example:"Artist"`
@@ -49,8 +49,8 @@ func ValidDifficulty(s string) bool {
 // Chart represents a specific difficulty chart (谱面) of a song
 type Chart struct {
 	ChartID      int        `gorm:"primaryKey;column:chart_id" json:"chart_id"`
-	SongID       int        `gorm:"not null" json:"song_id"`
-	Difficulty   Difficulty `gorm:"type:varchar(20);not null" json:"difficulty" example:"massive"`
+	SongID       int        `gorm:"not null;uniqueIndex:idx_song_difficulty" json:"song_id"`
+	Difficulty   Difficulty `gorm:"type:varchar(20);not null;uniqueIndex:idx_song_difficulty" json:"difficulty" example:"massive"`
 	Level        float64    `gorm:"not null" json:"level"`
 	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level"`
 	LevelDesign  *string    `gorm:"column:level_design" json:"level_design"`
@@ -65,7 +65,7 @@ func (Chart) TableName() string {
 
 // ChartInput represents the details of a chart for create/update requests
 type ChartInput struct {
-	Difficulty  Difficulty `json:"difficulty" example:"massive"`
+	Difficulty  Difficulty `json:"difficulty" binding:"required,oneof=detected invaded massive reboot" example:"massive"`
 	Level       float64    `json:"level" example:"14.5"`
 	LevelDesign string     `json:"level_design" example:"Designer"`
 	Notes       int        `json:"notes" example:"1000"`

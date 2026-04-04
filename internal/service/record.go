@@ -18,27 +18,14 @@ func NewRecordService(recordRepo *repository.RecordRepository, songRepo *reposit
 }
 
 func (s *RecordService) CreateRecords(username string, records []model.PlayRecordBase, isReplaced bool) ([]*model.PlayRecord, error) {
-	var responseRecords []*model.PlayRecord
-
+	var playRecords []*model.PlayRecord
 	for _, recordBase := range records {
-		// The repository handles rating calculation and best record update.
-		// We just need to call it.
-
-		// Construct the model.PlayRecord
-		// Note: Rating and RecordTime will be set by repository
-		record := &model.PlayRecord{
+		playRecords = append(playRecords, &model.PlayRecord{
 			PlayRecordBase: recordBase,
 			Username:       username,
-		}
-
-		savedRecord, err := s.recordRepo.CreateRecord(record, isReplaced)
-		if err != nil {
-			return nil, err
-		}
-		responseRecords = append(responseRecords, savedRecord)
+		})
 	}
-
-	return responseRecords, nil
+	return s.recordRepo.BatchCreateRecords(playRecords, isReplaced)
 }
 
 func (s *RecordService) GetAllRecords(username string, pageSize, pageIndex int, sortBy string, order string) ([]model.PlayRecord, error) {

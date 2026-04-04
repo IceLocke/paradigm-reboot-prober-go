@@ -6,6 +6,7 @@ import (
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -78,9 +79,7 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param song body request.CreateSongRequest true "Song creation info"
-// @Success 200 {array} model.ChartInfo
-// @Failure 400 {object} model.Response
-// @Router /songs [post]
+// @Success 201 {array} model.ChartInfo
 func (ctrl *SongController) CreateSong(c *gin.Context) {
 	var req request.CreateSongRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -93,7 +92,7 @@ func (ctrl *SongController) CreateSong(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, charts)
+	c.JSON(http.StatusCreated, charts)
 }
 
 // UpdateSong godoc
@@ -116,7 +115,11 @@ func (ctrl *SongController) UpdateSong(c *gin.Context) {
 
 	charts, err := ctrl.songService.UpdateSong(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		if strings.Contains(err.Error(), "record not found") {
+			c.JSON(http.StatusNotFound, model.Response{Error: "song not found"})
+		} else {
+			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		}
 		return
 	}
 	c.JSON(http.StatusOK, charts)

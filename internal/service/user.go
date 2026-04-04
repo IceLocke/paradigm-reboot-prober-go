@@ -84,109 +84,128 @@ func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, e
 	}
 
 	user := &model.User{
-		UserBase:        req.UserBase,
+		UserBase: model.UserBase{
+			Username:       req.Username,
+			Email:          req.Email,
+			Nickname:       req.Nickname,
+			UploadToken:    uploadToken,
+			IsActive:       true,
+			IsAdmin:        false,
+			AnonymousProbe: false,
+		},
 		EncodedPassword: encodedPassword,
 	}
-	user.UploadToken = uploadToken
-	user.IsActive = true
-	user.IsAdmin = false
 
 	return s.userRepo.CreateUser(user)
 }
 
 func (s *UserService) RefreshUploadToken(username string) (string, error) {
-	user, err := s.userRepo.GetUserByUsername(username)
-	if err != nil {
-		return "", err
-	}
-	if user == nil {
-		return "", errors.New("user not found")
-	}
+	var token string
+	err := s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
+		user, err := tx.GetUserByUsername(username)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return errors.New("user not found")
+		}
 
-	uploadToken, err := generateHexToken(config.GlobalConfig.Auth.UploadTokenLength)
-	if err != nil {
-		return "", errors.New("generate token failed")
-	}
-	user.UploadToken = uploadToken
-	if _, err := s.userRepo.UpdateUser(user); err != nil {
-		return "", err
-	}
-	return uploadToken, nil
+		uploadToken, err := generateHexToken(config.GlobalConfig.Auth.UploadTokenLength)
+		if err != nil {
+			return errors.New("generate token failed")
+		}
+		user.UploadToken = uploadToken
+		if _, err := tx.UpdateUser(user); err != nil {
+			return err
+		}
+		token = uploadToken
+		return nil
+	})
+	return token, err
 }
 
 func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest) (*model.User, error) {
-	user, err := s.userRepo.GetUserByUsername(username)
-	if err != nil {
-		return nil, err
-	}
-	if user == nil {
-		return nil, errors.New("user not found")
-	}
+	var result *model.User
+	err := s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
+		user, err := tx.GetUserByUsername(username)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return errors.New("user not found")
+		}
 
-	if req.Nickname != nil {
-		user.Nickname = *req.Nickname
-	}
-	if req.QQNumber != nil {
-		user.QQNumber = req.QQNumber
-	}
-	if req.Account != nil {
-		user.Account = req.Account
-	}
-	if req.AccountNumber != nil {
-		user.AccountNumber = req.AccountNumber
-	}
-	if req.UUID != nil {
-		user.UUID = req.UUID
-	}
-	if req.AnonymousProbe != nil {
-		user.AnonymousProbe = *req.AnonymousProbe
-	}
+		if req.Nickname != nil {
+			user.Nickname = *req.Nickname
+		}
+		if req.QQNumber != nil {
+			user.QQNumber = req.QQNumber
+		}
+		if req.Account != nil {
+			user.Account = req.Account
+		}
+		if req.AccountNumber != nil {
+			user.AccountNumber = req.AccountNumber
+		}
+		if req.UUID != nil {
+			user.UUID = req.UUID
+		}
+		if req.AnonymousProbe != nil {
+			user.AnonymousProbe = *req.AnonymousProbe
+		}
 
-	return s.userRepo.UpdateUser(user)
+		result, err = tx.UpdateUser(user)
+		return err
+	})
+	return result, err
 }
 
 func (s *UserService) ChangePassword(username string, req *request.ChangePasswordRequest) error {
-	user, err := s.userRepo.GetUserByUsername(username)
-	if err != nil {
+	return s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
+		user, err := tx.GetUserByUsername(username)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return errors.New("user not found")
+		}
+
+		if !auth.VerifyPassword(req.OldPassword, user.EncodedPassword) {
+			return errors.New("incorrect old password")
+		}
+
+		encodedPassword, err := auth.EncodePassword(req.NewPassword)
+		if err != nil {
+			return err
+		}
+
+		user.EncodedPassword = encodedPassword
+		_, err = tx.UpdateUser(user)
 		return err
-	}
-	if user == nil {
-		return errors.New("user not found")
-	}
-
-	if !auth.VerifyPassword(req.OldPassword, user.EncodedPassword) {
-		return errors.New("incorrect old password")
-	}
-
-	encodedPassword, err := auth.EncodePassword(req.NewPassword)
-	if err != nil {
-		return err
-	}
-
-	user.EncodedPassword = encodedPassword
-	_, err = s.userRepo.UpdateUser(user)
-	return err
+	})
 }
 
 func (s *UserService) ResetPassword(req *request.ResetPasswordRequest) error {
 	req.Username = strings.ToLower(req.Username)
 
-	user, err := s.userRepo.GetUserByUsername(req.Username)
-	if err != nil {
-		return err
-	}
-	if user == nil {
-		return errors.New("user not found")
-	}
+	return s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
+		user, err := tx.GetUserByUsername(req.Username)
+		if err != nil {
+			return err
+		}
+		if user == nil {
+			return errors.New("user not found")
+		}
 
-	encodedPassword, err := auth.EncodePassword(req.NewPassword)
-	if err != nil {
-		return err
-	}
+		encodedPassword, err := auth.EncodePassword(req.NewPassword)
+		if err != nil {
+			return err
+		}
 
-	user.EncodedPassword = encodedPassword
-	_, err = s.userRepo.UpdateUser(user)
-	return err
+		user.EncodedPassword = encodedPassword
+		_, err = tx.UpdateUser(user)
+		return err
+	})
 }
 
 func (s *UserService) CheckProbeAuthority(username string, currentUser *model.User) error {

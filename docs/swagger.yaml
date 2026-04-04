@@ -78,6 +78,10 @@ definitions:
       wiki_id:
         example: w123
         type: string
+    required:
+    - artist
+    - title
+    - wiki_id
     type: object
   model.ChartInfoSimple:
     properties:
@@ -107,6 +111,11 @@ definitions:
       difficulty:
         allOf:
         - $ref: '#/definitions/model.Difficulty'
+        enum:
+        - detected
+        - invaded
+        - massive
+        - reboot
         example: massive
       level:
         example: 14.5
@@ -117,6 +126,8 @@ definitions:
       notes:
         example: 1000
         type: integer
+    required:
+    - difficulty
     type: object
   model.Difficulty:
     enum:
@@ -145,6 +156,7 @@ definitions:
         type: string
       score:
         example: 1000000
+        maximum: 1010000
         minimum: 0
         type: integer
       username:
@@ -159,6 +171,7 @@ definitions:
         type: integer
       score:
         example: 1000000
+        maximum: 1010000
         minimum: 0
         type: integer
     required:
@@ -236,6 +249,10 @@ definitions:
       wiki_id:
         example: w123
         type: string
+    required:
+    - artist
+    - title
+    - wiki_id
     type: object
   model.Token:
     properties:
@@ -291,6 +308,36 @@ definitions:
     - email
     - username
     type: object
+  model.UserPublic:
+    properties:
+      account:
+        example: act_001
+        type: string
+      account_number:
+        example: 1001
+        type: integer
+      anonymous_probe:
+        example: false
+        type: boolean
+      email:
+        example: user@example.com
+        type: string
+      nickname:
+        example: 小明
+        type: string
+      qq_number:
+        example: 12345678
+        type: integer
+      user_id:
+        example: 1
+        type: integer
+      username:
+        example: user123
+        type: string
+      uuid:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
   request.BatchCreatePlayRecordRequest:
     properties:
       is_replace:
@@ -298,9 +345,12 @@ definitions:
       play_records:
         items:
           $ref: '#/definitions/model.PlayRecordBase'
+        minItems: 1
         type: array
       upload_token:
         type: string
+    required:
+    - play_records
     type: object
   request.ChangePasswordRequest:
     properties:
@@ -332,6 +382,7 @@ definitions:
       charts:
         items:
           $ref: '#/definitions/model.ChartInput'
+        minItems: 1
         type: array
       cover:
         example: https://example.com/cover.jpg
@@ -354,27 +405,17 @@ definitions:
       wiki_id:
         example: w123
         type: string
+    required:
+    - artist
+    - charts
+    - title
+    - wiki_id
     type: object
   request.CreateUserRequest:
     properties:
-      account:
-        example: act_001
-        type: string
-      account_number:
-        example: 1001
-        type: integer
-      anonymous_probe:
-        example: false
-        type: boolean
       email:
         example: user@example.com
         type: string
-      is_active:
-        example: true
-        type: boolean
-      is_admin:
-        example: false
-        type: boolean
       nickname:
         example: 小明
         type: string
@@ -382,17 +423,8 @@ definitions:
         example: secret123
         minLength: 6
         type: string
-      qq_number:
-        example: 12345678
-        type: integer
-      upload_token:
-        example: token_xyz
-        type: string
       username:
         example: user123
-        type: string
-      uuid:
-        example: 550e8400-e29b-41d4-a716-446655440000
         type: string
     required:
     - email
@@ -429,6 +461,7 @@ definitions:
       charts:
         items:
           $ref: '#/definitions/model.ChartInput'
+        minItems: 1
         type: array
       cover:
         example: https://example.com/cover.jpg
@@ -454,7 +487,11 @@ definitions:
         example: w123
         type: string
     required:
+    - artist
+    - charts
     - song_id
+    - title
+    - wiki_id
     type: object
   request.UpdateUserRequest:
     properties:
@@ -521,7 +558,7 @@ paths:
         name: sort_by
         type: string
       - default: desc
-        description: Order (desc or asce)
+        description: Order (desc or asc)
         in: query
         name: order
         type: string
@@ -724,35 +761,6 @@ paths:
           schema:
             $ref: '#/definitions/model.Response'
       summary: Get all charts
-      tags:
-      - song
-    post:
-      consumes:
-      - application/json
-      description: Create a new song with its charts (Admin only)
-      parameters:
-      - description: Song creation info
-        in: body
-        name: song
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateSongRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/model.ChartInfo'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/model.Response'
-      security:
-      - BearerAuth: []
-      summary: Create a new song
       tags:
       - song
     put:
@@ -958,10 +966,10 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
-            $ref: '#/definitions/model.User'
+            $ref: '#/definitions/model.UserPublic'
         "400":
           description: Bad Request
           schema:

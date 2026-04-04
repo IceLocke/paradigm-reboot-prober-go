@@ -9,7 +9,7 @@ type PlayRecord struct {
 	PlayRecordBase
 	PlayRecordID int       `gorm:"primaryKey;column:play_record_id" json:"play_record_id"`
 	RecordTime   time.Time `gorm:"not null" json:"record_time"`
-	Username     string    `gorm:"not null" json:"username"`
+	Username     string    `gorm:"not null;index" json:"username"`
 	Rating       int       `gorm:"not null" json:"rating"`
 	Chart        *Chart    `gorm:"foreignKey:ChartID;references:ChartID" json:"chart,omitempty"`
 }
@@ -22,7 +22,9 @@ func (PlayRecord) TableName() string {
 // BestPlayRecord represents the best record for a specific chart
 type BestPlayRecord struct {
 	BestRecordID int         `gorm:"primaryKey;column:best_record_id" json:"best_record_id"`
-	PlayRecordID int         `gorm:"column:play_record_id;not null" json:"play_record_id"`
+	Username     string      `gorm:"not null;uniqueIndex:idx_best_user_chart" json:"username"`
+	ChartID      int         `gorm:"not null;uniqueIndex:idx_best_user_chart" json:"chart_id"`
+	PlayRecordID int         `gorm:"column:play_record_id;not null;index" json:"play_record_id"`
 	PlayRecord   *PlayRecord `gorm:"foreignKey:PlayRecordID;references:PlayRecordID" json:"play_record,omitempty"`
 }
 
@@ -33,8 +35,8 @@ func (BestPlayRecord) TableName() string {
 
 // PlayRecordBase represents the basic information of a play record
 type PlayRecordBase struct {
-	ChartID int `json:"chart_id" binding:"required" example:"1"`
-	Score   int `json:"score" binding:"min=0" example:"1000000"`
+	ChartID int `json:"chart_id" gorm:"index:idx_pr_user_chart,priority:2" binding:"required" example:"1"`
+	Score   int `json:"score" binding:"min=0,max=1010000" example:"1000000"`
 }
 
 // PlayRecordInfo represents play record details including chart information
@@ -71,6 +73,12 @@ func ToPlayRecordInfo(record *PlayRecord) PlayRecordInfo {
 		}
 	}
 	return info
+}
+
+// AllChartsResponse represents the response for the all-charts scope
+type AllChartsResponse struct {
+	Username string           `json:"username"`
+	Charts   []ChartWithScore `json:"charts"`
 }
 
 // PlayRecordResponse represents the response for play records

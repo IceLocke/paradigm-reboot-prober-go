@@ -35,8 +35,38 @@ func NewRecordRepository(db *gorm.DB) *RecordRepository {
 
 // CreateRecord creates a new play record and updates the best record if necessary
 func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced bool) (*model.PlayRecord, error) {
+	var result *model.PlayRecord
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var txErr error
+		result, txErr = r.createRecordInTx(tx, record, isReplaced)
+		return txErr
+	})
+	return result, err
+}
+
+// BatchCreateRecords creates multiple play records atomically in a single transaction
+func (r *RecordRepository) BatchCreateRecords(records []*model.PlayRecord, isReplaced bool) ([]*model.PlayRecord, error) {
+	var results []*model.PlayRecord
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		for _, record := range records {
+			savedRecord, err := r.createRecordInTx(tx, record, isReplaced)
+			if err != nil {
+				return err
+			}
+			results = append(results, savedRecord)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// createRecordInTx handles creating a single record within an existing transaction.
+func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecord, isReplaced bool) (*model.PlayRecord, error) {
 	var chart model.Chart
-	if err := r.db.Where("chart_id = ?", record.ChartID).First(&chart).Error; err != nil {
+	if err := tx.Where("chart_id = ?", record.ChartID).First(&chart).Error; err != nil {
 		return nil, errors.New("chart does not exist")
 	}
 
@@ -45,43 +75,38 @@ func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced boo
 	record.Rating = calculatedRating
 	record.RecordTime = time.Now()
 
-	err := r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(record).Error; err != nil {
-			return err
-		}
-
-		var bestRecord model.BestPlayRecord
-		result := tx.Joins("PlayRecord").
-			Where("PlayRecord.chart_id = ? AND PlayRecord.username = ?", record.ChartID, record.Username).
-			First(&bestRecord)
-
-		if result.Error == nil {
-			// Best record exists
-			if isReplaced || record.Score > bestRecord.PlayRecord.Score {
-				bestRecord.PlayRecordID = record.PlayRecordID
-				bestRecord.PlayRecord = record
-				if err := tx.Save(&bestRecord).Error; err != nil {
-					return err
-				}
-			}
-		} else if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			// Create new best record
-			newBestRecord := model.BestPlayRecord{
-				PlayRecordID: record.PlayRecordID,
-				PlayRecord:   record,
-			}
-			if err := tx.Create(&newBestRecord).Error; err != nil {
-				return err
-			}
-		} else {
-			return result.Error
-		}
-
-		return nil
-	})
-
-	if err != nil {
+	if err := tx.Create(record).Error; err != nil {
 		return nil, err
+	}
+
+	// Find existing best record using indexed columns
+	var bestRecord model.BestPlayRecord
+	result := tx.Preload("PlayRecord").
+		Where("username = ? AND chart_id = ?", record.Username, record.ChartID).
+		First(&bestRecord)
+
+	if result.Error == nil {
+		// Best record exists
+		if isReplaced || record.Score > bestRecord.PlayRecord.Score {
+			bestRecord.PlayRecordID = record.PlayRecordID
+			bestRecord.PlayRecord = record
+			if err := tx.Save(&bestRecord).Error; err != nil {
+				return nil, err
+			}
+		}
+	} else if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		// Create new best record
+		newBestRecord := model.BestPlayRecord{
+			Username:     record.Username,
+			ChartID:      record.ChartID,
+			PlayRecordID: record.PlayRecordID,
+			PlayRecord:   record,
+		}
+		if err := tx.Create(&newBestRecord).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, result.Error
 	}
 
 	return record, nil
@@ -102,7 +127,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
 		Where("Chart__Song.b15 = ?", false).
-		Order("rating desc").
+		Order("rating desc, play_records.play_record_id desc").
 		Limit(config.GlobalConfig.Game.B35Limit + underflow).
 		Find(&b35).Error; err != nil {
 		return nil, nil, err
@@ -111,7 +136,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 	// B15: B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
 		Where("Chart__Song.b15 = ?", true).
-		Order("rating desc").
+		Order("rating desc, play_records.play_record_id desc").
 		Limit(config.GlobalConfig.Game.B15Limit + underflow).
 		Find(&b15).Error; err != nil {
 		return nil, nil, err
@@ -183,8 +208,7 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string) ([]model.
 func (r *RecordRepository) CountBestRecords(username string) (int64, error) {
 	var count int64
 	err := r.db.Model(&model.BestPlayRecord{}).
-		Joins("JOIN play_records ON best_play_records.play_record_id = play_records.play_record_id").
-		Where("play_records.username = ?", username).
+		Where("username = ?", username).
 		Count(&count).Error
 	return count, err
 }

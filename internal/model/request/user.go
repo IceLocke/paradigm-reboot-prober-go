@@ -1,10 +1,10 @@
 package request
 
-import "paradigm-reboot-prober-go/internal/model"
-
 // CreateUserRequest represents the request to create a new user
 type CreateUserRequest struct {
-	model.UserBase
+	Username string `json:"username" binding:"required" example:"user123"`
+	Email    string `json:"email" binding:"required,email" example:"user@example.com"`
+	Nickname string `json:"nickname" example:"小明"`
 	Password string `json:"password" binding:"required,min=6" example:"secret123"`
 }
 

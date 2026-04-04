@@ -48,9 +48,9 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── middleware/
 │   │   └── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
 │   ├── model/                   # Data models (GORM entities + DTOs)
-│   │   ├── user.go              # User, UserBase, UserInDB
+│   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
-│   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, ToPlayRecordInfo()
+│   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, AllChartsResponse, ToPlayRecordInfo()
 │   │   ├── auth.go              # Token, UploadToken
 │   │   ├── common.go            # Response (generic error/message response)
 │   │   └── request/             # Request DTOs
@@ -117,7 +117,7 @@ Request → Router → Middleware → Controller → Service → Repository → 
 - **Song**: A music track with metadata (title, artist, genre, cover, illustrator, version, album, bpm, length, wiki_id, b15 flag).
 - **Chart**: A specific difficulty chart (谱面) of a song. Difficulties: `detected`, `invaded`, `massive`, `reboot`. Each chart has a level, optional fitting_level, optional level_design, and notes count.
 - **PlayRecord**: A single play attempt with a score, linked to a Chart and User.
-- **BestPlayRecord**: Points to the best PlayRecord per user per Chart. Updated automatically when a higher score is submitted.
+- **BestPlayRecord**: Points to the best PlayRecord per user per Chart (unique constraint on username+chart_id). Updated automatically when a higher score is submitted.
 - **Rating**: Calculated from chart level and score using a piecewise formula (see `pkg/rating/rating.go`). Stored as `int` (rating × 100).
 - **B50**: Best 50 = B35 (top 35 ratings from old songs where `b15=false`) + B15 (top 15 ratings from new songs where `b15=true`).
 

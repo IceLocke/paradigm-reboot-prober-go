@@ -6,5 +6,5 @@ import "paradigm-reboot-prober-go/internal/model"
 type BatchCreatePlayRecordRequest struct {
 	UploadToken string                 `json:"upload_token"`
 	IsReplace   bool                   `json:"is_replace"`
-	PlayRecords []model.PlayRecordBase `json:"play_records"`
+	PlayRecords []model.PlayRecordBase `json:"play_records" binding:"required,min=1,dive"`
 }

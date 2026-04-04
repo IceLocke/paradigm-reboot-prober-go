@@ -1,7 +1,6 @@
 package service
 
 import (
-	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/pkg/auth"
@@ -17,10 +16,8 @@ func TestUserService(t *testing.T) {
 
 	t.Run("CreateUser", func(t *testing.T) {
 		req := &request.CreateUserRequest{
-			UserBase: model.UserBase{
-				Username: "testuser",
-				Email:    "test@example.com",
-			},
+			Username: "testuser",
+			Email:    "test@example.com",
 			Password: "password123",
 		}
 		user, err := userService.CreateUser(req)
@@ -33,10 +30,8 @@ func TestUserService(t *testing.T) {
 
 	t.Run("CreateDuplicateUser", func(t *testing.T) {
 		req := &request.CreateUserRequest{
-			UserBase: model.UserBase{
-				Username: "testuser",
-				Email:    "test2@example.com",
-			},
+			Username: "testuser",
+			Email:    "test2@example.com",
 			Password: "password123",
 		}
 		user, err := userService.CreateUser(req)

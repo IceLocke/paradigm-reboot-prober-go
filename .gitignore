@@ -41,9 +41,8 @@ Thumbs.db
 *.db
 *.sqlite
 
-# PRP temp files
-**/uploads/*
-
 web/style-samples/*
 
 .playwright-mcp/*
+
+**/config.yaml

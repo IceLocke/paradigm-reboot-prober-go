@@ -6,6 +6,7 @@ const en = {
     save: 'Save',
     cancel: 'Cancel',
     refresh: 'Refresh',
+    export_image: 'Export Image',
     upload_record: 'Upload Record',
     about: 'About',
     select_file: 'Select File',
@@ -104,6 +105,8 @@ const en = {
     change_password_success: 'Password changed',
     change_password_failed: 'Failed to change password: ',
     using_mock_data: 'Using mock data (backend not connected)',
+    export_image_success: 'Image exported',
+    export_image_failed: 'Failed to export image',
   },
   about: {
     title: 'Paradigm: Reboot Prober',

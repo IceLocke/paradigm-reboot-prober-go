@@ -80,7 +80,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "default": "desc",
-                        "description": "Order (desc or asce)",
+                        "description": "Order (desc or asc)",
                         "name": "order",
                         "in": "query"
                     }
@@ -418,52 +418,6 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Create a new song with its charts (Admin only)",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "song"
-                ],
-                "summary": "Create a new song",
-                "parameters": [
-                    {
-                        "description": "Song creation info",
-                        "name": "song",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.CreateSongRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/model.ChartInfo"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/model.Response"
-                        }
-                    }
-                }
             }
         },
         "/songs/{song_id}": {
@@ -740,10 +694,10 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/model.User"
+                            "$ref": "#/definitions/model.UserPublic"
                         }
                     },
                     "400": {
@@ -844,6 +798,11 @@ const docTemplate = `{
         },
         "model.ChartInfo": {
             "type": "object",
+            "required": [
+                "artist",
+                "title",
+                "wiki_id"
+            ],
             "properties": {
                 "album": {
                     "type": "string",
@@ -960,8 +919,17 @@ const docTemplate = `{
         },
         "model.ChartInput": {
             "type": "object",
+            "required": [
+                "difficulty"
+            ],
             "properties": {
                 "difficulty": {
+                    "enum": [
+                        "detected",
+                        "invaded",
+                        "massive",
+                        "reboot"
+                    ],
                     "allOf": [
                         {
                             "$ref": "#/definitions/model.Difficulty"
@@ -1022,6 +990,7 @@ const docTemplate = `{
                 },
                 "score": {
                     "type": "integer",
+                    "maximum": 1010000,
                     "minimum": 0,
                     "example": 1000000
                 },
@@ -1042,6 +1011,7 @@ const docTemplate = `{
                 },
                 "score": {
                     "type": "integer",
+                    "maximum": 1010000,
                     "minimum": 0,
                     "example": 1000000
                 }
@@ -1097,6 +1067,11 @@ const docTemplate = `{
         },
         "model.Song": {
             "type": "object",
+            "required": [
+                "artist",
+                "title",
+                "wiki_id"
+            ],
             "properties": {
                 "album": {
                     "type": "string",
@@ -1229,14 +1204,59 @@ const docTemplate = `{
                 }
             }
         },
+        "model.UserPublic": {
+            "type": "object",
+            "properties": {
+                "account": {
+                    "type": "string",
+                    "example": "act_001"
+                },
+                "account_number": {
+                    "type": "integer",
+                    "example": 1001
+                },
+                "anonymous_probe": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "nickname": {
+                    "type": "string",
+                    "example": "小明"
+                },
+                "qq_number": {
+                    "type": "integer",
+                    "example": 12345678
+                },
+                "user_id": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "username": {
+                    "type": "string",
+                    "example": "user123"
+                },
+                "uuid": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                }
+            }
+        },
         "request.BatchCreatePlayRecordRequest": {
             "type": "object",
+            "required": [
+                "play_records"
+            ],
             "properties": {
                 "is_replace": {
                     "type": "boolean"
                 },
                 "play_records": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/model.PlayRecordBase"
                     }
@@ -1266,6 +1286,12 @@ const docTemplate = `{
         },
         "request.CreateSongRequest": {
             "type": "object",
+            "required": [
+                "artist",
+                "charts",
+                "title",
+                "wiki_id"
+            ],
             "properties": {
                 "album": {
                     "type": "string",
@@ -1285,6 +1311,7 @@ const docTemplate = `{
                 },
                 "charts": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/model.ChartInput"
                     }
@@ -1327,29 +1354,9 @@ const docTemplate = `{
                 "username"
             ],
             "properties": {
-                "account": {
-                    "type": "string",
-                    "example": "act_001"
-                },
-                "account_number": {
-                    "type": "integer",
-                    "example": 1001
-                },
-                "anonymous_probe": {
-                    "type": "boolean",
-                    "example": false
-                },
                 "email": {
                     "type": "string",
                     "example": "user@example.com"
-                },
-                "is_active": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "is_admin": {
-                    "type": "boolean",
-                    "example": false
                 },
                 "nickname": {
                     "type": "string",
@@ -1360,21 +1367,9 @@ const docTemplate = `{
                     "minLength": 6,
                     "example": "secret123"
                 },
-                "qq_number": {
-                    "type": "integer",
-                    "example": 12345678
-                },
-                "upload_token": {
-                    "type": "string",
-                    "example": "token_xyz"
-                },
                 "username": {
                     "type": "string",
                     "example": "user123"
-                },
-                "uuid": {
-                    "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
                 }
             }
         },
@@ -1399,7 +1394,11 @@ const docTemplate = `{
         "request.UpdateSongRequest": {
             "type": "object",
             "required": [
-                "song_id"
+                "artist",
+                "charts",
+                "song_id",
+                "title",
+                "wiki_id"
             ],
             "properties": {
                 "album": {
@@ -1420,6 +1419,7 @@ const docTemplate = `{
                 },
                 "charts": {
                     "type": "array",
+                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/model.ChartInput"
                     }

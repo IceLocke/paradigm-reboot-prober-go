@@ -6,6 +6,7 @@ const zh = {
     save: '保存',
     cancel: '取消',
     refresh: '刷新',
+    export_image: '导出图片',
     upload_record: '上传成绩',
     about: '关于',
     select_file: '选择文件',
@@ -104,6 +105,8 @@ const zh = {
     change_password_success: '密码修改成功',
     change_password_failed: '密码修改失败：',
     using_mock_data: '使用 Mock 数据（后端未连接）',
+    export_image_success: '图片已导出',
+    export_image_failed: '导出图片失败',
   },
   about: {
     title: '范式：起源 查分器',

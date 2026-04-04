@@ -288,7 +288,7 @@ function drawRecordCard(
   const rankStr = `#${rank}`
   ctx.font = `bold 13px ${FONT_MONO}`
   const rankWidth = ctx.measureText(rankStr).width
-  ctx.font = `bold 14px ${FONT_SANS}`
+  ctx.font = `bold 16px ${FONT_SANS}`
   const title = truncateText(ctx, record.chart.title, contentW - rankWidth - 8)
   ctx.fillText(title, contentX, y + pad)
 
@@ -326,9 +326,9 @@ function drawRecordCard(
   ctx.font = `bold 32px ${FONT_MONO}`
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'left'
-  ctx.textBaseline = 'middle'
+  ctx.textBaseline = 'bottom'
   const scoreStr = String(record.score).padStart(7, '0')
-  ctx.fillText(scoreStr, contentX, y + h / 2 + 18)
+  ctx.fillText(scoreStr, contentX, y + h - pad - 16)
 
   // Reset shadow
   ctx.shadowColor = 'transparent'
