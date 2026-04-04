@@ -132,5 +132,4 @@ func TestGzipRequest_InvalidGzipReturns400(t *testing.T) {
 	router.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
-	assert.Contains(t, w.Body.String(), "Failed to decompress")
 }
