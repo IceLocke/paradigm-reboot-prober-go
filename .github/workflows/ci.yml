@@ -13,8 +13,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -33,8 +31,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -57,8 +53,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Checkout submodules (optional)
+        working-directory: ${{ github.workspace }}
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -n "$PAT_TOKEN" ]; then
+            git config url."https://x-access-token:${PAT_TOKEN}@github.com/".insteadOf "https://github.com/"
+            git submodule update --init --recursive
+          else
+            echo "PAT_TOKEN not set, skipping private submodule checkout"
+          fi
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -84,8 +90,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -120,8 +124,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Checkout submodules (optional)
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          if [ -n "$PAT_TOKEN" ]; then
+            git config url."https://x-access-token:${PAT_TOKEN}@github.com/".insteadOf "https://github.com/"
+            git submodule update --init --recursive
+          else
+            echo "PAT_TOKEN not set, skipping private submodule checkout"
+          fi
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
