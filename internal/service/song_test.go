@@ -231,8 +231,8 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 	songService := NewSongService(songRepo)
 
 	// Create songs in deliberately wrong order with mixed difficulties.
-	// Expected final order: Version DESC, SongID ASC (album order), Difficulty DESC.
-	// s2 and s4 share the same version to verify the SongID tiebreaker.
+	// Expected final order: Version DESC, SongID ASC (stable DB ID / insertion order), Difficulty DESC.
+	// s2 and s4 share the same version to verify the SongID tiebreaker based on DB/insertion order.
 	songs := []request.CreateSongRequest{
 		{
 			SongBase: model.SongBase{WikiID: "s1", Title: "Old Song", Artist: "A", Version: "1.0.0"},
