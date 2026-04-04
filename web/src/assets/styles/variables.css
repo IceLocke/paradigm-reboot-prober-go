@@ -1,0 +1,65 @@
+:root {
+  color-scheme: dark;
+
+  /* Background - three-layer progression */
+  --bg-primary: #0e0e12;
+  --bg-secondary: #16161c;
+  --bg-tertiary: #1e1e26;
+  --bg-card: #1a1a22;
+
+  /* Accent */
+  --accent: #3b82f6;
+  --accent-hover: #2563eb;
+  --accent-muted: rgba(59, 130, 246, 0.15);
+
+  /* Semantic colors */
+  --color-success: #22c55e;
+  --color-warning: #eab308;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Difficulty colors */
+  --diff-detected: #22c55e;
+  --diff-invaded: #eab308;
+  --diff-massive: #f97316;
+  --diff-reboot: #ec4899;
+
+  /* Text */
+  --text-primary: #e4e4e7;
+  --text-secondary: #a1a1aa;
+  --text-muted: #52525b;
+  --text-accent: var(--accent);
+
+  /* Border */
+  --border: #27272a;
+  --border-hover: #3f3f46;
+  --border-accent: var(--accent);
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Font */
+  --font-sans: 'Inter', 'Noto Sans SC', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Font size */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 16px;
+  --text-xl: 18px;
+  --text-2xl: 22px;
+  --text-3xl: 28px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+}
