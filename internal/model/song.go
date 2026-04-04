@@ -46,6 +46,22 @@ func ValidDifficulty(s string) bool {
 	return false
 }
 
+// Order returns the sort weight for a Difficulty (higher = harder).
+func (d Difficulty) Order() int {
+	switch d {
+	case DifficultyReboot:
+		return 4
+	case DifficultyMassive:
+		return 3
+	case DifficultyInvaded:
+		return 2
+	case DifficultyDetected:
+		return 1
+	default:
+		return 0
+	}
+}
+
 // Chart represents a specific difficulty chart (谱面) of a song
 type Chart struct {
 	ID           int        `gorm:"primaryKey" json:"id"`
