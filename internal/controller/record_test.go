@@ -24,6 +24,7 @@ func TestRecordController(t *testing.T) {
 	user := model.User{
 		UserBase: model.UserBase{
 			Username:       "testuser",
+			Nickname:       "Test Nickname",
 			UploadToken:    "testtoken",
 			AnonymousProbe: true,
 		},
@@ -64,6 +65,7 @@ func TestRecordController(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
 		assert.Equal(t, "testuser", resp["username"])
+		assert.Equal(t, "Test Nickname", resp["nickname"])
 	})
 }
 
@@ -79,6 +81,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 	user := model.User{
 		UserBase: model.UserBase{
 			Username:       "recuser",
+			Nickname:       "Rec Nickname",
 			UploadToken:    "rectoken",
 			AnonymousProbe: true,
 		},
@@ -127,6 +130,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
 		assert.Equal(t, "recuser", resp.Username)
+		assert.Equal(t, "Rec Nickname", resp.Nickname)
 		assert.Equal(t, 2, resp.Total) // best per difficulty: detected + massive
 	})
 
@@ -137,6 +141,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		var resp model.PlayRecordResponse
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
+		assert.Equal(t, "Rec Nickname", resp.Nickname)
 		assert.Equal(t, 2, resp.Total)
 	})
 
@@ -147,6 +152,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		var resp model.PlayRecordResponse
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
+		assert.Equal(t, "Rec Nickname", resp.Nickname)
 		assert.Equal(t, 3, resp.Total) // all 3 records
 	})
 
@@ -170,6 +176,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
 		assert.Equal(t, "recuser", resp.Username)
+		assert.Equal(t, "Rec Nickname", resp.Nickname)
 		assert.Equal(t, 1, resp.Total) // single best record
 		assert.Equal(t, 1005000, resp.Records[0].Score)
 	})
@@ -181,6 +188,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		var resp model.PlayRecordResponse
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
+		assert.Equal(t, "Rec Nickname", resp.Nickname)
 		assert.Equal(t, 1, resp.Total)
 	})
 
@@ -191,6 +199,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		var resp model.PlayRecordResponse
 		err := json.Unmarshal(w.Body.Bytes(), &resp)
 		assert.NoError(t, err)
+		assert.Equal(t, "Rec Nickname", resp.Nickname)
 		assert.Equal(t, 2, resp.Total) // 2 records on massive chart
 	})
 
