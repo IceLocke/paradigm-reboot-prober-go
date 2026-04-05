@@ -61,7 +61,7 @@ const FONT_MONO = "'JetBrains Mono', monospace"
 
 function formatDiffLevel(level: number): string {
   const base = Math.floor(level)
-  const plus = level - base >= 0.5 ? '+' : ''
+  const plus = level - base >= 0.6 ? '+' : ''
   return `${base}${plus}`
 }
 
