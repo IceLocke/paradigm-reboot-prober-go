@@ -2,6 +2,7 @@ package service
 
 import (
 	"cmp"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -49,7 +50,7 @@ func NewSongService(songRepo *repository.SongRepository) *SongService {
 	return &SongService{songRepo: songRepo}
 }
 
-func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
+func (s *SongService) GetAllCharts(ctx context.Context) ([]model.ChartInfo, error) {
 	songs, err := s.songRepo.GetAllSongs()
 	if err != nil {
 		return nil, err
@@ -86,7 +87,7 @@ func (s *SongService) GetAllCharts() ([]model.ChartInfo, error) {
 
 // ResolveSongID parses a song_addr (numeric ID or wiki_id) and returns the song_id.
 // Returns an error if the song doesn't exist.
-func (s *SongService) ResolveSongID(songAddr string) (int, error) {
+func (s *SongService) ResolveSongID(ctx context.Context, songAddr string) (int, error) {
 	if id, err := strconv.Atoi(songAddr); err == nil {
 		song, err := s.songRepo.GetSongByID(id)
 		if err != nil {
@@ -110,7 +111,7 @@ func (s *SongService) ResolveSongID(songAddr string) (int, error) {
 
 // ResolveChartID parses a chart_addr (numeric ID or "wiki_id:difficulty") and returns the chart_id.
 // Returns an error if the chart doesn't exist or the difficulty is invalid.
-func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
+func (s *SongService) ResolveChartID(ctx context.Context, chartAddr string) (int, error) {
 	if id, err := strconv.Atoi(chartAddr); err == nil {
 		chart, err := s.songRepo.GetChartByID(id)
 		if err != nil {
@@ -147,7 +148,7 @@ func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
 	return chart.ID, nil
 }
 
-func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error) {
+func (s *SongService) GetSingleSong(ctx context.Context, songID int, src string) (*model.Song, error) {
 	var song *model.Song
 	var err error
 
@@ -170,7 +171,7 @@ func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error)
 	return song, nil
 }
 
-func (s *SongService) GetSingleSongByWikiID(wikiID string) (*model.Song, error) {
+func (s *SongService) GetSingleSongByWikiID(ctx context.Context, wikiID string) (*model.Song, error) {
 	var song *model.Song
 	var err error
 
@@ -186,7 +187,7 @@ func (s *SongService) GetSingleSongByWikiID(wikiID string) (*model.Song, error) 
 	return song, nil
 }
 
-func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartInfo, error) {
+func (s *SongService) CreateSong(ctx context.Context, req *request.CreateSongRequest) ([]model.ChartInfo, error) {
 	// Check for duplicate difficulties
 	seenDifficulties := make(map[model.Difficulty]bool)
 	for _, chartInput := range req.Charts {
@@ -214,10 +215,10 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 
 	createdSong, err := s.songRepo.CreateSong(song)
 	if err != nil {
-		slog.Error("failed to create song", "error", err, "title", req.Title)
+		slog.ErrorContext(ctx, "failed to create song", "error", err, "title", req.Title)
 		return nil, err
 	}
-	slog.Info("song created", "song_id", createdSong.ID, "title", createdSong.Title)
+	slog.InfoContext(ctx, "song created", "song_id", createdSong.ID, "title", createdSong.Title)
 
 	// Convert to response format
 	var charts []model.ChartInfo
@@ -238,7 +239,7 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 	return charts, nil
 }
 
-func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartInfo, error) {
+func (s *SongService) UpdateSong(ctx context.Context, req *request.UpdateSongRequest) ([]model.ChartInfo, error) {
 	// Check for duplicate difficulties
 	seenDifficulties := make(map[model.Difficulty]bool)
 	for _, chartInput := range req.Charts {
@@ -269,10 +270,10 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartI
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("song %w", ErrNotFound)
 		}
-		slog.Error("failed to update song", "error", err, "song_id", req.ID)
+		slog.ErrorContext(ctx, "failed to update song", "error", err, "song_id", req.ID)
 		return nil, err
 	}
-	slog.Info("song updated", "song_id", updatedSong.ID, "title", updatedSong.Title)
+	slog.InfoContext(ctx, "song updated", "song_id", updatedSong.ID, "title", updatedSong.Title)
 
 	// Convert to response format
 	var charts []model.ChartInfo

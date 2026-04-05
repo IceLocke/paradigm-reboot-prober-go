@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -22,7 +23,7 @@ func NewUserService(userRepo *repository.UserRepository) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 
-func (s *UserService) Login(username, plainPassword string) (string, error) {
+func (s *UserService) Login(ctx context.Context, username, plainPassword string) (string, error) {
 	username = strings.ToLower(username)
 
 	user, err := s.userRepo.GetUserByUsername(username)
@@ -35,7 +36,7 @@ func (s *UserService) Login(username, plainPassword string) (string, error) {
 	}
 
 	if !auth.VerifyPassword(plainPassword, user.EncodedPassword) {
-		slog.Warn("login failed", "username", username, "reason", "incorrect password")
+		slog.WarnContext(ctx, "login failed", "username", username, "reason", "incorrect password")
 		return "", errors.New("incorrect username or password")
 	}
 
@@ -59,7 +60,7 @@ func generateHexToken(n int) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, req *request.CreateUserRequest) (*model.User, error) {
 	req.Username = strings.ToLower(req.Username)
 
 	if !config.UsernameRegex.MatchString(req.Username) {
@@ -100,14 +101,14 @@ func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, e
 
 	createdUser, err := s.userRepo.CreateUser(user)
 	if err != nil {
-		slog.Error("failed to create user", "error", err, "username", req.Username)
+		slog.ErrorContext(ctx, "failed to create user", "error", err, "username", req.Username)
 		return nil, err
 	}
-	slog.Info("user created", "username", req.Username)
+	slog.InfoContext(ctx, "user created", "username", req.Username)
 	return createdUser, nil
 }
 
-func (s *UserService) RefreshUploadToken(username string) (string, error) {
+func (s *UserService) RefreshUploadToken(ctx context.Context, username string) (string, error) {
 	var token string
 	err := s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
 		user, err := tx.GetUserByUsername(username)
@@ -132,7 +133,7 @@ func (s *UserService) RefreshUploadToken(username string) (string, error) {
 	return token, err
 }
 
-func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest) (*model.User, error) {
+func (s *UserService) UpdateUser(ctx context.Context, username string, req *request.UpdateUserRequest) (*model.User, error) {
 	var result *model.User
 	err := s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
 		user, err := tx.GetUserByUsername(username)
@@ -168,7 +169,7 @@ func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest
 	return result, err
 }
 
-func (s *UserService) ChangePassword(username string, req *request.ChangePasswordRequest) error {
+func (s *UserService) ChangePassword(ctx context.Context, username string, req *request.ChangePasswordRequest) error {
 	return s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
 		user, err := tx.GetUserByUsername(username)
 		if err != nil {
@@ -179,7 +180,7 @@ func (s *UserService) ChangePassword(username string, req *request.ChangePasswor
 		}
 
 		if !auth.VerifyPassword(req.OldPassword, user.EncodedPassword) {
-			slog.Warn("password change failed", "username", username, "reason", "incorrect old password")
+			slog.WarnContext(ctx, "password change failed", "reason", "incorrect old password")
 			return fmt.Errorf("incorrect old password: %w", ErrUnauthorized)
 		}
 
@@ -194,7 +195,7 @@ func (s *UserService) ChangePassword(username string, req *request.ChangePasswor
 	})
 }
 
-func (s *UserService) ResetPassword(req *request.ResetPasswordRequest) error {
+func (s *UserService) ResetPassword(ctx context.Context, req *request.ResetPasswordRequest) error {
 	req.Username = strings.ToLower(req.Username)
 
 	return s.userRepo.WithTransaction(func(tx *repository.UserRepository) error {
@@ -217,7 +218,7 @@ func (s *UserService) ResetPassword(req *request.ResetPasswordRequest) error {
 	})
 }
 
-func (s *UserService) CheckProbeAuthority(username string, currentUser *model.User) error {
+func (s *UserService) CheckProbeAuthority(ctx context.Context, username string, currentUser *model.User) error {
 	targetUser, err := s.userRepo.GetUserByUsername(username)
 	if err != nil {
 		return fmt.Errorf("failed to query user: %w", err)

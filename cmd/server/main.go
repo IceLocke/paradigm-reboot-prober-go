@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os/signal"
 	"paradigm-reboot-prober-go/config"
+	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/router"
 	"paradigm-reboot-prober-go/internal/util"
 	"syscall"
@@ -33,8 +34,12 @@ func main() {
 
 	// Validate JWT secret key
 	if config.GlobalConfig.Auth.SecretKey == "your_secret_key_here" {
-		log.Fatal("JWT secret key must be changed from default value")
+		slog.Error("JWT secret key must be changed from default value")
+		panic("JWT secret key must be changed from default value")
 	}
+
+	// Initialize structured logging
+	logging.Setup()
 
 	// Initialize Database
 	util.InitDB()
@@ -48,9 +53,10 @@ func main() {
 
 	// Start server in a goroutine
 	go func() {
-		log.Printf("Server starting on %s", srv.Addr)
+		slog.Info("server starting", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
+			slog.Error("failed to start server", "error", err)
+			panic(err)
 		}
 	}()
 
@@ -59,13 +65,14 @@ func main() {
 	defer stop()
 	<-ctx.Done()
 
-	log.Println("Shutting down server...")
+	slog.Info("shutting down server...")
 
 	// Give outstanding requests 10 seconds to complete
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced shutdown: %v", err)
+		slog.Error("server forced shutdown", "error", err)
+		panic(err)
 	}
-	log.Println("Server exited")
+	slog.Info("server exited")
 }

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/repository"
 	"testing"
@@ -13,6 +14,7 @@ func TestRecordService(t *testing.T) {
 	recordRepo := repository.NewRecordRepository(db)
 	songRepo := repository.NewSongRepository(db)
 	recordService := NewRecordService(recordRepo, songRepo)
+	ctx := context.Background()
 
 	// Setup Song and Chart
 	song := &model.Song{
@@ -31,7 +33,7 @@ func TestRecordService(t *testing.T) {
 				Score:   1000000,
 			},
 		}
-		savedRecords, err := recordService.CreateRecords("testuser", records, false)
+		savedRecords, err := recordService.CreateRecords(ctx, "testuser", records, false)
 		assert.NoError(t, err)
 		assert.Len(t, savedRecords, 1)
 		assert.Equal(t, 1000000, savedRecords[0].Score)
@@ -39,37 +41,37 @@ func TestRecordService(t *testing.T) {
 	})
 
 	t.Run("GetAllRecords", func(t *testing.T) {
-		records, err := recordService.GetAllRecords("testuser", 10, 0, "score", "desc")
+		records, err := recordService.GetAllRecords(ctx, "testuser", 10, 0, "score", "desc")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 		assert.Equal(t, 1000000, records[0].Score)
 	})
 
 	t.Run("GetBest50Records", func(t *testing.T) {
-		records, err := recordService.GetBest50Records("testuser", 0)
+		records, err := recordService.GetBest50Records(ctx, "testuser", 0)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 	})
 
 	t.Run("GetBestRecords", func(t *testing.T) {
-		records, err := recordService.GetBestRecords("testuser", 10, 0, "score", "desc")
+		records, err := recordService.GetBestRecords(ctx, "testuser", 10, 0, "score", "desc")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 	})
 
 	t.Run("GetAllChartsWithBestScores", func(t *testing.T) {
-		charts, err := recordService.GetAllChartsWithBestScores("testuser")
+		charts, err := recordService.GetAllChartsWithBestScores(ctx, "testuser")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, charts)
 		assert.Equal(t, 1000000, charts[0].Score)
 	})
 
 	t.Run("CountRecords", func(t *testing.T) {
-		bestCount, err := recordService.CountBestRecords("testuser")
+		bestCount, err := recordService.CountBestRecords(ctx, "testuser")
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), bestCount)
 
-		allCount, err := recordService.CountAllRecords("testuser")
+		allCount, err := recordService.CountAllRecords(ctx, "testuser")
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), allCount)
 	})

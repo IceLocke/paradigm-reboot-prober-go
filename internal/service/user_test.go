@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/pkg/auth"
@@ -13,6 +14,7 @@ func TestUserService(t *testing.T) {
 	db := setupTestDB(t)
 	userRepo := repository.NewUserRepository(db)
 	userService := NewUserService(userRepo)
+	ctx := context.Background()
 
 	t.Run("CreateUser", func(t *testing.T) {
 		req := &request.CreateUserRequest{
@@ -20,7 +22,7 @@ func TestUserService(t *testing.T) {
 			Email:    "test@example.com",
 			Password: "password123",
 		}
-		user, err := userService.CreateUser(req)
+		user, err := userService.CreateUser(ctx, req)
 		assert.NoError(t, err)
 		assert.NotNil(t, user)
 		assert.Equal(t, "testuser", user.Username)
@@ -34,20 +36,20 @@ func TestUserService(t *testing.T) {
 			Email:    "test2@example.com",
 			Password: "password123",
 		}
-		user, err := userService.CreateUser(req)
+		user, err := userService.CreateUser(ctx, req)
 		assert.Error(t, err)
 		assert.Nil(t, user)
 		assert.Equal(t, "username has already existed", err.Error())
 	})
 
 	t.Run("LoginSuccess", func(t *testing.T) {
-		token, err := userService.Login("testuser", "password123")
+		token, err := userService.Login(ctx, "testuser", "password123")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 	})
 
 	t.Run("LoginFailure", func(t *testing.T) {
-		token, err := userService.Login("testuser", "wrongpassword")
+		token, err := userService.Login(ctx, "testuser", "wrongpassword")
 		assert.Error(t, err)
 		assert.Empty(t, token)
 		assert.Equal(t, "incorrect username or password", err.Error())
@@ -56,7 +58,7 @@ func TestUserService(t *testing.T) {
 	t.Run("RefreshUploadToken", func(t *testing.T) {
 		user, _ := userService.GetUser("testuser")
 		oldToken := user.UploadToken
-		newToken, err := userService.RefreshUploadToken("testuser")
+		newToken, err := userService.RefreshUploadToken(ctx, "testuser")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, newToken)
 		assert.NotEqual(t, oldToken, newToken)
@@ -70,8 +72,9 @@ func TestUserService_ChangePassword(t *testing.T) {
 	db := setupTestDB(t)
 	userRepo := repository.NewUserRepository(db)
 	userService := NewUserService(userRepo)
+	ctx := context.Background()
 
-	_, err := userService.CreateUser(&request.CreateUserRequest{
+	_, err := userService.CreateUser(ctx, &request.CreateUserRequest{
 		Username: "chgpwd_user",
 		Email:    "chgpwd@example.com",
 		Password: "oldpassword",
@@ -79,24 +82,24 @@ func TestUserService_ChangePassword(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
-		err := userService.ChangePassword("chgpwd_user", &request.ChangePasswordRequest{
+		err := userService.ChangePassword(ctx, "chgpwd_user", &request.ChangePasswordRequest{
 			OldPassword: "oldpassword",
 			NewPassword: "newpassword",
 		})
 		assert.NoError(t, err)
 
 		// Verify login with new password works
-		token, err := userService.Login("chgpwd_user", "newpassword")
+		token, err := userService.Login(ctx, "chgpwd_user", "newpassword")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 
 		// Verify login with old password fails
-		_, err = userService.Login("chgpwd_user", "oldpassword")
+		_, err = userService.Login(ctx, "chgpwd_user", "oldpassword")
 		assert.Error(t, err)
 	})
 
 	t.Run("Wrong old password", func(t *testing.T) {
-		err := userService.ChangePassword("chgpwd_user", &request.ChangePasswordRequest{
+		err := userService.ChangePassword(ctx, "chgpwd_user", &request.ChangePasswordRequest{
 			OldPassword: "wrongpassword",
 			NewPassword: "another",
 		})
@@ -105,7 +108,7 @@ func TestUserService_ChangePassword(t *testing.T) {
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		err := userService.ChangePassword("ghost_user", &request.ChangePasswordRequest{
+		err := userService.ChangePassword(ctx, "ghost_user", &request.ChangePasswordRequest{
 			OldPassword: "a",
 			NewPassword: "bbbbbb",
 		})
@@ -118,8 +121,9 @@ func TestUserService_ResetPassword(t *testing.T) {
 	db := setupTestDB(t)
 	userRepo := repository.NewUserRepository(db)
 	userService := NewUserService(userRepo)
+	ctx := context.Background()
 
-	_, err := userService.CreateUser(&request.CreateUserRequest{
+	_, err := userService.CreateUser(ctx, &request.CreateUserRequest{
 		Username: "rstpwd_user",
 		Email:    "rstpwd@example.com",
 		Password: "original123",
@@ -127,20 +131,20 @@ func TestUserService_ResetPassword(t *testing.T) {
 	assert.NoError(t, err)
 
 	t.Run("Success", func(t *testing.T) {
-		err := userService.ResetPassword(&request.ResetPasswordRequest{
+		err := userService.ResetPassword(ctx, &request.ResetPasswordRequest{
 			Username:    "rstpwd_user",
 			NewPassword: "resetpwd123",
 		})
 		assert.NoError(t, err)
 
 		// Verify login with new password
-		token, err := userService.Login("rstpwd_user", "resetpwd123")
+		token, err := userService.Login(ctx, "rstpwd_user", "resetpwd123")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token)
 	})
 
 	t.Run("User not found", func(t *testing.T) {
-		err := userService.ResetPassword(&request.ResetPasswordRequest{
+		err := userService.ResetPassword(ctx, &request.ResetPasswordRequest{
 			Username:    "nobody_here",
 			NewPassword: "xxxxxx",
 		})
@@ -153,8 +157,9 @@ func TestUserService_UpdateUser(t *testing.T) {
 	db := setupTestDB(t)
 	userRepo := repository.NewUserRepository(db)
 	userService := NewUserService(userRepo)
+	ctx := context.Background()
 
-	_, err := userService.CreateUser(&request.CreateUserRequest{
+	_, err := userService.CreateUser(ctx, &request.CreateUserRequest{
 		Username: "upduser_svc",
 		Email:    "updsvc@example.com",
 		Nickname: "OldNick",
@@ -165,7 +170,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		newNick := "NewNick"
 		qq := 12345
-		updated, err := userService.UpdateUser("upduser_svc", &request.UpdateUserRequest{
+		updated, err := userService.UpdateUser(ctx, "upduser_svc", &request.UpdateUserRequest{
 			Nickname: &newNick,
 			QQNumber: &qq,
 		})
@@ -180,7 +185,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 	t.Run("User not found", func(t *testing.T) {
 		nick := "x"
-		_, err := userService.UpdateUser("nobody_upd", &request.UpdateUserRequest{
+		_, err := userService.UpdateUser(ctx, "nobody_upd", &request.UpdateUserRequest{
 			Nickname: &nick,
 		})
 		assert.Error(t, err)

@@ -26,7 +26,10 @@ const (
 
 // SetupRouter initializes the routes for the application
 func SetupRouter(db *gorm.DB) *gin.Engine {
-	r := gin.Default() // gin.Default() already includes Logger and Recovery middleware
+	r := gin.New()
+	r.Use(gin.Recovery())
+	r.Use(middleware.RequestIDMiddleware())
+	r.Use(middleware.SlogRequestMiddleware())
 
 	// CORS middleware
 	r.Use(cors.New(cors.Config{
