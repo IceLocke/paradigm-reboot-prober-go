@@ -920,7 +920,9 @@ const docTemplate = `{
         "model.ChartInput": {
             "type": "object",
             "required": [
-                "difficulty"
+                "difficulty",
+                "level",
+                "notes"
             ],
             "properties": {
                 "difficulty": {
@@ -947,6 +949,7 @@ const docTemplate = `{
                 },
                 "notes": {
                     "type": "integer",
+                    "minimum": 0,
                     "example": 1000
                 }
             }
@@ -1259,6 +1262,7 @@ const docTemplate = `{
                 },
                 "play_records": {
                     "type": "array",
+                    "maxItems": 500,
                     "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/model.PlayRecordBase"
@@ -1467,16 +1471,19 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "account_number": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "anonymous_probe": {
                     "type": "boolean"
                 },
                 "nickname": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                 },
                 "qq_number": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0
                 },
                 "uuid": {
                     "type": "string"

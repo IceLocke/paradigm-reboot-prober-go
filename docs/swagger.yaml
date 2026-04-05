@@ -125,9 +125,12 @@ definitions:
         type: string
       notes:
         example: 1000
+        minimum: 0
         type: integer
     required:
     - difficulty
+    - level
+    - notes
     type: object
   model.Difficulty:
     enum:
@@ -347,6 +350,7 @@ definitions:
       play_records:
         items:
           $ref: '#/definitions/model.PlayRecordBase'
+        maxItems: 500
         minItems: 1
         type: array
       upload_token:
@@ -500,12 +504,15 @@ definitions:
       account:
         type: string
       account_number:
+        minimum: 0
         type: integer
       anonymous_probe:
         type: boolean
       nickname:
+        minLength: 1
         type: string
       qq_number:
+        minimum: 0
         type: integer
       uuid:
         type: string

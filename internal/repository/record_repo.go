@@ -79,34 +79,18 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 		return nil, err
 	}
 
-	// Find existing best record using indexed columns
-	var bestRecord model.BestPlayRecord
-	result := tx.Preload("PlayRecord").
-		Where("username = ? AND chart_id = ?", record.Username, record.ChartID).
-		First(&bestRecord)
-
-	if result.Error == nil {
-		// Best record exists
-		if isReplaced || record.Score > bestRecord.PlayRecord.Score {
-			bestRecord.PlayRecordID = record.ID
-			bestRecord.PlayRecord = record
-			if err := tx.Save(&bestRecord).Error; err != nil {
-				return nil, err
-			}
-		}
-	} else if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		// Create new best record
-		newBestRecord := model.BestPlayRecord{
-			Username:     record.Username,
-			ChartID:      record.ChartID,
-			PlayRecordID: record.ID,
-			PlayRecord:   record,
-		}
-		if err := tx.Create(&newBestRecord).Error; err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, result.Error
+	// Upsert best record: INSERT if not exists, or UPDATE if the new score is
+	// higher (or isReplaced is true). This is atomic and race-condition-free,
+	// leveraging the unique index idx_best_user_chart(username, chart_id).
+	if err := tx.Exec(`
+		INSERT INTO best_play_records (username, chart_id, play_record_id)
+		VALUES (?, ?, ?)
+		ON CONFLICT (username, chart_id) DO UPDATE
+		  SET play_record_id = EXCLUDED.play_record_id
+		  WHERE ? OR (SELECT score FROM play_records WHERE id = best_play_records.play_record_id) < ?`,
+		record.Username, record.ChartID, record.ID, isReplaced, record.Score,
+	).Error; err != nil {
+		return nil, err
 	}
 
 	return record, nil

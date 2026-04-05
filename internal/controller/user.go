@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
+	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
@@ -37,7 +40,8 @@ func (ctrl *UserController) Register(c *gin.Context) {
 
 	req.Username = strings.ToLower(req.Username)
 
-	user, err := ctrl.userService.CreateUser(&req)
+	ctx := logging.AppendCtx(c.Request.Context(), slog.String("register_user", req.Username))
+	user, err := ctrl.userService.CreateUser(ctx, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
@@ -67,7 +71,8 @@ func (ctrl *UserController) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := ctrl.userService.Login(username, password)
+	ctx := logging.AppendCtx(c.Request.Context(), slog.String("login_user", username))
+	token, err := ctrl.userService.Login(ctx, username, password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
 		return
@@ -114,7 +119,7 @@ func (ctrl *UserController) GetMe(c *gin.Context) {
 // @Router /user/me/upload-token [post]
 func (ctrl *UserController) RefreshUploadToken(c *gin.Context) {
 	username := c.GetString("username")
-	token, err := ctrl.userService.RefreshUploadToken(username)
+	token, err := ctrl.userService.RefreshUploadToken(c.Request.Context(), username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
@@ -142,9 +147,9 @@ func (ctrl *UserController) UpdateMe(c *gin.Context) {
 		return
 	}
 
-	user, err := ctrl.userService.UpdateUser(username, &req)
+	user, err := ctrl.userService.UpdateUser(c.Request.Context(), username, &req)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
@@ -174,8 +179,8 @@ func (ctrl *UserController) ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
-	if err := ctrl.userService.ChangePassword(username, &req); err != nil {
-		if strings.Contains(err.Error(), "incorrect old password") {
+	if err := ctrl.userService.ChangePassword(c.Request.Context(), username, &req); err != nil {
+		if errors.Is(err, service.ErrUnauthorized) {
 			c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -203,8 +208,8 @@ func (ctrl *UserController) ResetPassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
 	}
-	if err := ctrl.userService.ResetPassword(&req); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+	if err := ctrl.userService.ResetPassword(c.Request.Context(), &req); err != nil {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})

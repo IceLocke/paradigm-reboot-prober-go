@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+.claude
+.playwright-mcp
+.DS_Store
+web/node_modules
+web/dist
+legacy
+docs
+*.md
+!README.md

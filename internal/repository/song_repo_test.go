@@ -81,14 +81,11 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 		var freshSong model.Song
 		db.Preload("Charts").First(&freshSong, song.ID)
 
-		assert.Len(t, freshSong.Charts, 3) // Detected (updated), Invaded (untouched), Massive (new)
+		assert.Len(t, freshSong.Charts, 2) // Detected (updated), Massive (new); Invaded deleted (not in request)
 
 		for _, l := range freshSong.Charts {
 			if l.Difficulty == model.DifficultyDetected {
 				assert.Equal(t, 6.0, l.Level)
-			}
-			if l.Difficulty == model.DifficultyInvaded {
-				assert.Equal(t, 10.0, l.Level)
 			}
 			if l.Difficulty == model.DifficultyMassive {
 				assert.Equal(t, 15.0, l.Level)

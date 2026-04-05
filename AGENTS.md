@@ -54,9 +54,15 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword
 │   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
 │   │   └── record.go            # GetPlayRecords, GetSongRecords, GetChartRecords, UploadRecords
+│   ├── logging/                 # Structured logging infrastructure (slog + context)
+│   │   ├── context.go           # AppendCtx helper, context key for slog attrs
+│   │   ├── handler.go           # ContextHandler wrapping slog.Handler
+│   │   └── setup.go             # Global logger initialization (TextHandler)
 │   ├── middleware/
 │   │   ├── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
-│   │   └── gzip.go              # GzipResponseMiddleware (compress responses), GzipRequestMiddleware (decompress request bodies)
+│   │   ├── gzip.go              # GzipResponseMiddleware (compress responses), GzipRequestMiddleware (decompress request bodies)
+│   │   ├── logging.go           # RequestIDMiddleware, SlogRequestMiddleware
+│   │   └── ratelimit.go         # Per-IP token bucket rate limiter
 │   ├── model/                   # Data models (GORM entities + DTOs)
 │   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
@@ -73,7 +79,8 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   └── record_repo.go       # Includes rating calculation on record creation
 │   ├── router/
 │   │   └── router.go            # Route definitions, dependency wiring, CORS, middleware setup
-│   ├── service/                  # Business logic layer
+│   ├── service/                  # Business logic layer (all methods accept context.Context)
+│   │   ├── errors.go            # Sentinel errors (ErrNotFound, ErrForbidden, ErrUnauthorized)
 │   │   ├── user.go
 │   │   ├── song.go
 │   │   └── record.go
@@ -119,15 +126,18 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 The application follows a **layered architecture**:
 
 ```
-Request → Router → CORS → Gzip(request decompress + response compress) → Middleware → Controller → Service → Repository → Database
+Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit → Auth → Controller → Service → Repository → Database
 ```
 
-- **Router** (`internal/router/`): Registers all routes, sets up CORS and middleware, wires dependencies (manual DI, no framework).
+- **Router** (`internal/router/`): Registers all routes, sets up CORS and middleware, wires dependencies (manual DI, no framework). Uses `gin.New()` (not `gin.Default()`) with explicit middleware chain.
+- **RequestID** (`internal/middleware/logging.go`): `RequestIDMiddleware` generates a random 8-byte hex request ID (or reuses `X-Request-ID` header), injects it into slog context and response header.
+- **SlogRequest** (`internal/middleware/logging.go`): `SlogRequestMiddleware` enriches context with `method`, `path`, `client_ip`; logs a request-completed summary with status, latency, and bytes. WARN for 4xx, ERROR for 5xx.
 - **CORS**: Configured via `gin-contrib/cors` — allows all origins, standard methods and headers.
 - **Gzip** (`internal/middleware/`): `GzipRequestMiddleware` transparently decompresses `Content-Encoding: gzip` request bodies; `GzipResponseMiddleware` (via `gin-contrib/gzip`) compresses responses when the client sends `Accept-Encoding: gzip`.
-- **Middleware** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`).
-- **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services.
-- **Service** (`internal/service/`): Business logic. Orchestrates repository calls.
+- **RateLimit** (`internal/middleware/ratelimit.go`): Per-IP token bucket rate limiter applied to login and registration endpoints.
+- **Auth** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`). Injects `username` into slog context on successful authentication.
+- **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services. Injects business-specific fields (e.g. `target_user`, `scope`, `song_id`) into context via `logging.AppendCtx` before calling services.
+- **Service** (`internal/service/`): Business logic. All public methods accept `context.Context` as their first parameter. Uses `slog.InfoContext`/`WarnContext`/`ErrorContext` for automatic inclusion of upstream context fields (request ID, HTTP metadata, username, business fields). Orchestrates repository calls.
 - **Repository** (`internal/repository/`): Direct database operations via GORM. Rating calculation happens here when creating records.
 - **Model** (`internal/model/`): GORM entities (with table name overrides) and DTOs. Request-specific DTOs live in `internal/model/request/`.
 - **Pkg** (`pkg/`): Reusable, domain-specific packages — `auth` (password hashing, JWT) and `rating` (score-to-rating calculation).
@@ -152,6 +162,30 @@ Request → Router → CORS → Gzip(request decompress + response compress) →
 | `best_play_records` | `BestPlayRecord` | `id`              |
 
 GORM `AutoMigrate` handles schema creation/updates at startup. Foreign key constraints are disabled during migration (`DisableForeignKeyConstraintWhenMigrating: true`).
+
+### Structured Logging
+
+The application uses Go's `log/slog` package with a custom `ContextHandler` for structured, context-aware logging.
+
+**Architecture**: `internal/logging/` provides the foundation:
+- **`ContextHandler`** wraps `slog.TextHandler` and automatically extracts `[]slog.Attr` stored in `context.Context` via `AppendCtx()`. This means any field injected into the context upstream (by middleware or controllers) is automatically included in all downstream log records.
+- **`AppendCtx(ctx, attrs...)`** is the primary helper for injecting fields into context.
+- **`Setup()`** initializes the global `slog` default logger (called once from `main.go`).
+
+**Context propagation pattern**:
+```
+Middleware (request_id, method, path, client_ip) → Auth (username) → Controller (target_user, scope, song_id) → Service (slog.*Context auto-enriched)
+```
+
+- All service methods accept `context.Context` as their first parameter.
+- Controllers pass `c.Request.Context()` (enriched by middleware) to services.
+- Services use `slog.InfoContext(ctx, ...)` / `slog.WarnContext(ctx, ...)` / `slog.ErrorContext(ctx, ...)` — fields from context are automatically attached.
+- The `request_id` field is shared across all log lines from the same HTTP request, enabling correlation during debugging.
+
+**Log output format**: `key=value` text (slog `TextHandler` to stdout). Example:
+```
+time=2026-04-05T10:00:00.000+08:00 level=INFO msg="request completed" request_id=a1b2c3d4e5f6g7h8 method=POST path=/api/v2/records/testuser client_ip=203.0.113.42 username=adminuser status=201 latency_ms=87 bytes_out=2048
+```
 
 ## Build and Run Commands
 
@@ -287,7 +321,7 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `auth.jwt_expiration`        | —              | `24h`                                | Access token lifetime (Go duration)      |
 | `auth.bcrypt_cost`           | —              | `10`                                 | bcrypt hashing cost (4–31)               |
 | `auth.upload_token_length`   | —              | `16`                                 | Upload token bytes (hex output is 2×)    |
-| `auth.username_pattern`      | —              | `^[A-Za-z][A-Za-z0-9_]{5,15}$`      | Regex for username validation            |
+| `auth.username_pattern`      | —              | `^[a-z][a-z0-9_]{5,15}$`            | Regex for username validation            |
 | `pagination.default_page_size` | —            | `50`                                 | Default page size for list endpoints     |
 | `pagination.max_page_size`   | —              | `200`                                | Maximum allowed page size                |
 | `game.b35_limit`             | —              | `35`                                 | B35 best record count (old songs)        |

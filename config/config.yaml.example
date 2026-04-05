@@ -18,7 +18,7 @@ auth:
   jwt_expiration: "24h"             # access token lifetime, e.g. "24h", "30m"
   bcrypt_cost: 10                   # bcrypt hashing cost (4-31)
   upload_token_length: 16           # bytes; hex output is 2x this value
-  username_pattern: "^[A-Za-z][A-Za-z0-9_]{5,15}$"
+  username_pattern: "^[a-z][a-z0-9_]{5,15}$"
 
 pagination:
   default_page_size: 50

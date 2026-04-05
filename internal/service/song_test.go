@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
@@ -15,6 +16,7 @@ func TestSongService(t *testing.T) {
 	db := setupTestDB(t)
 	songRepo := repository.NewSongRepository(db)
 	songService := NewSongService(songRepo)
+	ctx := context.Background()
 
 	t.Run("CreateSong", func(t *testing.T) {
 		req := &request.CreateSongRequest{
@@ -32,7 +34,7 @@ func TestSongService(t *testing.T) {
 				},
 			},
 		}
-		charts, err := songService.CreateSong(req)
+		charts, err := songService.CreateSong(ctx, req)
 		assert.NoError(t, err)
 		assert.Len(t, charts, 1)
 		assert.Equal(t, "Test Song", charts[0].Title)
@@ -40,26 +42,26 @@ func TestSongService(t *testing.T) {
 	})
 
 	t.Run("GetSingleSong", func(t *testing.T) {
-		song, err := songService.GetSingleSongByWikiID("test_song")
+		song, err := songService.GetSingleSongByWikiID(ctx, "test_song")
 		assert.NoError(t, err)
 		assert.NotNil(t, song)
 		assert.Equal(t, "Test Song", song.Title)
 
-		songByID, err := songService.GetSingleSong(song.ID, "prp")
+		songByID, err := songService.GetSingleSong(ctx, song.ID, "prp")
 		assert.NoError(t, err)
 		assert.NotNil(t, songByID)
 		assert.Equal(t, song.ID, songByID.ID)
 	})
 
 	t.Run("GetAllCharts", func(t *testing.T) {
-		charts, err := songService.GetAllCharts()
+		charts, err := songService.GetAllCharts(ctx)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, charts)
 		assert.Equal(t, "Test Song", charts[0].Title)
 	})
 
 	t.Run("UpdateSong", func(t *testing.T) {
-		song, _ := songService.GetSingleSongByWikiID("test_song")
+		song, _ := songService.GetSingleSongByWikiID(ctx, "test_song")
 		req := &request.UpdateSongRequest{
 			ID: song.ID,
 			SongBase: model.SongBase{
@@ -76,7 +78,7 @@ func TestSongService(t *testing.T) {
 				},
 			},
 		}
-		charts, err := songService.UpdateSong(req)
+		charts, err := songService.UpdateSong(ctx, req)
 		assert.NoError(t, err)
 		assert.Len(t, charts, 1)
 		assert.Equal(t, "Updated Song", charts[0].Title)
@@ -88,6 +90,7 @@ func TestSongService_ResolveSongID(t *testing.T) {
 	db := setupTestDB(t)
 	songRepo := repository.NewSongRepository(db)
 	songService := NewSongService(songRepo)
+	ctx := context.Background()
 
 	// Create a song
 	req := &request.CreateSongRequest{
@@ -100,31 +103,31 @@ func TestSongService_ResolveSongID(t *testing.T) {
 			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
 		},
 	}
-	_, err := songService.CreateSong(req)
+	_, err := songService.CreateSong(ctx, req)
 	assert.NoError(t, err)
 
-	song, _ := songService.GetSingleSongByWikiID("resolve_song")
+	song, _ := songService.GetSingleSongByWikiID(ctx, "resolve_song")
 
 	t.Run("Resolve by numeric ID", func(t *testing.T) {
-		id, err := songService.ResolveSongID(fmt.Sprintf("%d", song.ID))
+		id, err := songService.ResolveSongID(ctx, fmt.Sprintf("%d", song.ID))
 		assert.NoError(t, err)
 		assert.Equal(t, song.ID, id)
 	})
 
 	t.Run("Resolve by wiki_id", func(t *testing.T) {
-		id, err := songService.ResolveSongID("resolve_song")
+		id, err := songService.ResolveSongID(ctx, "resolve_song")
 		assert.NoError(t, err)
 		assert.Equal(t, song.ID, id)
 	})
 
 	t.Run("Resolve numeric ID not found", func(t *testing.T) {
-		_, err := songService.ResolveSongID("99999")
+		_, err := songService.ResolveSongID(ctx, "99999")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("Resolve wiki_id not found", func(t *testing.T) {
-		_, err := songService.ResolveSongID("nonexistent")
+		_, err := songService.ResolveSongID(ctx, "nonexistent")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -134,6 +137,7 @@ func TestSongService_ResolveChartID(t *testing.T) {
 	db := setupTestDB(t)
 	songRepo := repository.NewSongRepository(db)
 	songService := NewSongService(songRepo)
+	ctx := context.Background()
 
 	// Create a song with multiple charts
 	req := &request.CreateSongRequest{
@@ -147,7 +151,7 @@ func TestSongService_ResolveChartID(t *testing.T) {
 			{Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 1000},
 		},
 	}
-	charts, err := songService.CreateSong(req)
+	charts, err := songService.CreateSong(ctx, req)
 	assert.NoError(t, err)
 
 	var massiveChartID int
@@ -158,43 +162,43 @@ func TestSongService_ResolveChartID(t *testing.T) {
 	}
 
 	t.Run("Resolve by numeric chart ID", func(t *testing.T) {
-		id, err := songService.ResolveChartID(fmt.Sprintf("%d", massiveChartID))
+		id, err := songService.ResolveChartID(ctx, fmt.Sprintf("%d", massiveChartID))
 		assert.NoError(t, err)
 		assert.Equal(t, massiveChartID, id)
 	})
 
 	t.Run("Resolve by wiki_id:difficulty", func(t *testing.T) {
-		id, err := songService.ResolveChartID("resolve_chart:massive")
+		id, err := songService.ResolveChartID(ctx, "resolve_chart:massive")
 		assert.NoError(t, err)
 		assert.Equal(t, massiveChartID, id)
 	})
 
 	t.Run("Resolve numeric chart ID not found", func(t *testing.T) {
-		_, err := songService.ResolveChartID("99999")
+		_, err := songService.ResolveChartID(ctx, "99999")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("Resolve wiki_id:difficulty not found", func(t *testing.T) {
-		_, err := songService.ResolveChartID("resolve_chart:reboot")
+		_, err := songService.ResolveChartID(ctx, "resolve_chart:reboot")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("Resolve invalid difficulty", func(t *testing.T) {
-		_, err := songService.ResolveChartID("resolve_chart:easy")
+		_, err := songService.ResolveChartID(ctx, "resolve_chart:easy")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid difficulty")
 	})
 
 	t.Run("Resolve missing colon", func(t *testing.T) {
-		_, err := songService.ResolveChartID("nocolon")
+		_, err := songService.ResolveChartID(ctx, "nocolon")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "invalid chart address")
 	})
 
 	t.Run("Resolve empty wiki_id", func(t *testing.T) {
-		_, err := songService.ResolveChartID(":massive")
+		_, err := songService.ResolveChartID(ctx, ":massive")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "empty wiki_id")
 	})
@@ -229,6 +233,7 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 	db := setupTestDB(t)
 	songRepo := repository.NewSongRepository(db)
 	songService := NewSongService(songRepo)
+	ctx := context.Background()
 
 	// Create songs in deliberately wrong order with mixed difficulties.
 	// Expected final order: Version DESC, SongID ASC (stable DB ID / insertion order), Difficulty DESC.
@@ -266,11 +271,11 @@ func TestGetAllCharts_DefaultSortOrder(t *testing.T) {
 	}
 
 	for i := range songs {
-		_, err := songService.CreateSong(&songs[i])
+		_, err := songService.CreateSong(ctx, &songs[i])
 		require.NoError(t, err)
 	}
 
-	charts, err := songService.GetAllCharts()
+	charts, err := songService.GetAllCharts(ctx)
 	require.NoError(t, err)
 	require.Len(t, charts, 9) // 2 + 3 + 2 + 2
 

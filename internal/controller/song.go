@@ -1,12 +1,14 @@
 package controller
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
+	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,7 +30,7 @@ func NewSongController(songService *service.SongService) *SongController {
 // @Failure 500 {object} model.Response
 // @Router /songs [get]
 func (ctrl *SongController) GetAllCharts(c *gin.Context) {
-	charts, err := ctrl.songService.GetAllCharts()
+	charts, err := ctrl.songService.GetAllCharts(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
@@ -50,11 +52,12 @@ func (ctrl *SongController) GetAllCharts(c *gin.Context) {
 func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 	songIDStr := c.Param("song_id")
 	src := c.DefaultQuery("src", "prp")
+	ctx := logging.AppendCtx(c.Request.Context(), slog.String("song_addr", songIDStr))
 
 	songID, err := strconv.Atoi(songIDStr)
 	if err != nil {
 		// If not an integer, try searching by WikiID
-		song, err := ctrl.songService.GetSingleSongByWikiID(songIDStr)
+		song, err := ctrl.songService.GetSingleSongByWikiID(ctx, songIDStr)
 		if err != nil {
 			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 			return
@@ -63,7 +66,7 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 		return
 	}
 
-	song, err := ctrl.songService.GetSingleSong(songID, src)
+	song, err := ctrl.songService.GetSingleSong(ctx, songID, src)
 	if err != nil {
 		c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		return
@@ -87,7 +90,8 @@ func (ctrl *SongController) CreateSong(c *gin.Context) {
 		return
 	}
 
-	charts, err := ctrl.songService.CreateSong(&req)
+	ctx := logging.AppendCtx(c.Request.Context(), slog.String("song_title", req.Title))
+	charts, err := ctrl.songService.CreateSong(ctx, &req)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
 		return
@@ -113,9 +117,13 @@ func (ctrl *SongController) UpdateSong(c *gin.Context) {
 		return
 	}
 
-	charts, err := ctrl.songService.UpdateSong(&req)
+	ctx := logging.AppendCtx(c.Request.Context(),
+		slog.Int("song_id", req.ID),
+		slog.String("song_title", req.Title),
+	)
+	charts, err := ctrl.songService.UpdateSong(ctx, &req)
 	if err != nil {
-		if strings.Contains(err.Error(), "record not found") {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: "song not found"})
 		} else {
 			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
