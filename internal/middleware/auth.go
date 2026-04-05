@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"log/slog"
 	"net/http"
+	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/service"
 	"paradigm-reboot-prober-go/pkg/auth"
@@ -49,7 +51,9 @@ func AuthMiddleware(userService *service.UserService) gin.HandlerFunc {
 			return
 		}
 
-		// Set the username in the context so it can be used by subsequent handlers
+		// Inject username into slog context for automatic inclusion in all downstream logs
+		ctx := logging.AppendCtx(c.Request.Context(), slog.String("username", username))
+		c.Request = c.Request.WithContext(ctx)
 		c.Set("username", username)
 		c.Next()
 	}
@@ -77,6 +81,8 @@ func OptionalAuthMiddleware(userService *service.UserService) gin.HandlerFunc {
 		if err == nil {
 			user, err := userService.GetUser(username)
 			if err == nil && user != nil && user.IsActive {
+				ctx := logging.AppendCtx(c.Request.Context(), slog.String("username", username))
+				c.Request = c.Request.WithContext(ctx)
 				c.Set("username", username)
 			}
 		}
