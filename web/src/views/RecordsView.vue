@@ -272,8 +272,9 @@ const loadRecords = async () => {
     } else {
       if (!userStore.logged_in) return
       const { columnKey, order } = sortState.value ?? {}
-      const sortBy = order === false ? void 0 : String(columnKey)
-      const sortOrder = order === 'ascend' ? 'asc' : 'desc'
+      const hasActiveSort = (order === 'ascend' || order === 'descend') && columnKey != null
+      const sortBy = hasActiveSort ? String(columnKey) : 'rating'
+      const sortOrder = hasActiveSort ? (order === 'ascend' ? 'asc' : 'desc') : 'desc'
       const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value, sortBy, sortOrder)
       records.value = res.data.records
       total.value = res.data.total
