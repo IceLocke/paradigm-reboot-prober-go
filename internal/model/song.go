@@ -82,9 +82,9 @@ func (Chart) TableName() string {
 // ChartInput represents the details of a chart for create/update requests
 type ChartInput struct {
 	Difficulty  Difficulty `json:"difficulty" binding:"required,oneof=detected invaded massive reboot" example:"massive"`
-	Level       float64    `json:"level" example:"14.5"`
+	Level       float64    `json:"level" binding:"required,gt=0" example:"14.5"`
 	LevelDesign string     `json:"level_design" example:"Designer"`
-	Notes       int        `json:"notes" example:"1000"`
+	Notes       int        `json:"notes" binding:"required,min=0" example:"1000"`
 }
 
 // ChartInfo represents the detailed information of a song's chart (flattened view)
