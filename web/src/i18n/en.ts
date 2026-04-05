@@ -86,6 +86,8 @@ const en = {
     register_failed: 'Registration failed: ',
     login_success: 'Login successful',
     login_failed: 'Login failed: ',
+    logout_confirm: 'Are you sure you want to logout?',
+    logout_success: 'Logout successful',
     get_charts_success: 'Charts loaded',
     get_charts_failed: 'Failed to load charts',
     get_my_info_success: 'Profile loaded',

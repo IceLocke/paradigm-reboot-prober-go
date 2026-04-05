@@ -10,7 +10,7 @@
             @show-login="showLogin = true"
             @show-register="showRegister = true"
             @show-profile="showProfile = true"
-            @logout="onLogout"
+            @show-logout="showLogout = true"
           />
           <div class="app-body">
             <Sidebar v-model="appStore.sidebarOpen" />
@@ -25,6 +25,10 @@
           v-model:show="showLogin"
           @success="onLoginSuccess"
           @go-register="showLogin = false; showRegister = true"
+        />
+        <LogoutModal
+          v-model:show="showLogout"
+          @success="onLogoutSuccess"
         />
         <RegisterModal
           v-model:show="showRegister"
@@ -55,6 +59,7 @@ import { Analytics } from "@vercel/analytics/vue"
 import AppHeader from '@/components/layout/AppHeader.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import LoginModal from '@/components/business/LoginModal.vue'
+import LogoutModal from '@/components/business/LogoutModal.vue'
 import RegisterModal from '@/components/business/RegisterModal.vue'
 import ProfileModal from '@/components/business/ProfileModal.vue'
 
@@ -62,6 +67,7 @@ const userStore = useUserStore()
 const appStore = useAppStore()
 
 const showLogin = ref(false)
+const showLogout = ref(false)
 const showRegister = ref(false)
 const showProfile = ref(false)
 
@@ -70,8 +76,8 @@ const onLoginSuccess = () => {
   loadUserInfo()
 }
 
-const onLogout = () => {
-  userStore.$reset()
+const onLogoutSuccess = () => {
+  showLogout.value = false
 }
 
 const loadUserInfo = async () => {

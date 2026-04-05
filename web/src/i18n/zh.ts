@@ -86,6 +86,8 @@ const zh = {
     register_failed: '注册失败：',
     login_success: '登录成功',
     login_failed: '登录失败：',
+    logout_confirm: '确定要退出吗？',
+    logout_success: '退出成功',
     get_charts_success: '定数表已加载',
     get_charts_failed: '加载定数表失败',
     get_my_info_success: '个人资料已加载',
