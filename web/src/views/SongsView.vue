@@ -303,7 +303,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     width: 110,
     sorter: true,
     render(row) {
-      return h(DifficultyBadge, { difficulty: row.difficulty, level: row.level.toFixed(1), short: true })
+      return h(DifficultyBadge, { difficulty: row.difficulty, level: row.level, short: true })
     },
   },
   {
