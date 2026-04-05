@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"log/slog"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/pkg/rating"
@@ -60,6 +61,7 @@ func (r *RecordRepository) BatchCreateRecords(records []*model.PlayRecord, isRep
 	if err != nil {
 		return nil, err
 	}
+	slog.Info("batch records created", "count", len(results))
 	return results, nil
 }
 
