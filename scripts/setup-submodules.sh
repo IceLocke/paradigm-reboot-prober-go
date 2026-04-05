@@ -7,4 +7,4 @@ if [ -n "$GH_TOKEN" ]; then
   git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
 fi
 
-git submodule update --init --recursive || echo "Submodule checkout skipped (private repo requires GH_TOKEN)"
+git submodule update --init --remote || echo "Submodule checkout skipped (private repo requires GH_TOKEN)"
