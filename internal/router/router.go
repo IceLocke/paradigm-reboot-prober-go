@@ -49,7 +49,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	songCtrl := controller.NewSongController(songService)
 	recordCtrl := controller.NewRecordController(recordService, userService, songService)
 
-	r.GET("/health", func(c *gin.Context) {
+	r.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "up",
 		})

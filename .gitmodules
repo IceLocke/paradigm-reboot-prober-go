@@ -1,3 +1,4 @@
 [submodule "web/public"]
 	path = web/public
 	url = https://github.com/IceLocke/prp-resource
+	branch = master
