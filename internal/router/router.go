@@ -6,6 +6,7 @@ import (
 	"paradigm-reboot-prober-go/internal/middleware"
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/internal/service"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -14,6 +15,13 @@ import (
 	"gorm.io/gorm"
 
 	_ "paradigm-reboot-prober-go/docs" // Swagger docs
+)
+
+const (
+	MaxRawRequestBodySize = 10 << 20 // 10MB
+
+	RegisterEndpointRequestPerMinute = 2
+	LoginEndpointRequestPerMinute    = 10
 )
 
 // SetupRouter initializes the routes for the application
@@ -32,6 +40,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	// Gzip middleware – decompress incoming gzip request bodies and
 	// compress outgoing responses when the client supports it.
 	r.Use(middleware.GzipRequestMiddleware())
+	r.Use(middleware.MaxRequestBodyMiddleware(MaxRawRequestBodySize)) // 10 MB after decompression
 	r.Use(middleware.GzipResponseMiddleware())
 
 	// Initialize Repositories
@@ -60,14 +69,14 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	v2 := r.Group("/api/v2")
 	{
 		// Public routes
-		v2.POST("/user/register", userCtrl.Register)
-		v2.POST("/user/login", userCtrl.Login)
+		v2.POST("/user/register", middleware.RateLimitMiddleware(RegisterEndpointRequestPerMinute, time.Minute), userCtrl.Register)
+		v2.POST("/user/login", middleware.RateLimitMiddleware(LoginEndpointRequestPerMinute, time.Minute), userCtrl.Login)
 		v2.GET("/songs", songCtrl.GetAllCharts)
 		v2.GET("/songs/:song_id", songCtrl.GetSingleSongInfo)
 
 		// Routes with optional auth
 		optionalAuth := v2.Group("")
-		optionalAuth.Use(middleware.OptionalAuthMiddleware())
+		optionalAuth.Use(middleware.OptionalAuthMiddleware(userService))
 		{
 			optionalAuth.GET("/records/:username", recordCtrl.GetPlayRecords)
 			optionalAuth.GET("/records/:username/song/:song_addr", recordCtrl.GetSongRecords)
@@ -80,7 +89,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 
 		// Protected routes
 		auth := v2.Group("")
-		auth.Use(middleware.AuthMiddleware())
+		auth.Use(middleware.AuthMiddleware(userService))
 		{
 			// User routes
 			auth.GET("/user/me", userCtrl.GetMe)
