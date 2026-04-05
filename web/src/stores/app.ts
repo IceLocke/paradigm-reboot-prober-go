@@ -6,7 +6,7 @@ interface UploadItem {
   difficulty: string
   level: number
   chart_id: number
-  score: number
+  score?: number
 }
 
 interface AppState {

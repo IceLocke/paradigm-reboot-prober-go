@@ -104,7 +104,7 @@ const showQuickUpload = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
 const diffTabs = [
-  { key: 'all', label: t('term.all') },
+  { key: 'all', label: t('common.all') },
   { key: 'detected', label: 'DET' },
   { key: 'invaded', label: 'IVD' },
   { key: 'massive', label: 'MSV' },
@@ -112,9 +112,9 @@ const diffTabs = [
 ]
 
 const versionTabs = [
-  { key: 'all', label: t('term.all') },
-  { key: 'old', label: t('term.b35') },
-  { key: 'new', label: t('term.b15') },
+  { key: 'all', label: t('common.all') },
+  { key: 'new', label: t('term.current') },
+  { key: 'old', label: t('term.past') },
 ]
 
 const compareVersions = (a: string, b: string): number => {
@@ -230,7 +230,7 @@ const onClickTitle = async (songId: number) => {
     }
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    message.error(t('message.get_song_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
   }
 }
 
@@ -246,14 +246,17 @@ const onQuickUpload = (chart: ChartInfo) => {
 
 const onAddToCart = (chart: ChartInfo) => {
   const exists = appStore.uploadList.some((item) => item.chart_id === chart.id)
-  if (exists) return
+  if (exists) {
+    message.error(t('message.add_to_upload_list_failed'))
+    return
+  }
   appStore.uploadList.push({
     title: chart.title,
     difficulty: chart.difficulty,
     level: chart.level,
     chart_id: chart.id,
-    score: 0,
   })
+  message.success(t('message.add_to_upload_list_success'))
 }
 
 const onUploadSuccess = () => {
@@ -281,34 +284,26 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
   {
     title: t('term.version'),
     key: 'version',
-    width: 80,
+    width: 90,
     sorter: true,
   },
   {
-    title: t('term.b35orb15'),
+    title: t('term.season'),
     key: 'b15',
-    width: 70,
+    width: 90,
     render(row) {
       return h('span', {
         class: row.b15 ? 'version-badge version-badge--new' : 'version-badge version-badge--old',
-      }, row.b15 ? t('term.b15') : t('term.b35'))
+      }, row.b15 ? t('term.current') : t('term.past'))
     },
   },
   {
     title: t('term.difficulty'),
-    key: 'difficulty',
-    width: 110,
-    render(row) {
-      return h(DifficultyBadge, { difficulty: row.difficulty, level: row.level, short: true })
-    },
-  },
-  {
-    title: t('term.level'),
     key: 'level',
-    width: 80,
+    width: 110,
     sorter: true,
     render(row) {
-      return h('span', { class: 'mono' }, row.level.toFixed(1))
+      return h(DifficultyBadge, { difficulty: row.difficulty, level: row.level.toFixed(1), short: true })
     },
   },
   {
@@ -351,6 +346,7 @@ const loadCharts = async () => {
   try {
     const res = await getAllCharts()
     appStore.charts = res.data
+    message.success(t('message.get_charts_success'))
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
@@ -365,8 +361,7 @@ onMounted(() => {
 <style scoped>
 .filters-row {
   display: flex;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: 0 var(--space-4);
   flex-wrap: wrap;
 }
 .search-box {
@@ -394,7 +389,6 @@ onMounted(() => {
 .search-input::placeholder { color: var(--text-muted); }
 
 .table-wrapper {
-  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   background: var(--bg-card);
   border: 1px solid var(--border);

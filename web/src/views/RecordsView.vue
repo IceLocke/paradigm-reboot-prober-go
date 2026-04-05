@@ -12,7 +12,7 @@
           </template>
           <UploadCartPanel />
         </n-popover>
-        <button class="icon-btn" :title="t('common.refresh')" @click="loadRecords">
+        <button class="icon-btn" :title="t('common.refresh')" @click="refreshRecords">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>
@@ -144,7 +144,7 @@ const onClickTitle = async (songId: number) => {
     }
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    message.error(t('message.get_song_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
   }
 }
 
@@ -160,14 +160,17 @@ const onQuickUpload = (record: PlayRecordInfo) => {
 
 const onAddToCart = (record: PlayRecordInfo) => {
   const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.id)
-  if (exists) return
+  if (exists) {
+    message.error(t('message.add_to_upload_list_failed'))
+    return
+  }
   appStore.uploadList.push({
     title: record.chart.title,
     difficulty: record.chart.difficulty,
     level: record.chart.level,
     chart_id: record.chart.id,
-    score: 0,
   })
+  message.success(t('message.add_to_upload_list_success'))
 }
 
 const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
@@ -196,13 +199,13 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     },
   },
   {
-    title: t('term.b35orb15'),
+    title: t('term.season'),
     key: 'b15',
-    width: 70,
+    width: 90,
     render(row) {
       return h('span', {
         class: row.chart.b15 ? 'version-badge version-badge--new' : 'version-badge version-badge--old',
-      }, row.chart.b15 ? t('term.b15') : t('term.b35'))
+      }, row.chart.b15 ? t('term.current') : t('term.past'))
     },
   },
   {
@@ -235,6 +238,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     title: t('term.record_time'),
     key: 'record_time',
     width: 130,
+    sorter: true,
     render(row) {
       return h('span', { class: 'time-text' }, dayjs(row.record_time).format('YY/MM/DD HH:mm'))
     },
@@ -287,6 +291,11 @@ const loadRecords = async () => {
   }
 }
 
+const refreshRecords = async () => {
+  await loadRecords()
+  message.success(t('message.refresh_record_success'))
+}
+
 watch(() => userStore.logged_in, (loggedIn) => {
   if (loggedIn) loadRecords()
 })
@@ -297,8 +306,7 @@ onMounted(loadRecords)
 <style scoped>
 .filters-row {
   display: flex;
-  gap: var(--space-4);
-  margin-bottom: var(--space-4);
+  gap: 0 var(--space-4);
   flex-wrap: wrap;
 }
 .table-wrapper {
