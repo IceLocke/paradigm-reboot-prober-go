@@ -9,7 +9,7 @@ type PlayRecord struct {
 	PlayRecordBase
 	ID         int       `gorm:"primaryKey" json:"id"`
 	RecordTime time.Time `gorm:"not null" json:"record_time"`
-	Username   string    `gorm:"not null;index" json:"username"`
+	Username   string    `gorm:"not null;index;index:idx_pr_user_chart,priority:1" json:"username"`
 	Rating     int       `gorm:"not null" json:"rating"`
 	Chart      *Chart    `gorm:"foreignKey:ChartID;references:ID" json:"chart,omitempty"`
 }
