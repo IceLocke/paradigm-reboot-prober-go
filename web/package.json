@@ -13,6 +13,7 @@
     "generate:api": "swagger2openapi ../docs/swagger.json -o src/api/openapi3.json && openapi-typescript src/api/openapi3.json -o src/api/generated.d.ts"
   },
   "dependencies": {
+    "@vercel/speed-insights": "^2.0.0",
     "@vueuse/core": "^12.5.0",
     "axios": "^1.7.9",
     "dayjs": "^1.11.13",
@@ -28,7 +29,10 @@
     "vue-router": "^4.5.0"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "vue-demi"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "vue-demi"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
