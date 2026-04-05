@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"paradigm-reboot-prober-go/config"
 	"time"
@@ -17,6 +19,9 @@ func VerifyPassword(plainPassword, encodedPassword string) bool {
 
 // EncodePassword hashes the password using bcrypt.
 func EncodePassword(password string) (string, error) {
+	if len(password) > 72 {
+		return "", errors.New("password must not exceed 72 bytes")
+	}
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), config.GlobalConfig.Auth.BcryptCost)
 	return string(bytes), err
 }
@@ -31,6 +36,14 @@ func GenerateJWT(claims jwt.MapClaims, expiresDelta *time.Duration) (string, err
 	}
 
 	claims["exp"] = expire.Unix()
+	claims["iat"] = time.Now().Unix()
+
+	// Generate a random JWT ID for potential token revocation
+	jtiBytes := make([]byte, 16)
+	if _, err := rand.Read(jtiBytes); err != nil {
+		return "", err
+	}
+	claims["jti"] = hex.EncodeToString(jtiBytes)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(config.GlobalConfig.Auth.SecretKey))
