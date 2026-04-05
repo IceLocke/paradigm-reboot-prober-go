@@ -3,16 +3,64 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
+	"paradigm-reboot-prober-go/config"
+	"paradigm-reboot-prober-go/internal/model"
+	"paradigm-reboot-prober-go/internal/repository"
+	"paradigm-reboot-prober-go/internal/service"
 	"paradigm-reboot-prober-go/pkg/auth"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
+
+func setupAuthTest(t *testing.T) *service.UserService {
+	t.Helper()
+	config.InitDefaults()
+	config.GlobalConfig.Auth.SecretKey = "testsecret"
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	if err := db.AutoMigrate(&model.User{}); err != nil {
+		t.Fatalf("failed to migrate: %v", err)
+	}
+
+	encoded, _ := auth.EncodePassword("password")
+
+	// Active user
+	db.Create(&model.User{
+		UserBase: model.UserBase{
+			Username:    "testuser",
+			Email:       "test@test.com",
+			IsActive:    true,
+			UploadToken: "tok",
+		},
+		EncodedPassword: encoded,
+	})
+
+	// Inactive user
+	db.Create(&model.User{
+		UserBase: model.UserBase{
+			Username:    "inactiveuser",
+			Email:       "inactive@test.com",
+			IsActive:    false,
+			UploadToken: "tok2",
+		},
+		EncodedPassword: encoded,
+	})
+
+	userRepo := repository.NewUserRepository(db)
+	return service.NewUserService(userRepo)
+}
 
 func TestAuthMiddleware(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	userService := setupAuthTest(t)
 
 	tests := []struct {
 		name           string
@@ -73,13 +121,31 @@ func TestAuthMiddleware(t *testing.T) {
 			expectedBody:   "OK",
 			checkContext:   true,
 		},
+		{
+			name: "Valid Token - User Not Found",
+			setupAuth: func() string {
+				token, _ := auth.GenerateAccessJWT("nonexistent", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"user not found"}`,
+		},
+		{
+			name: "Valid Token - Inactive User",
+			setupAuth: func() string {
+				token, _ := auth.GenerateAccessJWT("inactiveuser", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"user account is deactivated"}`,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Setup router
 			r := gin.New()
-			r.Use(AuthMiddleware())
+			r.Use(AuthMiddleware(userService))
 			r.GET("/", func(c *gin.Context) {
 				if tt.checkContext {
 					username, exists := c.Get("username")
