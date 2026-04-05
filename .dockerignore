@@ -8,6 +8,5 @@
 web/node_modules
 web/dist
 legacy
-docs
 *.md
 !README.md
