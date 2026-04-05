@@ -396,6 +396,11 @@ onMounted(() => {
 .table-wrapper {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: var(--space-3);
 }
 
 .pagination-row {
