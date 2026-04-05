@@ -3,12 +3,16 @@ package service
 import (
 	"cmp"
 	"errors"
+	"fmt"
+	"log/slog"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/repository"
 	"slices"
 	"strconv"
 	"strings"
+
+	"gorm.io/gorm"
 )
 
 // compareVersion compares two dot-separated version strings numerically.
@@ -89,7 +93,7 @@ func (s *SongService) ResolveSongID(songAddr string) (int, error) {
 			return 0, err
 		}
 		if song == nil {
-			return 0, errors.New("song not found")
+			return 0, fmt.Errorf("song %w", ErrNotFound)
 		}
 		return song.ID, nil
 	}
@@ -99,7 +103,7 @@ func (s *SongService) ResolveSongID(songAddr string) (int, error) {
 		return 0, err
 	}
 	if song == nil {
-		return 0, errors.New("song not found")
+		return 0, fmt.Errorf("song %w", ErrNotFound)
 	}
 	return song.ID, nil
 }
@@ -113,7 +117,7 @@ func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
 			return 0, err
 		}
 		if chart == nil {
-			return 0, errors.New("chart not found")
+			return 0, fmt.Errorf("chart %w", ErrNotFound)
 		}
 		return chart.ID, nil
 	}
@@ -138,7 +142,7 @@ func (s *SongService) ResolveChartID(chartAddr string) (int, error) {
 		return 0, err
 	}
 	if chart == nil {
-		return 0, errors.New("chart not found")
+		return 0, fmt.Errorf("chart %w", ErrNotFound)
 	}
 	return chart.ID, nil
 }
@@ -160,7 +164,7 @@ func (s *SongService) GetSingleSong(songID int, src string) (*model.Song, error)
 		return nil, err
 	}
 	if song == nil {
-		return nil, errors.New("song doesn't exist")
+		return nil, fmt.Errorf("song doesn't exist: %w", ErrNotFound)
 	}
 
 	return song, nil
@@ -176,13 +180,22 @@ func (s *SongService) GetSingleSongByWikiID(wikiID string) (*model.Song, error) 
 		return nil, err
 	}
 	if song == nil {
-		return nil, errors.New("song doesn't exist")
+		return nil, fmt.Errorf("song doesn't exist: %w", ErrNotFound)
 	}
 
 	return song, nil
 }
 
 func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartInfo, error) {
+	// Check for duplicate difficulties
+	seenDifficulties := make(map[model.Difficulty]bool)
+	for _, chartInput := range req.Charts {
+		if seenDifficulties[chartInput.Difficulty] {
+			return nil, fmt.Errorf("duplicate chart difficulty: %s", chartInput.Difficulty)
+		}
+		seenDifficulties[chartInput.Difficulty] = true
+	}
+
 	// Map request to model.Song
 	song := &model.Song{
 		SongBase: req.SongBase,
@@ -201,8 +214,10 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 
 	createdSong, err := s.songRepo.CreateSong(song)
 	if err != nil {
+		slog.Error("failed to create song", "error", err, "title", req.Title)
 		return nil, err
 	}
+	slog.Info("song created", "song_id", createdSong.ID, "title", createdSong.Title)
 
 	// Convert to response format
 	var charts []model.ChartInfo
@@ -224,6 +239,15 @@ func (s *SongService) CreateSong(req *request.CreateSongRequest) ([]model.ChartI
 }
 
 func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartInfo, error) {
+	// Check for duplicate difficulties
+	seenDifficulties := make(map[model.Difficulty]bool)
+	for _, chartInput := range req.Charts {
+		if seenDifficulties[chartInput.Difficulty] {
+			return nil, fmt.Errorf("duplicate chart difficulty: %s", chartInput.Difficulty)
+		}
+		seenDifficulties[chartInput.Difficulty] = true
+	}
+
 	// Map request to model.Song
 	song := &model.Song{
 		SongBase: req.SongBase,
@@ -242,8 +266,13 @@ func (s *SongService) UpdateSong(req *request.UpdateSongRequest) ([]model.ChartI
 
 	updatedSong, err := s.songRepo.UpdateSong(req.ID, song)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("song %w", ErrNotFound)
+		}
+		slog.Error("failed to update song", "error", err, "song_id", req.ID)
 		return nil, err
 	}
+	slog.Info("song updated", "song_id", updatedSong.ID, "title", updatedSong.Title)
 
 	// Convert to response format
 	var charts []model.ChartInfo

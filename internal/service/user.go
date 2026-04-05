@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
@@ -34,6 +35,7 @@ func (s *UserService) Login(username, plainPassword string) (string, error) {
 	}
 
 	if !auth.VerifyPassword(plainPassword, user.EncodedPassword) {
+		slog.Warn("login failed", "username", username, "reason", "incorrect password")
 		return "", errors.New("incorrect username or password")
 	}
 
@@ -96,7 +98,13 @@ func (s *UserService) CreateUser(req *request.CreateUserRequest) (*model.User, e
 		EncodedPassword: encodedPassword,
 	}
 
-	return s.userRepo.CreateUser(user)
+	createdUser, err := s.userRepo.CreateUser(user)
+	if err != nil {
+		slog.Error("failed to create user", "error", err, "username", req.Username)
+		return nil, err
+	}
+	slog.Info("user created", "username", req.Username)
+	return createdUser, nil
 }
 
 func (s *UserService) RefreshUploadToken(username string) (string, error) {
@@ -107,7 +115,7 @@ func (s *UserService) RefreshUploadToken(username string) (string, error) {
 			return err
 		}
 		if user == nil {
-			return errors.New("user not found")
+			return fmt.Errorf("user %w", ErrNotFound)
 		}
 
 		uploadToken, err := generateHexToken(config.GlobalConfig.Auth.UploadTokenLength)
@@ -132,7 +140,7 @@ func (s *UserService) UpdateUser(username string, req *request.UpdateUserRequest
 			return err
 		}
 		if user == nil {
-			return errors.New("user not found")
+			return fmt.Errorf("user %w", ErrNotFound)
 		}
 
 		if req.Nickname != nil {
@@ -167,11 +175,12 @@ func (s *UserService) ChangePassword(username string, req *request.ChangePasswor
 			return err
 		}
 		if user == nil {
-			return errors.New("user not found")
+			return fmt.Errorf("user %w", ErrNotFound)
 		}
 
 		if !auth.VerifyPassword(req.OldPassword, user.EncodedPassword) {
-			return errors.New("incorrect old password")
+			slog.Warn("password change failed", "username", username, "reason", "incorrect old password")
+			return fmt.Errorf("incorrect old password: %w", ErrUnauthorized)
 		}
 
 		encodedPassword, err := auth.EncodePassword(req.NewPassword)
@@ -194,7 +203,7 @@ func (s *UserService) ResetPassword(req *request.ResetPasswordRequest) error {
 			return err
 		}
 		if user == nil {
-			return errors.New("user not found")
+			return fmt.Errorf("user %w", ErrNotFound)
 		}
 
 		encodedPassword, err := auth.EncodePassword(req.NewPassword)
@@ -214,7 +223,7 @@ func (s *UserService) CheckProbeAuthority(username string, currentUser *model.Us
 		return fmt.Errorf("failed to query user: %w", err)
 	}
 	if targetUser == nil {
-		return errors.New("user not found")
+		return fmt.Errorf("user %w", ErrNotFound)
 	}
 
 	// Authorized if: anonymous probe enabled, or authenticated as the target user, or admin
@@ -224,12 +233,9 @@ func (s *UserService) CheckProbeAuthority(username string, currentUser *model.Us
 
 	if !isAuthorized {
 		if currentUser == nil {
-			return errors.New("anonymous probes are not allowed")
+			return fmt.Errorf("anonymous probes are not allowed: %w", ErrForbidden)
 		}
-		if currentUser.Username != username {
-			return errors.New("authentication info not matched")
-		}
-		return errors.New("forbidden")
+		return fmt.Errorf("authentication info not matched: %w", ErrForbidden)
 	}
 
 	return nil

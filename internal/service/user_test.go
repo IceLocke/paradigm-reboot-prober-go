@@ -101,7 +101,7 @@ func TestUserService_ChangePassword(t *testing.T) {
 			NewPassword: "another",
 		})
 		assert.Error(t, err)
-		assert.Equal(t, "incorrect old password", err.Error())
+		assert.ErrorIs(t, err, ErrUnauthorized)
 	})
 
 	t.Run("User not found", func(t *testing.T) {

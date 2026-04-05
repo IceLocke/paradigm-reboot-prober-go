@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
@@ -144,7 +145,7 @@ func (ctrl *UserController) UpdateMe(c *gin.Context) {
 
 	user, err := ctrl.userService.UpdateUser(username, &req)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
@@ -175,7 +176,7 @@ func (ctrl *UserController) ChangePassword(c *gin.Context) {
 		return
 	}
 	if err := ctrl.userService.ChangePassword(username, &req); err != nil {
-		if strings.Contains(err.Error(), "incorrect old password") {
+		if errors.Is(err, service.ErrUnauthorized) {
 			c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -204,7 +205,7 @@ func (ctrl *UserController) ResetPassword(c *gin.Context) {
 		return
 	}
 	if err := ctrl.userService.ResetPassword(&req); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})

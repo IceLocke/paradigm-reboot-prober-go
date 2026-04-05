@@ -1,12 +1,12 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/model/request"
 	"paradigm-reboot-prober-go/internal/service"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -115,7 +115,7 @@ func (ctrl *SongController) UpdateSong(c *gin.Context) {
 
 	charts, err := ctrl.songService.UpdateSong(&req)
 	if err != nil {
-		if strings.Contains(err.Error(), "record not found") {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: "song not found"})
 		} else {
 			c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
