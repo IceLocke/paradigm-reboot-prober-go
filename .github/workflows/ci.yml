@@ -157,7 +157,7 @@ jobs:
           
       - name: Check Health Status
         run: |
-          STATUS=$(curl -s http://localhost:8080/health | jq -r '.status')
+          STATUS=$(curl -s http://localhost:8080/healthz | jq -r '.status')
           if [ "$STATUS" != "up" ]; then
             echo "Health check failed: $STATUS"
             docker compose logs app
