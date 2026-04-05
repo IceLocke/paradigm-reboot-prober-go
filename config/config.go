@@ -61,7 +61,7 @@ func InitDefaults() {
 	GlobalConfig.Auth.JWTExpiration = "24h"
 	GlobalConfig.Auth.BcryptCost = 10
 	GlobalConfig.Auth.UploadTokenLength = 16
-	GlobalConfig.Auth.UsernamePattern = `^[A-Za-z][A-Za-z0-9_]{5,15}$`
+	GlobalConfig.Auth.UsernamePattern = `^[a-z][a-z0-9_]{5,15}$`
 	GlobalConfig.Pagination.DefaultPageSize = 50
 	GlobalConfig.Pagination.MaxPageSize = 200
 	GlobalConfig.Game.B35Limit = 35
