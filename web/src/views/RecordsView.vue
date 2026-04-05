@@ -219,7 +219,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
   {
     title: t('term.score'),
     key: 'score',
-    width: 110,
+    width: 100,
     sorter: true,
     render(row) {
       return h('span', { class: 'mono' }, row.score.toLocaleString())

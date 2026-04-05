@@ -299,11 +299,19 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
   },
   {
     title: t('term.difficulty'),
+    key: 'difficulty',
+    width: 90,
+    render(row) {
+      return h(DifficultyBadge, { difficulty: row.difficulty, short: false })
+    },
+  },
+  {
+    title: t('term.level'),
     key: 'level',
-    width: 110,
+    width: 80,
     sorter: true,
     render(row) {
-      return h(DifficultyBadge, { difficulty: row.difficulty, level: row.level, short: true })
+      return h('span', { class: 'mono' }, row.level.toFixed(1))
     },
   },
   {
