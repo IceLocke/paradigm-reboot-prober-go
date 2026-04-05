@@ -1,6 +1,7 @@
 package service
 
 import (
+	"log/slog"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/repository"
 )
@@ -25,7 +26,13 @@ func (s *RecordService) CreateRecords(username string, records []model.PlayRecor
 			Username:       username,
 		})
 	}
-	return s.recordRepo.BatchCreateRecords(playRecords, isReplaced)
+	results, err := s.recordRepo.BatchCreateRecords(playRecords, isReplaced)
+	if err != nil {
+		slog.Error("failed to create records", "error", err, "username", username, "count", len(records))
+		return nil, err
+	}
+	slog.Info("records uploaded", "username", username, "count", len(results))
+	return results, nil
 }
 
 func (s *RecordService) GetAllRecords(username string, pageSize, pageIndex int, sortBy string, order string) ([]model.PlayRecord, error) {
