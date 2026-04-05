@@ -43,16 +43,19 @@ func setupAuthTest(t *testing.T) *service.UserService {
 		EncodedPassword: encoded,
 	})
 
-	// Inactive user
-	db.Create(&model.User{
+	// Inactive user — IsActive has gorm default:true, so Create with false
+	// would be skipped as a zero-value. Create first, then update explicitly.
+	inactiveUser := &model.User{
 		UserBase: model.UserBase{
 			Username:    "inactiveuser",
 			Email:       "inactive@test.com",
-			IsActive:    false,
+			IsActive:    true,
 			UploadToken: "tok2",
 		},
 		EncodedPassword: encoded,
-	})
+	}
+	db.Create(inactiveUser)
+	db.Model(inactiveUser).Update("is_active", false)
 
 	userRepo := repository.NewUserRepository(db)
 	return service.NewUserService(userRepo)
