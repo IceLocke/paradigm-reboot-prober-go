@@ -88,7 +88,7 @@ function roundedRectPath(
   ctx.closePath()
 }
 
-/** Draw image with CSS `object-fit: cover` behaviour */
+/** Draw image with CSS `object-fit: cover` behaviour, biased slightly upward */
 function drawImageCover(
   ctx: CanvasRenderingContext2D,
   img: HTMLImageElement,
@@ -106,7 +106,8 @@ function drawImageCover(
     sw = img.naturalWidth
     sh = sw / targetRatio
     sx = 0
-    sy = (img.naturalHeight - sh) / 2
+    // Bias crop toward the top (0.35) so cover art's visual center is preserved
+    sy = (img.naturalHeight - sh) * 0.3
   }
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
 }

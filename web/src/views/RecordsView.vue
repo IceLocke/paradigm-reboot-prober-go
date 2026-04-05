@@ -302,8 +302,12 @@ onMounted(loadRecords)
   flex-wrap: wrap;
 }
 .table-wrapper {
-  overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: var(--space-3);
 }
 .pagination-row {
   display: flex;
@@ -346,7 +350,7 @@ onMounted(loadRecords)
 
 :deep(.link-text) { color: var(--accent); cursor: pointer; text-decoration: none; font-size: var(--text-sm); }
 :deep(.link-text:hover) { text-decoration: underline; }
-:deep(.mono) { font-family: var(--font-mono); font-size: var(--text-sm); }
+:deep(.mono) { font-family: var(--font-mono),monospace; font-size: var(--text-sm); }
 :deep(.time-text) { font-size: var(--text-xs); color: var(--text-secondary); }
 :deep(.version-badge) { display: inline-flex; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; }
 :deep(.version-badge--new) { background: var(--accent-muted); color: var(--accent); }
