@@ -5,6 +5,7 @@
     :title="t('auth.profile')"
     style="width: 500px; max-width: 95vw;"
     :bordered="false"
+    :auto-focus="false"
     @update:show="$emit('update:show', $event)"
   >
     <div v-if="userStore.profile" class="profile-form">

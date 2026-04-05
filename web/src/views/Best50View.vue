@@ -29,36 +29,13 @@
 
     <!-- Stats overview -->
     <div class="stats-row">
-      <StatCard label="Best 50 Avg" :value="b50Rating" :precision="4" />
+      <StatCard label="Rating" :value="b50Rating" :precision="4" />
       <StatCard label="B35 Avg" :value="b35Rating" :precision="4" />
       <StatCard label="B15 Avg" :value="b15Rating" :precision="4" />
     </div>
 
     <!-- Charts section -->
     <div class="b50-grid">
-      <!-- B35 -->
-      <BaseCard>
-        <template #header>
-          <div class="section-header">
-            <h3>{{ t('term.b35') }} <span class="record-count">({{ b35Records.length }})</span></h3>
-          </div>
-        </template>
-        <div class="chart-wrapper" v-if="b35Records.length > 0">
-          <VChart :option="scatterOption(b35Records)" :autoresize="true" class="scatter-chart" />
-        </div>
-        <div class="table-wrapper">
-          <n-data-table
-            :columns="recordColumns"
-            :data="b35Records"
-            :pagination="false"
-            :bordered="false"
-            :scroll-x="500"
-            size="small"
-            striped
-          />
-        </div>
-      </BaseCard>
-
       <!-- B15 -->
       <BaseCard>
         <template #header>
@@ -73,6 +50,29 @@
           <n-data-table
             :columns="recordColumns"
             :data="b15Records"
+            :pagination="false"
+            :bordered="false"
+            :scroll-x="500"
+            size="small"
+            striped
+          />
+        </div>
+      </BaseCard>
+
+      <!-- B35 -->
+      <BaseCard>
+        <template #header>
+          <div class="section-header">
+            <h3>{{ t('term.b35') }} <span class="record-count">({{ b35Records.length }})</span></h3>
+          </div>
+        </template>
+        <div class="chart-wrapper" v-if="b35Records.length > 0">
+          <VChart :option="scatterOption(b35Records)" :autoresize="true" class="scatter-chart" />
+        </div>
+        <div class="table-wrapper">
+          <n-data-table
+            :columns="recordColumns"
+            :data="b35Records"
             :pagination="false"
             :bordered="false"
             :scroll-x="500"
@@ -209,7 +209,11 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     title: t('term.title'),
     key: 'title',
     minWidth: 140,
-    ellipsis: { tooltip: true },
+    ellipsis: {
+      tooltip: {
+        zIndex: 1,
+      },
+    },
     render(row) {
       return h('a', {
         class: 'link-text',
@@ -381,6 +385,7 @@ onMounted(loadData)
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-5);
+  align-items: start;
 }
 @media (max-width: 1023px) {
   .b50-grid { grid-template-columns: 1fr; }

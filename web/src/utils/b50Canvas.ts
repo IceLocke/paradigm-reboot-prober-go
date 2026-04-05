@@ -46,10 +46,10 @@ const DIFF_COLORS: Record<string, string> = {
 }
 
 const DIFF_NAMES: Record<string, string> = {
-  detected: "Detected",
-  invaded: 'Invaded',
-  massive: 'Massive',
-  reboot: 'Reboot',
+  detected: "DETECTED",
+  invaded: 'INVADED',
+  massive: 'MASSIVE',
+  reboot: 'REBOOT',
 }
 
 // ─── Fonts ─────────────────────────────────────────────────────

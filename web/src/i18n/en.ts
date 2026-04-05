@@ -71,6 +71,7 @@ const en = {
     avg_rating: 'Avg Rating',
     total_rating: 'Total Rating',
     scope: 'Scope',
+    all: 'All',
   },
   message: {
     welcome: 'Welcome, {username}!',

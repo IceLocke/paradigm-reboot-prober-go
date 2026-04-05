@@ -5,6 +5,7 @@
     :title="t('auth.login')"
     style="width: 400px; max-width: 95vw;"
     :bordered="false"
+    :auto-focus="false"
     @update:show="$emit('update:show', $event)"
   >
     <div class="auth-form">
