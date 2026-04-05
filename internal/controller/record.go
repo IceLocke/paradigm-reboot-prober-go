@@ -2,6 +2,7 @@ package controller
 
 import (
 	"crypto/subtle"
+	"errors"
 	"net/http"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
@@ -100,7 +101,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	// Check authority
 	if err := ctrl.userService.CheckProbeAuthority(username, currentUser); err != nil {
-		if strings.Contains(err.Error(), "not found") {
+		if errors.Is(err, service.ErrNotFound) {
 			c.JSON(http.StatusNotFound, model.Response{Error: err.Error()})
 		} else {
 			c.JSON(http.StatusForbidden, model.Response{Error: err.Error()})
@@ -316,7 +317,7 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		var recordInfos []model.PlayRecordInfo
+		recordInfos := make([]model.PlayRecordInfo, 0, len(records))
 		for i := range records {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
 		}
@@ -334,8 +335,12 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		total, _ := ctrl.recordService.CountAllRecordsBySong(username, songID)
-		var recordInfos []model.PlayRecordInfo
+		total, err := ctrl.recordService.CountAllRecordsBySong(username, songID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		recordInfos := make([]model.PlayRecordInfo, 0, len(records))
 		for i := range records {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
 		}
@@ -401,7 +406,7 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		var recordInfos []model.PlayRecordInfo
+		recordInfos := make([]model.PlayRecordInfo, 0, 1)
 		if record != nil {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(record))
 		}
@@ -419,8 +424,12 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		total, _ := ctrl.recordService.CountAllRecordsByChart(username, chartID)
-		var recordInfos []model.PlayRecordInfo
+		total, err := ctrl.recordService.CountAllRecordsByChart(username, chartID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+			return
+		}
+		recordInfos := make([]model.PlayRecordInfo, 0, len(records))
 		for i := range records {
 			recordInfos = append(recordInfos, model.ToPlayRecordInfo(&records[i]))
 		}
