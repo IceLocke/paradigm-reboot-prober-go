@@ -174,7 +174,8 @@ const filteredData = computed(() => {
 watch(
   () => filteredData.value.length,
   (length: number) => {
-    pageIndex.value = Math.min(pageIndex.value, Math.ceil(length / pageSize))
+    const maxPage = Math.max(1, Math.ceil(length / pageSize))
+    pageIndex.value = Math.min(pageIndex.value, maxPage)
   },
 )
 
