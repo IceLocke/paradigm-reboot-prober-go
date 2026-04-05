@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
+	"net/http"
+	"os/signal"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/router"
 	"paradigm-reboot-prober-go/internal/util"
+	"syscall"
+	"time"
 )
 
 // @title           Paradigm: Reboot Prober API
@@ -36,9 +41,31 @@ func main() {
 
 	r := router.SetupRouter(util.DB)
 
-	port := config.GlobalConfig.Server.Port
-	log.Printf("Server starting on %s", port)
-	if err := r.Run(port); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := &http.Server{
+		Addr:    config.GlobalConfig.Server.Port,
+		Handler: r,
 	}
+
+	// Start server in a goroutine
+	go func() {
+		log.Printf("Server starting on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-ctx.Done()
+
+	log.Println("Shutting down server...")
+
+	// Give outstanding requests 10 seconds to complete
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced shutdown: %v", err)
+	}
+	log.Println("Server exited")
 }
