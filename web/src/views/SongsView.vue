@@ -35,6 +35,7 @@
     <!-- Table -->
     <div class="table-wrapper">
       <n-data-table
+        remote
         :columns="columns"
         :data="paginatedData"
         :bordered="false"
@@ -42,7 +43,7 @@
         size="small"
         striped
         :row-key="(row: ChartInfo) => row.id"
-        @update:sorter="onSorterUpdate"
+        @update:sorter="handleSorterUpdate"
       />
     </div>
 
@@ -184,9 +185,9 @@ const paginatedData = computed(() => {
   return filteredData.value.slice(start, start + pageSize)
 })
 
-const onSorterUpdate = (sorter: DataTableSortState | DataTableSortState[] | null) => {
+const handleSorterUpdate = (sorter: DataTableSortState | DataTableSortState[] | null) => {
   if (Array.isArray(sorter)) {
-    sortState.value = sorter[0]
+    sortState.value = sorter[0] ?? null
   } else {
     sortState.value = sorter
   }

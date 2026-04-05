@@ -26,6 +26,7 @@
     <!-- Table -->
     <div class="table-wrapper">
       <n-data-table
+        remote
         :columns="columns"
         :data="records"
         :bordered="false"
@@ -33,7 +34,7 @@
         size="small"
         striped
         :loading="loading"
-        @update:sorter="onSorterUpdate"
+        @update:sorter="handleSorterUpdate"
       />
     </div>
 
@@ -109,7 +110,7 @@ watch(scope, () => {
   loadRecords()
 })
 
-const onSorterUpdate = (
+const handleSorterUpdate = (
   sorter: DataTableSortState | DataTableSortState[] | null
 ) => {
   if (Array.isArray(sorter)) {
