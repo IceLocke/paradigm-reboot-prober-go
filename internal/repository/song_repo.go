@@ -140,6 +140,7 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 				if err := tx.Create(&newChart).Error; err != nil {
 					return err
 				}
+				existingSong.Charts = append(existingSong.Charts, newChart)
 			}
 		}
 		result = &existingSong
