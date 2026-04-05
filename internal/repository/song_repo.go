@@ -143,6 +143,23 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 				existingSong.Charts = append(existingSong.Charts, newChart)
 			}
 		}
+		// Delete charts not in the update request
+		requestedDifficulties := make(map[model.Difficulty]bool)
+		for _, c := range updatedSong.Charts {
+			requestedDifficulties[c.Difficulty] = true
+		}
+		remainingCharts := make([]model.Chart, 0, len(existingSong.Charts))
+		for i := range existingSong.Charts {
+			chart := &existingSong.Charts[i]
+			if !requestedDifficulties[chart.Difficulty] {
+				if err := tx.Delete(chart).Error; err != nil {
+					return err
+				}
+			} else {
+				remainingCharts = append(remainingCharts, *chart)
+			}
+		}
+		existingSong.Charts = remainingCharts
 		result = &existingSong
 		return nil
 	})
