@@ -8,3 +8,7 @@ if [ -n "$GH_TOKEN" ]; then
 fi
 
 git submodule update --init --remote || echo "Submodule checkout skipped (private repo requires GH_TOKEN)"
+
+if [ -n "$GH_TOKEN" ]; then
+  git config --global url."https://github.com/".insteadOf "https://x-access-token:${GH_TOKEN}@github.com/"
+fi
