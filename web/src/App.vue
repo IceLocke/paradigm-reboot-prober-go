@@ -1,4 +1,5 @@
 <template>
+  <SpeedInsights />
   <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-notification-provider>
@@ -47,6 +48,7 @@ import { useAppStore } from '@/stores/app'
 import { getMyInfo } from '@/api/user'
 import { getAllCharts } from '@/api/song'
 import { USE_MOCK, getMockCharts, getMockUser } from '@/api/mock'
+import { SpeedInsights } from '@vercel/speed-insights/vue';
 
 import AppHeader from '@/components/layout/AppHeader.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
