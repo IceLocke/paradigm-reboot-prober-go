@@ -34,6 +34,8 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
+func intPtr(v int) *int { return &v }
+
 func performRequest(r http.Handler, method, path string, body io.Reader, headers map[string]string) *httptest.ResponseRecorder {
 	req, _ := http.NewRequest(method, path, body)
 	for k, v := range headers {

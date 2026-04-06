@@ -30,13 +30,13 @@ func TestRecordService(t *testing.T) {
 		records := []model.PlayRecordBase{
 			{
 				ChartID: chartID,
-				Score:   1000000,
+				Score:   intPtr(1000000),
 			},
 		}
 		savedRecords, err := recordService.CreateRecords(ctx, "testuser", records, false)
 		assert.NoError(t, err)
 		assert.Len(t, savedRecords, 1)
-		assert.Equal(t, 1000000, savedRecords[0].Score)
+		assert.Equal(t, 1000000, *savedRecords[0].Score)
 		assert.Equal(t, "testuser", savedRecords[0].Username)
 	})
 
@@ -44,7 +44,7 @@ func TestRecordService(t *testing.T) {
 		records, err := recordService.GetAllRecords(ctx, "testuser", 10, 0, "score", "desc")
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
-		assert.Equal(t, 1000000, records[0].Score)
+		assert.Equal(t, 1000000, *records[0].Score)
 	})
 
 	t.Run("GetBest50Records", func(t *testing.T) {

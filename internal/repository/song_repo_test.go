@@ -202,12 +202,12 @@ func TestSongRepository_UpdateSong_RecalculatesRatings(t *testing.T) {
 
 	// Create play records
 	_, err = recordRepo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: intPtr(1000000)},
 		Username:       "user_lvlchg",
 	}, false)
 	assert.NoError(t, err)
 	_, err = recordRepo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: 1005000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: intPtr(1005000)},
 		Username:       "user_lvlchg",
 	}, false)
 	assert.NoError(t, err)
@@ -228,8 +228,8 @@ func TestSongRepository_UpdateSong_RecalculatesRatings(t *testing.T) {
 		db.Where("chart_id = ?", chartID).Find(&records)
 		assert.Len(t, records, 2)
 		for _, r := range records {
-			expected := rating.SingleRating(newLevel, r.Score)
-			assert.Equal(t, expected, r.Rating, "score=%d should have rating=%d", r.Score, expected)
+			expected := rating.SingleRating(newLevel, *r.Score)
+			assert.Equal(t, expected, r.Rating, "score=%d should have rating=%d", *r.Score, expected)
 		}
 	})
 

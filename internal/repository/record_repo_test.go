@@ -27,14 +27,14 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
 				ChartID: chartID,
-				Score:   1000000,
+				Score:   intPtr(1000000),
 			},
 			Username: "testuser",
 		}
 		savedRecord, err := repo.CreateRecord(record, false)
 		assert.NoError(t, err)
 		assert.NotNil(t, savedRecord)
-		assert.Equal(t, 1000000, savedRecord.Score)
+		assert.Equal(t, 1000000, *savedRecord.Score)
 		assert.Equal(t, "testuser", savedRecord.Username)
 		// Level 15.0, Score 1000000 -> Rating 150.0 -> 15000
 		assert.Equal(t, 15000, savedRecord.Rating)
@@ -51,7 +51,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
 				ChartID: chartID,
-				Score:   1000001,
+				Score:   intPtr(1000001),
 			},
 			Username: "testuser",
 		}
@@ -71,7 +71,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
 				ChartID: chartID,
-				Score:   900000,
+				Score:   intPtr(900000),
 			},
 			Username: "testuser",
 		}
@@ -90,7 +90,7 @@ func TestRecordRepository_CreateRecord(t *testing.T) {
 		record := &model.PlayRecord{
 			PlayRecordBase: model.PlayRecordBase{
 				ChartID: chartID,
-				Score:   800000,
+				Score:   intPtr(800000),
 			},
 			Username: "testuser",
 		}
@@ -129,12 +129,12 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 
 	// Create Records
 	_, err := repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: createdB15.Charts[0].ID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: createdB15.Charts[0].ID, Score: intPtr(1000000)},
 		Username:       "user_b50",
 	}, false)
 	assert.NoError(t, err)
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: createdOld.Charts[0].ID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: createdOld.Charts[0].ID, Score: intPtr(1000000)},
 		Username:       "user_b50",
 	}, false)
 	assert.NoError(t, err)
@@ -174,27 +174,27 @@ func TestRecordRepository_PerSongQueries(t *testing.T) {
 
 	// Create records for user on song1 charts
 	_, err := repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[0].ID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[0].ID, Score: intPtr(1000000)},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ID, Score: 1005000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ID, Score: intPtr(1005000)},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	// A second record on same chart (lower score)
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ID, Score: 900000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created1.Charts[1].ID, Score: intPtr(900000)},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
 
 	// Create record for user on song2 chart
 	_, err = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: created2.Charts[0].ID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: created2.Charts[0].ID, Score: intPtr(1000000)},
 		Username:       "user_song",
 	}, false)
 	assert.NoError(t, err)
@@ -254,21 +254,21 @@ func TestRecordRepository_PerChartQueries(t *testing.T) {
 
 	// Create multiple records on massive chart
 	_, _ = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: massiveChartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: massiveChartID, Score: intPtr(1000000)},
 		Username:       "user_chart",
 	}, false)
 	_, _ = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: massiveChartID, Score: 1005000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: massiveChartID, Score: intPtr(1005000)},
 		Username:       "user_chart",
 	}, false)
 	_, _ = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: massiveChartID, Score: 900000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: massiveChartID, Score: intPtr(900000)},
 		Username:       "user_chart",
 	}, false)
 
 	// One record on detected chart
 	_, _ = repo.CreateRecord(&model.PlayRecord{
-		PlayRecordBase: model.PlayRecordBase{ChartID: detectedChartID, Score: 1000000},
+		PlayRecordBase: model.PlayRecordBase{ChartID: detectedChartID, Score: intPtr(1000000)},
 		Username:       "user_chart",
 	}, false)
 
@@ -276,7 +276,7 @@ func TestRecordRepository_PerChartQueries(t *testing.T) {
 		record, err := repo.GetBestRecordByChart("user_chart", massiveChartID)
 		assert.NoError(t, err)
 		assert.NotNil(t, record)
-		assert.Equal(t, 1005000, record.Score) // best score
+		assert.Equal(t, 1005000, *record.Score) // best score
 		assert.NotNil(t, record.Chart)
 		assert.NotNil(t, record.Chart.Song)
 	})
@@ -292,7 +292,7 @@ func TestRecordRepository_PerChartQueries(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, records, 3)
 		// Should be ordered by score desc
-		assert.True(t, records[0].Score >= records[1].Score)
+		assert.True(t, *records[0].Score >= *records[1].Score)
 	})
 
 	t.Run("GetAllRecordsByChart - pagination", func(t *testing.T) {
@@ -336,7 +336,7 @@ func TestRecalculateRatingsByChart(t *testing.T) {
 	scores := []int{1000000, 1005000, 900000}
 	for _, score := range scores {
 		_, err := recordRepo.CreateRecord(&model.PlayRecord{
-			PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: score},
+			PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: intPtr(score)},
 			Username:       "user_recalc",
 		}, false)
 		assert.NoError(t, err)
@@ -347,7 +347,7 @@ func TestRecalculateRatingsByChart(t *testing.T) {
 	db.Where("chart_id = ? AND username = ?", chartID, "user_recalc").Find(&before)
 	assert.Len(t, before, 3)
 	for _, r := range before {
-		assert.Equal(t, rating.SingleRating(15.0, r.Score), r.Rating)
+		assert.Equal(t, rating.SingleRating(15.0, *r.Score), r.Rating)
 	}
 
 	t.Run("Recalculate with new level", func(t *testing.T) {
@@ -359,8 +359,8 @@ func TestRecalculateRatingsByChart(t *testing.T) {
 		db.Where("chart_id = ? AND username = ?", chartID, "user_recalc").Find(&after)
 		assert.Len(t, after, 3)
 		for _, r := range after {
-			expected := rating.SingleRating(newLevel, r.Score)
-			assert.Equal(t, expected, r.Rating, "score=%d should have rating=%d, got=%d", r.Score, expected, r.Rating)
+			expected := rating.SingleRating(newLevel, *r.Score)
+			assert.Equal(t, expected, r.Rating, "score=%d should have rating=%d, got=%d", *r.Score, expected, r.Rating)
 		}
 	})
 

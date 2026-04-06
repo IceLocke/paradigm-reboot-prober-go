@@ -85,7 +85,7 @@ func main() {
 		fmt.Printf("  ❌ PlayRecord query failed: %v\n", err)
 	} else {
 		fmt.Printf("  ✅ PlayRecord: ID=%d, Username=%s, ChartID=%d, Score=%d, Rating=%d\n",
-			pr.ID, pr.Username, pr.ChartID, pr.Score, pr.Rating)
+			pr.ID, pr.Username, pr.ChartID, *pr.Score, pr.Rating)
 		if pr.Chart != nil {
 			fmt.Printf("     Chart: ID=%d, Difficulty=%s\n", pr.Chart.ID, pr.Chart.Difficulty)
 		}
@@ -99,7 +99,7 @@ func main() {
 		fmt.Printf("  ✅ BestPlayRecord: ID=%d, Username=%s, ChartID=%d, PlayRecordID=%d\n",
 			bpr.ID, bpr.Username, bpr.ChartID, bpr.PlayRecordID)
 		if bpr.PlayRecord != nil {
-			fmt.Printf("     PlayRecord: ID=%d, Score=%d\n", bpr.PlayRecord.ID, bpr.PlayRecord.Score)
+			fmt.Printf("     PlayRecord: ID=%d, Score=%d\n", bpr.PlayRecord.ID, *bpr.PlayRecord.Score)
 		}
 	}
 

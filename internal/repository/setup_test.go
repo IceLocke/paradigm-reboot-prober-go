@@ -35,3 +35,5 @@ func setupTestDB(t *testing.T) *gorm.DB {
 
 	return db
 }
+
+func intPtr(v int) *int { return &v }
