@@ -74,7 +74,8 @@ func parsePaginationParams(c *gin.Context) paginationParams {
 // @Param page_index query int false "Page index" default(1)
 // @Param sort_by query string false "Sort by (rating, score, record_time, etc.)" default(rating)
 // @Param order query string false "Order (desc or asc)" default(desc)
-// @Success 200 {object} model.PlayRecordResponse
+// @Success 200 {object} model.PlayRecordResponse "b50/best/all scope"
+// @Success 200 {object} model.AllChartsResponse "all-charts scope"
 // @Failure 400 {object} model.Response
 // @Failure 401 {object} model.Response
 // @Failure 403 {object} model.Response

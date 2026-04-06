@@ -115,18 +115,17 @@ const onSave = async () => {
   successMsg.value = ''
 
   try {
-    if (USE_MOCK) {
-      if (userStore.profile) {
-        userStore.profile.nickname = form.nickname
-        userStore.profile.anonymous_probe = form.anonymous_probe
-      }
-    } else {
-      const res = await updateMyInfo({
+    if (!USE_MOCK) {
+      await updateMyInfo({
         nickname: form.nickname,
         qq_account: form.qq_account || undefined,
         anonymous_probe: form.anonymous_probe,
       })
-      userStore.profile = res.data
+    }
+    if (userStore.profile) {
+      userStore.profile.nickname = form.nickname
+      userStore.profile.qq_account = form.qq_account
+      userStore.profile.anonymous_probe = form.anonymous_probe
     }
     successMsg.value = t('message.update_profile_success')
     message.success(t('message.update_profile_success'))

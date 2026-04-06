@@ -1,5 +1,5 @@
 import client from './client'
-import type { PlayRecordResponse, BatchCreatePlayRecordRequest, PlayRecord } from './types'
+import type { PlayRecordResponse, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse } from './types'
 
 export const getRecords = (
   username: string,
@@ -22,4 +22,10 @@ export const getRecords = (
 
 export const uploadRecords = (username: string, data: BatchCreatePlayRecordRequest) => {
   return client.post<PlayRecord[]>(`/records/${username}`, data)
+}
+
+export const getAllChartsWithScores = (username: string) => {
+  return client.get<AllChartsResponse>(`/records/${username}`, {
+    params: { scope: 'all-charts' },
+  })
 }

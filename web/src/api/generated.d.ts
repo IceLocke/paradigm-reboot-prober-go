@@ -40,13 +40,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description OK */
+                /** @description all-charts scope */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["model.PlayRecordResponse"];
+                        "application/json": components["schemas"]["model.AllChartsResponse"];
                     };
                 };
                 /** @description Bad Request */
@@ -818,6 +818,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        "model.AllChartsResponse": {
+            charts?: components["schemas"]["model.ChartWithScore"][];
+            nickname?: string;
+            username?: string;
+        };
         "model.Chart": {
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
@@ -907,6 +912,14 @@ export interface components {
             override_title?: string;
             /** @example 2.0.0 */
             override_version?: string;
+        };
+        "model.ChartWithScore": {
+            difficulty?: components["schemas"]["model.Difficulty"];
+            id?: number;
+            level?: number;
+            score?: number;
+            title?: string;
+            version?: string;
         };
         /** @enum {string} */
         "model.Difficulty": "detected" | "invaded" | "massive" | "reboot";

@@ -3,6 +3,12 @@
     <div class="page-header">
       <h2>{{ t('term.records') }}</h2>
       <div class="page-actions">
+        <button class="icon-btn" :title="t('common.export_csv')" @click="onExportCsv">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </button>
+        <button class="icon-btn" :title="t('common.import_csv')" @click="showCsvImport = true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </button>
         <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
           <template #trigger>
             <button class="icon-btn" :title="t('term.upload_list')">
@@ -51,6 +57,7 @@
 
     <!-- Modals -->
     <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+    <CsvImportModal v-model:show="showCsvImport" @success="loadRecords" />
     <QuickUploadModal
       v-model:show="showQuickUpload"
       :title="uploadTarget.title"
@@ -71,15 +78,18 @@ import dayjs from 'dayjs'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
-import { getRecords } from '@/api/record'
+import { getRecords, getAllChartsWithScores } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
-import { USE_MOCK, getMockRecords } from '@/api/mock'
+import { USE_MOCK, getMockRecords, getMockAllCharts } from '@/api/mock'
+import { exportCsv } from '@/utils/csv'
+import { saveAs } from 'file-saver'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
 import BaseTabs from '@/components/ui/BaseTabs.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
+import CsvImportModal from '@/components/business/CsvImportModal.vue'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -98,6 +108,7 @@ const sortState = ref<DataTableSortState | null>(null)
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const showQuickUpload = ref(false)
+const showCsvImport = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
 const scopeTabs = [
@@ -295,6 +306,24 @@ const loadRecords = async () => {
 const refreshRecords = async () => {
   await loadRecords()
   message.success(t('message.refresh_record_success'))
+}
+
+const onExportCsv = async () => {
+  try {
+    let csvData
+    if (USE_MOCK) {
+      csvData = getMockAllCharts()
+    } else {
+      const res = await getAllChartsWithScores(userStore.username)
+      csvData = res.data
+    }
+    const csvStr = exportCsv(csvData.charts)
+    const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8' })
+    saveAs(blob, `${userStore.username}_records.csv`)
+    message.success(t('message.csv_export_success'))
+  } catch {
+    message.error(t('message.csv_export_failed'))
+  }
 }
 
 watch(() => userStore.logged_in, (loggedIn) => {
