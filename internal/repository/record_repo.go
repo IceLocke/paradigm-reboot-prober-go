@@ -178,7 +178,7 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string) ([]model.
 	var results []model.ChartWithScore
 
 	err := r.db.Table("charts").
-		Select("charts.id, songs.title, songs.version, charts.difficulty, charts.level, COALESCE(play_records.score, 0) as score").
+		Select("charts.id, COALESCE(charts.override_title, songs.title) as title, COALESCE(charts.override_version, songs.version) as version, charts.difficulty, charts.level, COALESCE(play_records.score, 0) as score").
 		Joins("JOIN songs ON charts.song_id = songs.id").
 		Joins("LEFT JOIN play_records ON charts.id = play_records.chart_id AND play_records.username = ?", username).
 		Joins("LEFT JOIN best_play_records ON play_records.id = best_play_records.play_record_id").

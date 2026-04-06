@@ -60,7 +60,7 @@ func (s *SongService) GetAllCharts(ctx context.Context) ([]model.ChartInfo, erro
 	for _, song := range songs {
 		for _, chart := range song.Charts {
 			charts = append(charts, model.ChartInfo{
-				SongBase:     song.SongBase,
+				SongBase:     song.WithOverride(chart.SongBaseOverride),
 				SongID:       song.ID,
 				ID:           chart.ID,
 				Difficulty:   chart.Difficulty,
@@ -205,10 +205,11 @@ func (s *SongService) CreateSong(ctx context.Context, req *request.CreateSongReq
 	// Map charts
 	for _, chartInput := range req.Charts {
 		chart := model.Chart{
-			Difficulty:  chartInput.Difficulty,
-			Level:       chartInput.Level,
-			LevelDesign: &chartInput.LevelDesign,
-			Notes:       chartInput.Notes,
+			Difficulty:       chartInput.Difficulty,
+			Level:            chartInput.Level,
+			LevelDesign:      &chartInput.LevelDesign,
+			Notes:            chartInput.Notes,
+			SongBaseOverride: chartInput.SongBaseOverride,
 		}
 		song.Charts = append(song.Charts, chart)
 	}
@@ -224,7 +225,7 @@ func (s *SongService) CreateSong(ctx context.Context, req *request.CreateSongReq
 	var charts []model.ChartInfo
 	for _, chart := range createdSong.Charts {
 		info := model.ChartInfo{
-			SongBase:     createdSong.SongBase,
+			SongBase:     createdSong.WithOverride(chart.SongBaseOverride),
 			SongID:       createdSong.ID,
 			ID:           chart.ID,
 			Difficulty:   chart.Difficulty,
@@ -257,10 +258,11 @@ func (s *SongService) UpdateSong(ctx context.Context, req *request.UpdateSongReq
 	// Map charts
 	for _, chartInput := range req.Charts {
 		chart := model.Chart{
-			Difficulty:  chartInput.Difficulty,
-			Level:       chartInput.Level,
-			LevelDesign: &chartInput.LevelDesign,
-			Notes:       chartInput.Notes,
+			Difficulty:       chartInput.Difficulty,
+			Level:            chartInput.Level,
+			LevelDesign:      &chartInput.LevelDesign,
+			Notes:            chartInput.Notes,
+			SongBaseOverride: chartInput.SongBaseOverride,
 		}
 		song.Charts = append(song.Charts, chart)
 	}
@@ -279,7 +281,7 @@ func (s *SongService) UpdateSong(ctx context.Context, req *request.UpdateSongReq
 	var charts []model.ChartInfo
 	for _, chart := range updatedSong.Charts {
 		info := model.ChartInfo{
-			SongBase:     updatedSong.SongBase,
+			SongBase:     updatedSong.WithOverride(chart.SongBaseOverride),
 			SongID:       updatedSong.ID,
 			ID:           chart.ID,
 			Difficulty:   chart.Difficulty,

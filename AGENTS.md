@@ -145,7 +145,7 @@ Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit
 ### Key Domain Concepts
 
 - **Song**: A music track with metadata (title, artist, genre, cover, illustrator, version, album, bpm, length, wiki_id, b15 flag).
-- **Chart**: A specific difficulty chart (谱面) of a song. Difficulties: `detected`, `invaded`, `massive`, `reboot`. Each chart has a level, optional fitting_level, optional level_design, and notes count.
+- **Chart**: A specific difficulty chart (谱面) of a song. Difficulties: `detected`, `invaded`, `massive`, `reboot`. Each chart has a level, optional fitting_level, optional level_design, and notes count. Charts may also carry `SongBaseOverride` fields (`override_title`, `override_artist`, `override_version`, `override_cover`) to override the parent song's metadata — useful when a chart was added in a later version (e.g. Reboot difficulty). `SongBase.WithOverride()` applies non-nil overrides when building API responses.
 - **PlayRecord**: A single play attempt with a score, linked to a Chart and User.
 - **BestPlayRecord**: Points to the best PlayRecord per user per Chart (unique constraint on username+chart_id). Updated automatically when a higher score is submitted.
 - **Rating**: Calculated from chart level and score using a piecewise formula (see `pkg/rating/rating.go`). Stored as `int` (rating × 100).

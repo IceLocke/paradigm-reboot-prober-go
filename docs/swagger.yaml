@@ -16,6 +16,18 @@ definitions:
         type: string
       notes:
         type: integer
+      override_artist:
+        example: Alt Artist
+        type: string
+      override_cover:
+        example: Cover_alt.jpg
+        type: string
+      override_title:
+        example: Alt Title
+        type: string
+      override_version:
+        example: 2.0.0
+        type: string
       song:
         $ref: '#/definitions/model.Song'
       song_id:
@@ -127,6 +139,18 @@ definitions:
         example: 1000
         minimum: 0
         type: integer
+      override_artist:
+        example: Alt Artist
+        type: string
+      override_cover:
+        example: Cover_alt.jpg
+        type: string
+      override_title:
+        example: Alt Title
+        type: string
+      override_version:
+        example: 2.0.0
+        type: string
     required:
     - difficulty
     - level

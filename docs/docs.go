@@ -788,6 +788,22 @@ const docTemplate = `{
                 "notes": {
                     "type": "integer"
                 },
+                "override_artist": {
+                    "type": "string",
+                    "example": "Alt Artist"
+                },
+                "override_cover": {
+                    "type": "string",
+                    "example": "Cover_alt.jpg"
+                },
+                "override_title": {
+                    "type": "string",
+                    "example": "Alt Title"
+                },
+                "override_version": {
+                    "type": "string",
+                    "example": "2.0.0"
+                },
                 "song": {
                     "$ref": "#/definitions/model.Song"
                 },
@@ -951,6 +967,22 @@ const docTemplate = `{
                     "type": "integer",
                     "minimum": 0,
                     "example": 1000
+                },
+                "override_artist": {
+                    "type": "string",
+                    "example": "Alt Artist"
+                },
+                "override_cover": {
+                    "type": "string",
+                    "example": "Cover_alt.jpg"
+                },
+                "override_title": {
+                    "type": "string",
+                    "example": "Alt Title"
+                },
+                "override_version": {
+                    "type": "string",
+                    "example": "2.0.0"
                 }
             }
         },
