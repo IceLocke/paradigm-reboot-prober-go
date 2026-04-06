@@ -62,6 +62,32 @@ func (d Difficulty) Order() int {
 	}
 }
 
+// SongBaseOverride holds optional per-chart overrides for SongBase fields.
+// A nil pointer means "use the song's original value".
+type SongBaseOverride struct {
+	OverrideTitle   *string `gorm:"column:override_title"   json:"override_title,omitempty"   example:"Alt Title"`
+	OverrideArtist  *string `gorm:"column:override_artist"  json:"override_artist,omitempty"  example:"Alt Artist"`
+	OverrideVersion *string `gorm:"column:override_version" json:"override_version,omitempty" example:"2.0.0"`
+	OverrideCover   *string `gorm:"column:override_cover"   json:"override_cover,omitempty"   example:"Cover_alt.jpg"`
+}
+
+// WithOverride returns a copy of SongBase with non-nil override fields applied.
+func (s SongBase) WithOverride(o SongBaseOverride) SongBase {
+	if o.OverrideTitle != nil {
+		s.Title = *o.OverrideTitle
+	}
+	if o.OverrideArtist != nil {
+		s.Artist = *o.OverrideArtist
+	}
+	if o.OverrideVersion != nil {
+		s.Version = *o.OverrideVersion
+	}
+	if o.OverrideCover != nil {
+		s.Cover = *o.OverrideCover
+	}
+	return s
+}
+
 // Chart represents a specific difficulty chart (谱面) of a song
 type Chart struct {
 	ID           int        `gorm:"primaryKey" json:"id"`
@@ -71,7 +97,8 @@ type Chart struct {
 	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level"`
 	LevelDesign  *string    `gorm:"column:level_design" json:"level_design"`
 	Notes        int        `gorm:"not null" json:"notes"`
-	Song         *Song      `gorm:"foreignKey:SongID;references:ID" json:"song,omitempty"`
+	SongBaseOverride
+	Song *Song `gorm:"foreignKey:SongID;references:ID" json:"song,omitempty"`
 }
 
 // TableName specifies the table name for GORM
@@ -85,6 +112,7 @@ type ChartInput struct {
 	Level       float64    `json:"level" binding:"required,gt=0" example:"14.5"`
 	LevelDesign string     `json:"level_design" example:"Designer"`
 	Notes       int        `json:"notes" binding:"required,min=0" example:"1000"`
+	SongBaseOverride
 }
 
 // ChartInfo represents the detailed information of a song's chart (flattened view)

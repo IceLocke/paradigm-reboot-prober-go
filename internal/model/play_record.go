@@ -64,12 +64,13 @@ func ToPlayRecordInfo(record *PlayRecord) PlayRecordInfo {
 			FittingLevel: record.Chart.FittingLevel,
 		}
 		if record.Chart.Song != nil {
-			info.Chart.WikiID = record.Chart.Song.WikiID
-			info.Chart.Title = record.Chart.Song.Title
-			info.Chart.Version = record.Chart.Song.Version
-			info.Chart.B15 = record.Chart.Song.B15
+			effective := record.Chart.Song.WithOverride(record.Chart.SongBaseOverride)
+			info.Chart.WikiID = effective.WikiID
+			info.Chart.Title = effective.Title
+			info.Chart.Version = effective.Version
+			info.Chart.B15 = effective.B15
 			info.Chart.SongID = record.Chart.Song.ID
-			info.Chart.Cover = record.Chart.Song.Cover
+			info.Chart.Cover = effective.Cover
 		}
 	}
 	return info

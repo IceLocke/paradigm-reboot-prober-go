@@ -204,6 +204,125 @@ func TestSongService_ResolveChartID(t *testing.T) {
 	})
 }
 
+func ptr(s string) *string { return &s }
+
+func TestSongService_ChartOverride(t *testing.T) {
+	db := setupTestDB(t)
+	songRepo := repository.NewSongRepository(db)
+	songService := NewSongService(songRepo)
+	ctx := context.Background()
+
+	t.Run("CreateSong with override fields", func(t *testing.T) {
+		req := &request.CreateSongRequest{
+			SongBase: model.SongBase{
+				WikiID:  "override_song",
+				Title:   "Original Title",
+				Artist:  "Original Artist",
+				Version: "1.0.0",
+				Cover:   "original.jpg",
+			},
+			Charts: []model.ChartInput{
+				{
+					Difficulty: model.DifficultyMassive,
+					Level:      15.0,
+					Notes:      1000,
+				},
+				{
+					Difficulty: model.DifficultyReboot,
+					Level:      15.5,
+					Notes:      1200,
+					SongBaseOverride: model.SongBaseOverride{
+						OverrideVersion: ptr("2.0.0"),
+						OverrideTitle:   ptr("Reboot Title"),
+						OverrideArtist:  ptr("Reboot Artist"),
+					},
+				},
+			},
+		}
+		charts, err := songService.CreateSong(ctx, req)
+		assert.NoError(t, err)
+		assert.Len(t, charts, 2)
+
+		// Find charts by difficulty
+		var massiveChart, rebootChart model.ChartInfo
+		for _, c := range charts {
+			switch c.Difficulty {
+			case model.DifficultyMassive:
+				massiveChart = c
+			case model.DifficultyReboot:
+				rebootChart = c
+			}
+		}
+
+		// Massive chart should have original song values
+		assert.Equal(t, "Original Title", massiveChart.Title)
+		assert.Equal(t, "Original Artist", massiveChart.Artist)
+		assert.Equal(t, "1.0.0", massiveChart.Version)
+
+		// Reboot chart should have overridden values
+		assert.Equal(t, "Reboot Title", rebootChart.Title)
+		assert.Equal(t, "Reboot Artist", rebootChart.Artist)
+		assert.Equal(t, "2.0.0", rebootChart.Version)
+		assert.Equal(t, "original.jpg", rebootChart.Cover) // Cover not overridden
+	})
+
+	t.Run("GetAllCharts reflects overrides", func(t *testing.T) {
+		charts, err := songService.GetAllCharts(ctx)
+		assert.NoError(t, err)
+
+		var rebootChart model.ChartInfo
+		for _, c := range charts {
+			if c.WikiID == "override_song" && c.Difficulty == model.DifficultyReboot {
+				rebootChart = c
+			}
+		}
+		assert.Equal(t, "Reboot Title", rebootChart.Title)
+		assert.Equal(t, "2.0.0", rebootChart.Version)
+	})
+
+	t.Run("UpdateSong preserves and modifies overrides", func(t *testing.T) {
+		song, _ := songService.GetSingleSongByWikiID(ctx, "override_song")
+		req := &request.UpdateSongRequest{
+			ID: song.ID,
+			SongBase: model.SongBase{
+				WikiID:  "override_song",
+				Title:   "Original Title",
+				Artist:  "Original Artist",
+				Version: "1.0.0",
+				Cover:   "original.jpg",
+			},
+			Charts: []model.ChartInput{
+				{
+					Difficulty: model.DifficultyMassive,
+					Level:      15.0,
+					Notes:      1000,
+				},
+				{
+					Difficulty: model.DifficultyReboot,
+					Level:      15.5,
+					Notes:      1200,
+					SongBaseOverride: model.SongBaseOverride{
+						OverrideVersion: ptr("3.0.0"), // Changed from 2.0.0
+						// Title/Artist overrides removed → should fall back to song values
+					},
+				},
+			},
+		}
+		charts, err := songService.UpdateSong(ctx, req)
+		assert.NoError(t, err)
+
+		var rebootChart model.ChartInfo
+		for _, c := range charts {
+			if c.Difficulty == model.DifficultyReboot {
+				rebootChart = c
+			}
+		}
+		assert.Equal(t, "3.0.0", rebootChart.Version)
+		assert.Equal(t, "Original Title", rebootChart.Title)   // Override removed → original
+		assert.Equal(t, "Original Artist", rebootChart.Artist) // Override removed → original
+	})
+}
+
 func TestCompareVersion(t *testing.T) {
 	tests := []struct {
 		a, b string

@@ -125,6 +125,7 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 				existingChart.Level = newChart.Level
 				existingChart.LevelDesign = newChart.LevelDesign
 				existingChart.Notes = newChart.Notes
+				existingChart.SongBaseOverride = newChart.SongBaseOverride
 				if err := tx.Save(existingChart).Error; err != nil {
 					return err
 				}
