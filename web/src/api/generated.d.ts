@@ -886,11 +886,11 @@ export interface components {
              */
             difficulty: "detected" | "invaded" | "massive" | "reboot";
             /** @example 14.5 */
-            level?: number;
+            level: number;
             /** @example Designer */
             level_design?: string;
             /** @example 1000 */
-            notes?: number;
+            notes: number;
         };
         /** @enum {string} */
         "model.Difficulty": "detected" | "invaded" | "massive" | "reboot";
