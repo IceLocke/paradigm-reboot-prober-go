@@ -11,7 +11,7 @@ type CreateUserRequest struct {
 // UpdateUserRequest represents the request to update an existing user
 type UpdateUserRequest struct {
 	Nickname       *string `json:"nickname" binding:"omitempty,min=0"`
-	QQNumber       *int    `json:"qq_number" binding:"omitempty,min=0"`
+	QQAccount      *string `json:"qq_account" binding:"omitempty"`
 	Account        *string `json:"account"`
 	AccountNumber  *int    `json:"account_number" binding:"omitempty,min=0"`
 	UUID           *string `json:"uuid"`

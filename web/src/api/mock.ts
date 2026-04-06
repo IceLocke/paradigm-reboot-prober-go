@@ -264,7 +264,7 @@ export function getMockUser(): User {
     username: 'demo_user',
     nickname: 'Demo',
     email: 'demo@example.com',
-    qq_number: 123456789,
+    qq_account: '123456789',
     account: 'demo_account',
     account_number: 1001,
     uuid: '550e8400-e29b-41d4-a716-446655440000',

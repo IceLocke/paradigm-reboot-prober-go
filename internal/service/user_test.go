@@ -169,14 +169,14 @@ func TestUserService_UpdateUser(t *testing.T) {
 
 	t.Run("Success", func(t *testing.T) {
 		newNick := "NewNick"
-		qq := 12345
+		qq := "12345"
 		updated, err := userService.UpdateUser(ctx, "upduser_svc", &request.UpdateUserRequest{
-			Nickname: &newNick,
-			QQNumber: &qq,
+			Nickname:  &newNick,
+			QQAccount: &qq,
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, "NewNick", updated.Nickname)
-		assert.Equal(t, 12345, *updated.QQNumber)
+		assert.Equal(t, "12345", *updated.QQAccount)
 
 		// Verify persisted
 		fetched, _ := userService.GetUser("upduser_svc")

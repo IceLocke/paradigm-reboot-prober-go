@@ -34,7 +34,7 @@ const en = {
     new_password: 'New Password',
     email: 'Email',
     upload_token: 'Upload Token',
-    qq_number: 'QQ Number',
+    qq_account: 'QQ',
     uuid: 'In-game UUID',
     anonymous_probe: 'Allow Anonymous Query',
     change_password: 'Change Password',

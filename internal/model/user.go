@@ -5,7 +5,7 @@ type UserBase struct {
 	Username       string  `gorm:"unique;not null" json:"username" binding:"required" example:"user123"`
 	Email          string  `gorm:"not null" json:"email" binding:"required,email" example:"user@example.com"`
 	Nickname       string  `gorm:"not null" json:"nickname" example:"小明"`
-	QQNumber       *int    `gorm:"column:qq_number" json:"qq_number" example:"12345678"`
+	QQAccount      *string `gorm:"column:qq_account" json:"qq_account" example:"12345678"`
 	Account        *string `gorm:"column:account" json:"account" example:"act_001"`
 	AccountNumber  *int    `gorm:"column:account_number" json:"account_number" example:"1001"`
 	UUID           *string `gorm:"column:uuid" json:"uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
@@ -33,7 +33,7 @@ type UserPublic struct {
 	Username       string  `json:"username" example:"user123"`
 	Email          string  `json:"email" example:"user@example.com"`
 	Nickname       string  `json:"nickname" example:"小明"`
-	QQNumber       *int    `json:"qq_number" example:"12345678"`
+	QQAccount      *string `json:"qq_account" example:"12345678"`
 	Account        *string `json:"account" example:"act_001"`
 	AccountNumber  *int    `json:"account_number" example:"1001"`
 	UUID           *string `json:"uuid" example:"550e8400-e29b-41d4-a716-446655440000"`
@@ -47,7 +47,7 @@ func (u *User) ToPublic() UserPublic {
 		Username:       u.Username,
 		Email:          u.Email,
 		Nickname:       u.Nickname,
-		QQNumber:       u.QQNumber,
+		QQAccount:      u.QQAccount,
 		Account:        u.Account,
 		AccountNumber:  u.AccountNumber,
 		UUID:           u.UUID,

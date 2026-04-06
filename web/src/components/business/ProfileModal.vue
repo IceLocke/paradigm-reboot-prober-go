@@ -25,6 +25,12 @@
         :label="t('auth.nickname')"
       />
 
+      <BaseInput
+        v-model="form.qq_account"
+        :label="t('auth.qq_account')"
+        :placeholder="t('auth.qq_account')"
+      />
+
       <!-- Upload Token -->
       <div class="token-field">
         <BaseInput
@@ -84,6 +90,7 @@ defineEmits<{ 'update:show': [value: boolean] }>()
 
 const form = reactive({
   nickname: '',
+  qq_account: '',
   anonymous_probe: false,
 })
 const loading = ref(false)
@@ -95,6 +102,7 @@ const tokenDisplay = computed(() => userStore.profile?.upload_token ?? '')
 watch(() => props.show, (val) => {
   if (val && userStore.profile) {
     form.nickname = userStore.profile.nickname ?? ''
+    form.qq_account = userStore.profile.qq_account ?? ''
     form.anonymous_probe = userStore.profile.anonymous_probe ?? false
     errorMsg.value = ''
     successMsg.value = ''
@@ -115,6 +123,7 @@ const onSave = async () => {
     } else {
       const res = await updateMyInfo({
         nickname: form.nickname,
+        qq_account: form.qq_account || undefined,
         anonymous_probe: form.anonymous_probe,
       })
       userStore.profile = res.data
