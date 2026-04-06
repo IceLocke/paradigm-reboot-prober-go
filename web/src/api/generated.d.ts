@@ -902,14 +902,14 @@ export interface components {
             rating?: number;
             record_time?: string;
             /** @example 1000000 */
-            score?: number;
+            score: number;
             username?: string;
         };
         "model.PlayRecordBase": {
             /** @example 1 */
             chart_id: number;
             /** @example 1000000 */
-            score?: number;
+            score: number;
         };
         "model.PlayRecordInfo": {
             chart?: components["schemas"]["model.ChartInfoSimple"];
