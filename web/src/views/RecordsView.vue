@@ -203,6 +203,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
         zIndex: 1,
       },
     },
+    fixed: "left",
     render(row) {
       return h('a', {
         class: 'link-text',
