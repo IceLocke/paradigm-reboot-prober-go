@@ -185,6 +185,15 @@ DO $$ BEGIN RAISE NOTICE '[step 6] All integer PK/FK columns widened to bigint.'
 
 
 -- ============================================================================
+-- 6b. Convert qq_number from integer to text (supports QQ email format)
+-- ============================================================================
+ALTER TABLE prober_users ALTER COLUMN qq_number TYPE text USING qq_number::text;
+ALTER TABLE prober_users RENAME COLUMN qq_number TO qq_account;
+
+DO $$ BEGIN RAISE NOTICE '[step 6b] prober_users.qq_number → qq_account (text).'; END $$;
+
+
+-- ============================================================================
 -- 7. Rename PK columns to `id` (Go convention: ID field)
 -- ============================================================================
 

@@ -826,6 +826,14 @@ export interface components {
             level?: number;
             level_design?: string;
             notes?: number;
+            /** @example Alt Artist */
+            override_artist?: string;
+            /** @example Cover_alt.jpg */
+            override_cover?: string;
+            /** @example Alt Title */
+            override_title?: string;
+            /** @example 2.0.0 */
+            override_version?: string;
             song?: components["schemas"]["model.Song"];
             song_id?: number;
         };
@@ -891,6 +899,14 @@ export interface components {
             level_design?: string;
             /** @example 1000 */
             notes: number;
+            /** @example Alt Artist */
+            override_artist?: string;
+            /** @example Cover_alt.jpg */
+            override_cover?: string;
+            /** @example Alt Title */
+            override_title?: string;
+            /** @example 2.0.0 */
+            override_version?: string;
         };
         /** @enum {string} */
         "model.Difficulty": "detected" | "invaded" | "massive" | "reboot";
@@ -979,7 +995,7 @@ export interface components {
             /** @example 小明 */
             nickname?: string;
             /** @example 12345678 */
-            qq_number?: number;
+            qq_account?: string;
             /** @example token_xyz */
             upload_token?: string;
             /** @example user123 */
@@ -1001,7 +1017,7 @@ export interface components {
             /** @example 小明 */
             nickname?: string;
             /** @example 12345678 */
-            qq_number?: number;
+            qq_account?: string;
             /** @example user123 */
             username?: string;
             /** @example 550e8400-e29b-41d4-a716-446655440000 */
@@ -1090,7 +1106,7 @@ export interface components {
             account_number?: number;
             anonymous_probe?: boolean;
             nickname?: string;
-            qq_number?: number;
+            qq_account?: string;
             uuid?: string;
         };
     };

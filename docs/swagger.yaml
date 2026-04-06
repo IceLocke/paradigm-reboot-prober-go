@@ -323,9 +323,9 @@ definitions:
       nickname:
         example: 小明
         type: string
-      qq_number:
-        example: 12345678
-        type: integer
+      qq_account:
+        example: "12345678"
+        type: string
       upload_token:
         example: token_xyz
         type: string
@@ -359,9 +359,9 @@ definitions:
       nickname:
         example: 小明
         type: string
-      qq_number:
-        example: 12345678
-        type: integer
+      qq_account:
+        example: "12345678"
+        type: string
       username:
         example: user123
         type: string
@@ -537,9 +537,8 @@ definitions:
       nickname:
         minLength: 0
         type: string
-      qq_number:
-        minimum: 0
-        type: integer
+      qq_account:
+        type: string
       uuid:
         type: string
     type: object

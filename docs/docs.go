@@ -1226,9 +1226,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "小明"
                 },
-                "qq_number": {
-                    "type": "integer",
-                    "example": 12345678
+                "qq_account": {
+                    "type": "string",
+                    "example": "12345678"
                 },
                 "upload_token": {
                     "type": "string",
@@ -1271,9 +1271,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "小明"
                 },
-                "qq_number": {
-                    "type": "integer",
-                    "example": 12345678
+                "qq_account": {
+                    "type": "string",
+                    "example": "12345678"
                 },
                 "username": {
                     "type": "string",
@@ -1515,9 +1515,8 @@ const docTemplate = `{
                     "type": "string",
                     "minLength": 0
                 },
-                "qq_number": {
-                    "type": "integer",
-                    "minimum": 0
+                "qq_account": {
+                    "type": "string"
                 },
                 "uuid": {
                     "type": "string"

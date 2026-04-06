@@ -34,7 +34,7 @@ const zh = {
     new_password: '新密码',
     email: '邮箱',
     upload_token: '上传 Token',
-    qq_number: 'QQ 号',
+    qq_account: 'QQ 号',
     uuid: '游戏内 UUID',
     anonymous_probe: '允许匿名查询',
     change_password: '修改密码',

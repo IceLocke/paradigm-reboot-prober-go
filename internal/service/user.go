@@ -147,8 +147,8 @@ func (s *UserService) UpdateUser(ctx context.Context, username string, req *requ
 		if req.Nickname != nil {
 			user.Nickname = *req.Nickname
 		}
-		if req.QQNumber != nil {
-			user.QQNumber = req.QQNumber
+		if req.QQAccount != nil {
+			user.QQAccount = req.QQAccount
 		}
 		if req.Account != nil {
 			user.Account = req.Account

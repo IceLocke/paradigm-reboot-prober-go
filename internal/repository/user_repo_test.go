@@ -125,10 +125,10 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		userToUpdate, _ := repo.GetUserByUsername("update_target")
 
 		newNick := "Updated Nick"
-		newQQ := 123456
+		newQQ := "123456"
 
 		userToUpdate.Nickname = newNick
-		userToUpdate.QQNumber = &newQQ
+		userToUpdate.QQAccount = &newQQ
 
 		updatedUser, err := repo.UpdateUser(userToUpdate)
 		assert.NoError(t, err)
@@ -137,8 +137,8 @@ func TestUserRepository_UpdateUser(t *testing.T) {
 		// Verify
 		fetchedUser, _ := repo.GetUserByUsername("update_target")
 		assert.Equal(t, "Updated Nick", fetchedUser.Nickname)
-		assert.NotNil(t, fetchedUser.QQNumber)
-		assert.Equal(t, 123456, *fetchedUser.QQNumber)
+		assert.NotNil(t, fetchedUser.QQAccount)
+		assert.Equal(t, "123456", *fetchedUser.QQAccount)
 	})
 
 	t.Run("Idempotency Check (PUT semantics)", func(t *testing.T) {
