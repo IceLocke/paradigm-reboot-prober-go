@@ -7,7 +7,7 @@
     :bordered="false"
     @update:show="$emit('update:show', $event)"
   >
-    <div class="upload-form">
+    <form class="upload-form" @submit.prevent="onSubmit">
       <div class="form-info">
         <div class="info-row">
           <span class="info-label">{{ t('term.title') }}</span>
@@ -41,10 +41,10 @@
       </div>
 
       <div class="form-actions">
-        <button class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
-        <button class="btn btn--primary" @click="onSubmit" :disabled="loading">{{ t('common.submit') }}</button>
+        <button type="button" class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn--primary" :disabled="loading">{{ t('common.submit') }}</button>
       </div>
-    </div>
+    </form>
   </n-modal>
 </template>
 

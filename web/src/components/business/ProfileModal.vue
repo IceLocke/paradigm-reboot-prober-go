@@ -8,7 +8,7 @@
     :auto-focus="false"
     @update:show="$emit('update:show', $event)"
   >
-    <div v-if="userStore.profile" class="profile-form">
+    <form v-if="userStore.profile" class="profile-form" @submit.prevent="onSave">
       <!-- Read-only info -->
       <div class="form-row">
         <span class="form-label">{{ t('auth.username') }}</span>
@@ -59,10 +59,10 @@
       <div v-if="successMsg" class="success-msg">{{ successMsg }}</div>
 
       <div class="form-actions">
-        <button class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
-        <button class="btn btn--primary" @click="onSave" :disabled="loading">{{ t('common.save') }}</button>
+        <button type="button" class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
+        <button type="submit" class="btn btn--primary" :disabled="loading">{{ t('common.save') }}</button>
       </div>
-    </div>
+    </form>
   </n-modal>
 </template>
 
