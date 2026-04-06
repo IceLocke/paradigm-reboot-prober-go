@@ -21,7 +21,7 @@
           <svg v-if="!exporting" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spin"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
         </button>
-        <button class="icon-btn" :title="t('common.refresh')" @click="loadData">
+        <button class="icon-btn" :title="t('common.refresh')" @click="refreshData">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>
@@ -40,7 +40,7 @@
       <BaseCard>
         <template #header>
           <div class="section-header">
-            <h3>{{ t('term.b15') }} <span class="record-count">({{ b15Records.length }})</span></h3>
+            <h3>{{ t('term.current') }} <span class="record-count">({{ b15Records.length }})</span></h3>
           </div>
         </template>
         <div class="chart-wrapper" v-if="b15Records.length > 0">
@@ -63,7 +63,7 @@
       <BaseCard>
         <template #header>
           <div class="section-header">
-            <h3>{{ t('term.b35') }} <span class="record-count">({{ b35Records.length }})</span></h3>
+            <h3>{{ t('term.past') }} <span class="record-count">({{ b35Records.length }})</span></h3>
           </div>
         </template>
         <div class="chart-wrapper" v-if="b35Records.length > 0">
@@ -162,14 +162,18 @@ const b15Rating = computed(() => {
 
 const onAddToCart = (record: PlayRecordInfo) => {
   const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.id)
-  if (exists) return
+  if (exists) {
+    message.error(t('message.add_to_upload_list_failed'))
+    return
+  }
   appStore.uploadList.push({
     title: record.chart.title,
     difficulty: record.chart.difficulty,
     level: record.chart.level,
     chart_id: record.chart.id,
-    score: 0,
+    score: record.score,
   })
+  message.success(t('message.add_to_upload_list_success'))
 }
 
 const onQuickUpload = (record: PlayRecordInfo) => {
@@ -182,7 +186,7 @@ const onQuickUpload = (record: PlayRecordInfo) => {
   showQuickUpload.value = true
 }
 
-const onClickSongTitle = async (songId: number) => {
+const onClickTitle = async (songId: number) => {
   showSongDetail.value = true
   selectedSong.value = null
   try {
@@ -199,7 +203,7 @@ const onClickSongTitle = async (songId: number) => {
     }
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    message.error(t('message.get_song_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
   }
 }
 
@@ -217,7 +221,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     render(row) {
       return h('a', {
         class: 'link-text',
-        onClick: () => onClickSongTitle(row.chart.song_id),
+        onClick: () => onClickTitle(row.chart.song_id),
       }, row.chart.title)
     },
   },
@@ -341,6 +345,11 @@ const loadData = async () => {
     const e = err as { response?: { data?: { error?: string } } }
     message.error(t('message.get_record_failed') + (e.response?.data?.error ?? ''))
   }
+}
+
+const refreshData = async () => {
+  await loadData()
+  message.success(t('message.refresh_record_success'))
 }
 
 const exportImage = async () => {

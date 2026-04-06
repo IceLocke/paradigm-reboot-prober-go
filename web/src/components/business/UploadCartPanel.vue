@@ -14,8 +14,8 @@
             <input
               type="number"
               class="score-input"
-              v-model.number="appStore.uploadList[index].score"
-              placeholder="Score"
+              v-model.number="appStore.uploadList[index].new_score"
+              v-bind:placeholder="String(appStore.uploadList[index].score ?? t('term.score'))"
               min="0"
               max="1010000"
             />
@@ -58,7 +58,7 @@ const removeItem = (chartId: number) => {
 const onSubmit = async () => {
   const records = appStore.uploadList.map((item) => ({
     chart_id: item.chart_id,
-    score: item.score,
+    score: item.new_score ?? 0,
   }))
 
   loading.value = true

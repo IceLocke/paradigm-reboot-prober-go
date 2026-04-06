@@ -31,8 +31,8 @@ const diffFullNames: Record<Difficulty, string> = {
 }
 
 const label = props.short
-  ? (props.level != null ? `${diffNames[props.difficulty]} ${props.level}` : diffNames[props.difficulty])
-  : (props.level != null ? `${diffFullNames[props.difficulty]} ${props.level}` : diffFullNames[props.difficulty])
+  ? (props.level != null ? `${diffNames[props.difficulty]} ${props.level.toFixed(1)}` : diffNames[props.difficulty])
+  : (props.level != null ? `${diffFullNames[props.difficulty]} ${props.level.toFixed(1)}` : diffFullNames[props.difficulty])
 </script>
 
 <style scoped>
