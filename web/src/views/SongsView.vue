@@ -35,14 +35,12 @@
     <!-- Table -->
     <div class="table-wrapper">
       <n-data-table
-        remote
         :columns="columns"
         :data="paginatedData"
         :bordered="false"
         :scroll-x="650"
         size="small"
         striped
-        :row-key="(row: ChartInfo) => row.id"
         @update:sorter="handleSorterUpdate"
       />
     </div>
@@ -274,6 +272,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
       },
     },
     sorter: true,
+    fixed: "left",
     render(row) {
       return h('a', {
         class: 'link-text',

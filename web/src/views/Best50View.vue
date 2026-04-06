@@ -218,6 +218,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
         zIndex: 1,
       },
     },
+    fixed: "left",
     render(row) {
       return h('a', {
         class: 'link-text',
@@ -247,7 +248,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     },
   },
   {
-    title: 'Rt.',
+    title: 'Rating',
     key: 'rating',
     width: 80,
     sorter: (a, b) => a.rating - b.rating,
