@@ -5,32 +5,32 @@
     </div>
     <template v-else>
       <form class="cart-form" @submit.prevent="onSubmit">
-      <div class="cart-list">
-        <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
-          <div class="cart-info">
-            <span class="cart-title">{{ item.title }}</span>
-            <DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" />
+        <div class="cart-list">
+          <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
+            <div class="cart-info">
+              <span class="cart-title">{{ item.title }}</span>
+              <DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" />
+            </div>
+            <div class="cart-score">
+              <input
+                type="number"
+                class="score-input"
+                v-model.number="appStore.uploadList[index].new_score"
+                v-bind:placeholder="String(appStore.uploadList[index].score ?? t('term.score'))"
+                min="0"
+                max="1010000"
+              />
+            </div>
+            <button type="button" class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
           </div>
-          <div class="cart-score">
-            <input
-              type="number"
-              class="score-input"
-              v-model.number="appStore.uploadList[index].new_score"
-              v-bind:placeholder="String(appStore.uploadList[index].score ?? t('term.score'))"
-              min="0"
-              max="1010000"
-            />
-          </div>
-          <button type="button" class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </div>
+        <div class="cart-actions">
+          <button type="submit" class="btn btn--primary btn--sm" :disabled="loading">
+            {{ t('common.submit') }} ({{ appStore.uploadList.length }})
           </button>
         </div>
-      </div>
-      <div class="cart-actions">
-        <button type="submit" class="btn btn--primary btn--sm" :disabled="loading">
-          {{ t('common.submit') }} ({{ appStore.uploadList.length }})
-        </button>
-      </div>
       </form>
     </template>
   </div>
