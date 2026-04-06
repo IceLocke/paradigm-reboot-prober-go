@@ -124,7 +124,7 @@ const onSave = async () => {
     }
     if (userStore.profile) {
       userStore.profile.nickname = form.nickname
-      userStore.profile.qq_account = form.qq_account || undefined
+      userStore.profile.qq_account = form.qq_account
       userStore.profile.anonymous_probe = form.anonymous_probe
     }
     successMsg.value = t('message.update_profile_success')
