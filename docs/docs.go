@@ -1479,7 +1479,7 @@ const docTemplate = `{
                 },
                 "nickname": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 0
                 },
                 "qq_number": {
                     "type": "integer",
