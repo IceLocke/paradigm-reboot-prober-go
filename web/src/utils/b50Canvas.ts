@@ -112,6 +112,21 @@ function drawImageCover(
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
 }
 
+/** Detect whether the browser supports CanvasRenderingContext2D.filter */
+function detectFilterSupport(): boolean {
+  try {
+    const c = document.createElement('canvas')
+    const ctx = c.getContext('2d')
+    if (!ctx) return false
+    ctx.filter = 'blur(1px)'
+    return ctx.filter === 'blur(1px)'
+  } catch {
+    return false
+  }
+}
+
+const supportsFilter = detectFilterSupport()
+
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text
   let t = text
@@ -167,18 +182,23 @@ function drawBackground(
   bgImage: HTMLImageElement | null,
 ) {
   if (bgImage) {
-    // Dark base beneath the blurred cover
+    // Dark base beneath the cover
     ctx.fillStyle = '#0e0e12'
     ctx.fillRect(0, 0, width, height)
 
-    ctx.save()
-    ctx.filter = 'blur(20px)'
-    // Draw larger than canvas to prevent white edges from blur
-    drawImageCover(ctx, bgImage, -40, -40, width + 80, height + 80)
-    ctx.restore()
+    if (supportsFilter) {
+      ctx.save()
+      ctx.filter = 'blur(20px)'
+      // Draw larger than canvas to prevent white edges from blur
+      drawImageCover(ctx, bgImage, -40, -40, width + 80, height + 80)
+      ctx.restore()
+      ctx.fillStyle = 'rgba(14, 14, 18, 0.45)'
+    } else {
+      drawImageCover(ctx, bgImage, 0, 0, width, height)
+      ctx.fillStyle = 'rgba(14, 14, 18, 0.7)'
+    }
 
-    // Semi-transparent overlay to ensure text readability
-    ctx.fillStyle = 'rgba(14, 14, 18, 0.45)'
+    // Overlay to ensure text readability
     ctx.fillRect(0, 0, width, height)
   } else {
     // No cover image — use a slightly lighter tinted background
@@ -280,18 +300,20 @@ function drawRecordCard(
 
   // ── Background: blurred cover or fallback ──
   if (coverImage) {
-    ctx.save()
-    ctx.filter = 'blur(3px)'
-    const bleed = 20 // extra pixels to avoid blur edge artifacts
-    drawImageCover(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed)
-    ctx.restore()
+    if (supportsFilter) {
+      ctx.save()
+      ctx.filter = 'blur(3px)'
+      const bleed = 20 // extra pixels to avoid blur edge artifacts
+      drawImageCover(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed)
+      ctx.restore()
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.42)'
+    } else {
+      drawImageCover(ctx, coverImage, x, y, w, h)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
+    }
   } else {
     ctx.fillStyle = '#1a1a22'
-    ctx.fillRect(x, y, w, h)
   }
-
-  // Dark overlay for readability
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)'
   ctx.fillRect(x, y, w, h)
 
   // ── Text content ──
