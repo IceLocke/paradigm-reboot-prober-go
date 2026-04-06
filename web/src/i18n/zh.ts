@@ -60,7 +60,7 @@ const zh = {
     album: '专辑',
     genre: '流派',
     length: '时长',
-    notes: '音符',
+    notes: '物量',
     score: '分数',
     rating: 'Rating',
     replace: '替换最佳记录',

@@ -7,6 +7,7 @@ interface UploadItem {
   level: number
   chart_id: number
   score?: number
+  new_score?: number
 }
 
 interface AppState {

@@ -171,6 +171,7 @@ const onAddToCart = (record: PlayRecordInfo) => {
     difficulty: record.chart.difficulty,
     level: record.chart.level,
     chart_id: record.chart.id,
+    score: record.score,
   })
   message.success(t('message.add_to_upload_list_success'))
 }
