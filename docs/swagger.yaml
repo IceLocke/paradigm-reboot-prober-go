@@ -509,7 +509,7 @@ definitions:
       anonymous_probe:
         type: boolean
       nickname:
-        minLength: 1
+        minLength: 0
         type: string
       qq_number:
         minimum: 0
