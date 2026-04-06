@@ -58,6 +58,10 @@ export type PlayRecordBase = DeepRequired<Schemas['model.PlayRecordBase']>
 export type PlayRecordInfo = DeepRequired<Schemas['model.PlayRecordInfo']>
 export type PlayRecordResponse = DeepRequired<Schemas['model.PlayRecordResponse']>
 
+// ─── All-Charts scope ──────────────────────────────────────────────
+export type ChartWithScore = DeepRequired<Schemas['model.ChartWithScore']>
+export type AllChartsResponse = DeepRequired<Schemas['model.AllChartsResponse']>
+
 // ─── Request DTOs (keep optional fields as-is) ────────────────────
 export type BatchCreatePlayRecordRequest = Schemas['request.BatchCreatePlayRecordRequest']
 export type CreateUserRequest = Schemas['request.CreateUserRequest']

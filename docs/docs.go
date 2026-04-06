@@ -87,9 +87,9 @@ const docTemplate = `{
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "all-charts scope",
                         "schema": {
-                            "$ref": "#/definitions/model.PlayRecordResponse"
+                            "$ref": "#/definitions/model.AllChartsResponse"
                         }
                     },
                     "400": {
@@ -762,6 +762,23 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "model.AllChartsResponse": {
+            "type": "object",
+            "properties": {
+                "charts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.ChartWithScore"
+                    }
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
         "model.Chart": {
             "type": "object",
             "properties": {
@@ -983,6 +1000,29 @@ const docTemplate = `{
                 "override_version": {
                     "type": "string",
                     "example": "2.0.0"
+                }
+            }
+        },
+        "model.ChartWithScore": {
+            "type": "object",
+            "properties": {
+                "difficulty": {
+                    "$ref": "#/definitions/model.Difficulty"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "level": {
+                    "type": "number"
+                },
+                "score": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
                 }
             }
         },

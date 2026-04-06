@@ -1,5 +1,16 @@
 basePath: /api/v2
 definitions:
+  model.AllChartsResponse:
+    properties:
+      charts:
+        items:
+          $ref: '#/definitions/model.ChartWithScore'
+        type: array
+      nickname:
+        type: string
+      username:
+        type: string
+    type: object
   model.Chart:
     properties:
       difficulty:
@@ -155,6 +166,21 @@ definitions:
     - difficulty
     - level
     - notes
+    type: object
+  model.ChartWithScore:
+    properties:
+      difficulty:
+        $ref: '#/definitions/model.Difficulty'
+      id:
+        type: integer
+      level:
+        type: number
+      score:
+        type: integer
+      title:
+        type: string
+      version:
+        type: string
     type: object
   model.Difficulty:
     enum:
@@ -600,9 +626,9 @@ paths:
       - application/json
       responses:
         "200":
-          description: OK
+          description: all-charts scope
           schema:
-            $ref: '#/definitions/model.PlayRecordResponse'
+            $ref: '#/definitions/model.AllChartsResponse'
         "400":
           description: Bad Request
           schema:

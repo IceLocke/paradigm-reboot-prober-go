@@ -360,7 +360,7 @@ const exportImage = async () => {
       b15Records: b15Records.value,
       b35Records: b35Records.value,
       username: USE_MOCK ? 'demo_user' : userStore.username,
-      nickname: nickname.value,
+      nickname: userStore.profile?.nickname || nickname.value,
       rating: b50Rating.value,
       b15Avg: b15Rating.value,
       b35Avg: b35Rating.value,

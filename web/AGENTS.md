@@ -80,7 +80,8 @@ web/
 │   │   └── app.ts                # App state (charts cache, upload cart, sidebar)
 │   │
 │   ├── utils/
-│   │   └── b50Canvas.ts          # B50 image Canvas renderer (export as JPEG)
+│   │   ├── b50Canvas.ts          # B50 image Canvas renderer (export as JPEG)
+│   │   └── csv.ts                # CSV export generation, import parsing, GBK/UTF-8 detection
 │   │
 │   ├── composables/
 │   │   └── useBreakpoint.ts      # Reactive viewport width / isMobile / isDesktop
@@ -110,6 +111,7 @@ web/
 │   │       ├── SongDetailModal.vue    # Song info modal (cover, metadata, charts)
 │   │       ├── QuickUploadModal.vue   # Single record upload form
 │   │       ├── UploadCartPanel.vue    # Batch upload queue with inline editing
+│   │       ├── CsvImportModal.vue      # CSV file import modal (parse, preview, batch upload)
 │   │       ├── LoginModal.vue         # Login form modal
 │   │       ├── RegisterModal.vue      # Registration form modal
 │   │       └── ProfileModal.vue       # User profile editor modal
@@ -350,7 +352,7 @@ Types are **auto-generated** from `docs/swagger.json` via `pnpm generate:api`, t
 |--------|-----------|
 | `user.ts` | `login`, `register`, `getMyInfo`, `updateMyInfo`, `changePassword`, `refreshUploadToken`, `resetPassword` |
 | `song.ts` | `getAllCharts`, `getSingleSongInfo`, `createSong`, `updateSong` |
-| `record.ts` | `getRecords`, `uploadRecords` |
+| `record.ts` | `getRecords`, `uploadRecords`, `getAllChartsWithScores` |
 
 ### v1 → v2 Breaking Changes
 
@@ -365,9 +367,9 @@ See `web/API_DIFF.md` for the full migration reference. Key changes:
 ## Internationalization
 
 - Auto-detects browser language (`navigator.language`)
-- Supported: `en` (English), `zh` (Simplified Chinese)
+- Supported: `en` (English), `zh` (Simplified Chinese), `ja` (Japanese)
 - Fallback: English
-- Translation files: `src/i18n/en.ts`, `src/i18n/zh.ts`
+- Translation files: `src/i18n/en.ts`, `src/i18n/zh.ts`, `src/i18n/ja.ts`
 - Usage in components: `const { t } = useI18n()` + `t('key.path')`
 - All user-facing strings MUST go through `t()`, never hardcode
 

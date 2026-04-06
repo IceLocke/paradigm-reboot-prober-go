@@ -1,4 +1,4 @@
-import type { ChartInfo, PlayRecordInfo, PlayRecordResponse, User } from './types'
+import type { ChartInfo, PlayRecordInfo, PlayRecordResponse, User, AllChartsResponse } from './types'
 import type { Difficulty } from './types'
 
 // ---- Mock Song Data ----
@@ -277,3 +277,19 @@ export function getMockUser(): User {
 
 // Flag for mock mode
 export const USE_MOCK = false
+
+export function getMockAllCharts(): AllChartsResponse {
+  const charts = getMockCharts()
+  return {
+    username: 'demo_user',
+    nickname: 'Demo',
+    charts: charts.map((c) => ({
+      id: c.id,
+      title: c.title,
+      version: c.version,
+      difficulty: c.difficulty,
+      level: c.level,
+      score: Math.random() > 0.3 ? 900000 + Math.floor(Math.random() * 110000) : 0,
+    })),
+  }
+}
