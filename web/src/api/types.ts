@@ -37,7 +37,11 @@ export type UploadToken = DeepRequired<Schemas['model.UploadToken']>
 // ─── Domain Models (response — always complete) ───────────────────
 export type User = DeepRequired<Schemas['model.User']>
 
-export type Chart = Omit<DeepRequired<Schemas['model.Chart']>, 'song'> & {
+/** Fields from SongBaseOverride — genuinely optional (Go `*string`), excluded from DeepRequired. */
+type SongBaseOverrideKeys = 'override_title' | 'override_artist' | 'override_version' | 'override_cover'
+
+export type Chart = Omit<DeepRequired<Schemas['model.Chart']>, 'song' | SongBaseOverrideKeys> &
+  Partial<Pick<Schemas['model.Chart'], SongBaseOverrideKeys>> & {
   song?: Song
 }
 export type Song = Omit<DeepRequired<Schemas['model.Song']>, 'charts'> & {
@@ -45,7 +49,8 @@ export type Song = Omit<DeepRequired<Schemas['model.Song']>, 'charts'> & {
 }
 export type ChartInfo = DeepRequired<Schemas['model.ChartInfo']>
 export type ChartInfoSimple = DeepRequired<Schemas['model.ChartInfoSimple']>
-export type ChartInput = DeepRequired<Schemas['model.ChartInput']>
+export type ChartInput = Omit<DeepRequired<Schemas['model.ChartInput']>, SongBaseOverrideKeys> &
+  Partial<Pick<Schemas['model.ChartInput'], SongBaseOverrideKeys>>
 export type PlayRecord = Omit<DeepRequired<Schemas['model.PlayRecord']>, 'chart'> & {
   chart?: Chart
 }
