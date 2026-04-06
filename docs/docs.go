@@ -972,7 +972,8 @@ const docTemplate = `{
         "model.PlayRecord": {
             "type": "object",
             "required": [
-                "chart_id"
+                "chart_id",
+                "score"
             ],
             "properties": {
                 "chart": {
@@ -1005,7 +1006,8 @@ const docTemplate = `{
         "model.PlayRecordBase": {
             "type": "object",
             "required": [
-                "chart_id"
+                "chart_id",
+                "score"
             ],
             "properties": {
                 "chart_id": {
