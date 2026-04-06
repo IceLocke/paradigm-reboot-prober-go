@@ -71,7 +71,7 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 	}
 
 	// Calculate rating
-	calculatedRating := rating.SingleRating(chart.Level, record.Score)
+	calculatedRating := rating.SingleRating(chart.Level, *record.Score)
 	record.Rating = calculatedRating
 	record.RecordTime = time.Now()
 
@@ -88,7 +88,7 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 		ON CONFLICT (username, chart_id) DO UPDATE
 		  SET play_record_id = EXCLUDED.play_record_id
 		  WHERE ? OR (SELECT score FROM play_records WHERE id = best_play_records.play_record_id) < ?`,
-		record.Username, record.ChartID, record.ID, isReplaced, record.Score,
+		record.Username, record.ChartID, record.ID, isReplaced, *record.Score,
 	).Error; err != nil {
 		return nil, err
 	}
@@ -310,7 +310,7 @@ func RecalculateRatingsByChart(tx *gorm.DB, chartID int, newLevel float64) error
 	// DB ops: 1 SELECT + M UPDATEs (M = distinct rating values, typically << N records)
 	ratingGroups := make(map[int][]int) // newRating -> []playRecordID
 	for _, r := range records {
-		newRating := rating.SingleRating(newLevel, r.Score)
+		newRating := rating.SingleRating(newLevel, *r.Score)
 		ratingGroups[newRating] = append(ratingGroups[newRating], r.ID)
 	}
 	for newRating, ids := range ratingGroups {

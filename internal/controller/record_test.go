@@ -47,7 +47,7 @@ func TestRecordController(t *testing.T) {
 			PlayRecords: []model.PlayRecordBase{
 				{
 					ChartID: 1,
-					Score:   1000000,
+					Score:   intPtr(1000000),
 				},
 			},
 		}
@@ -109,7 +109,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		reqBody := request.BatchCreatePlayRecordRequest{
 			UploadToken: "rectoken",
 			PlayRecords: []model.PlayRecordBase{
-				{ChartID: chartID, Score: score},
+				{ChartID: chartID, Score: intPtr(score)},
 			},
 		}
 		body, _ := json.Marshal(reqBody)
