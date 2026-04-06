@@ -38,10 +38,10 @@
           :label="t('auth.upload_token')"
           :readonly="true"
         />
-        <button class="icon-btn token-action" @click="onCopyToken" :title="t('common.copy')">
+        <button type="button" class="icon-btn token-action" @click="onCopyToken" :title="t('common.copy')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>
-        <button class="icon-btn token-action" @click="onRefreshToken" :title="t('common.refresh')">
+        <button type="button" class="icon-btn token-action" @click="onRefreshToken" :title="t('common.refresh')">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
         </button>
       </div>

@@ -11,8 +11,8 @@
     <div class="logout-form">
       <p>{{ t('message.logout_confirm') }}</p>
       <div class="logout-actions">
-        <button class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
-        <button class="btn btn--primary" @click="onLogout">{{ t('auth.logout') }}</button>
+        <button type="button" class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
+        <button type="button" class="btn btn--primary" @click="onLogout">{{ t('auth.logout') }}</button>
       </div>
     </div>
   </n-modal>
