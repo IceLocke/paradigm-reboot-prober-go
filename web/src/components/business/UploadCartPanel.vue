@@ -4,6 +4,7 @@
       <p>{{ t('common.no_data') }}</p>
     </div>
     <template v-else>
+      <form class="cart-form" @submit.prevent="onSubmit">
       <div class="cart-list">
         <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
           <div class="cart-info">
@@ -20,16 +21,17 @@
               max="1010000"
             />
           </div>
-          <button class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
+          <button type="button" class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
         </div>
       </div>
       <div class="cart-actions">
-        <button class="btn btn--primary btn--sm" @click="onSubmit" :disabled="loading">
+        <button type="submit" class="btn btn--primary btn--sm" :disabled="loading">
           {{ t('common.submit') }} ({{ appStore.uploadList.length }})
         </button>
       </div>
+      </form>
     </template>
   </div>
 </template>

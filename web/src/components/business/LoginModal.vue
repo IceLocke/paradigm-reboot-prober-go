@@ -8,7 +8,7 @@
     :auto-focus="false"
     @update:show="$emit('update:show', $event)"
   >
-    <div class="auth-form">
+    <form class="auth-form" @submit.prevent="onSubmit">
       <BaseInput
         v-model="form.username"
         :label="t('auth.username')"
@@ -21,14 +21,14 @@
         :placeholder="t('auth.password')"
       />
       <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
-      <button class="btn btn--primary btn--full" @click="onSubmit" :disabled="loading">
+      <button type="submit" class="btn btn--primary btn--full" :disabled="loading">
         {{ t('auth.login') }}
       </button>
       <p class="auth-switch">
         {{ t('auth.register') }}?
         <a @click.prevent="$emit('goRegister')" class="switch-link">{{ t('auth.register') }}</a>
       </p>
-    </div>
+    </form>
   </n-modal>
 </template>
 
