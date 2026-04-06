@@ -137,7 +137,12 @@ ALTER TABLE play_records ALTER COLUMN rating SET NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_play_records_username ON play_records (username);
 CREATE INDEX IF NOT EXISTS idx_pr_user_chart ON play_records (chart_id);
 
-DO $$ BEGIN RAISE NOTICE '[step 4] play_records migrated: song_level_id → chart_id, rating float → bigint.'; END $$;
+-- Convert record_time: timestamp → timestamptz (legacy stored local time without tz info)
+ALTER TABLE play_records
+  ALTER COLUMN record_time TYPE timestamptz
+  USING record_time AT TIME ZONE 'Asia/Shanghai';
+
+DO $$ BEGIN RAISE NOTICE '[step 4] play_records migrated: song_level_id → chart_id, rating float → bigint, record_time → timestamptz.'; END $$;
 
 
 -- ============================================================================
