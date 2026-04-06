@@ -14,7 +14,7 @@
         <input
           ref="fileInputRef"
           type="file"
-          accept=".csv"
+          accept=".csv,text/csv,application/csv,text/comma-separated-values"
           class="file-input-hidden"
           @change="onFileSelected"
         />
