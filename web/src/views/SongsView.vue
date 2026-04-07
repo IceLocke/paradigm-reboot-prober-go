@@ -11,18 +11,8 @@
             :placeholder="t('message.search_placeholder')"
           />
         </div>
-        <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
-          <template #trigger>
-            <button class="icon-btn" :title="t('term.upload_list')">
-              <ShoppingCart :size="18" />
-              <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
-            </button>
-          </template>
-          <UploadCartPanel />
-        </n-popover>
-        <button class="icon-btn" :title="t('common.refresh')" @click="loadCharts">
-          <RefreshCw :size="18" />
-        </button>
+        <UploadCart />
+        <IconButton :icon="RefreshCw" :size="18" :title="t('common.refresh')" @click="loadCharts"/>
       </div>
     </div>
 
@@ -71,19 +61,20 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
+import { NDataTable, NPagination, useMessage } from 'naive-ui'
 import type { DataTableColumns, DataTableSortState } from 'naive-ui'
-import { Search, ShoppingCart, RefreshCw, Plus, Upload } from '@lucide/vue';
+import { Search, RefreshCw, Plus, Upload } from '@lucide/vue';
 
 import { useAppStore } from '@/stores/app'
 import { getAllCharts, getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockCharts } from '@/api/mock'
 import type { ChartInfo, Song, Difficulty } from '@/api/types'
 import BaseTabs from '@/components/ui/BaseTabs.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
-import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
+import UploadCart from '@/components/business/UploadCart.vue'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -411,40 +402,6 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: var(--space-5);
-}
-
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background var(--transition-fast);
-  position: relative;
-}
-@media (hover: hover) {
-  .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
-}
-.badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
 }
 
 :deep(.link-text) {

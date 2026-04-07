@@ -3,27 +3,21 @@
     <div class="page-header">
       <h2>{{ t('term.b50') }}</h2>
       <div class="page-actions">
-        <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
-          <template #trigger>
-            <button class="icon-btn" :title="t('term.upload_list')">
-              <ShoppingCart :size="18" />
-              <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
-            </button>
-          </template>
-          <UploadCartPanel />
-        </n-popover>
-        <button
-          class="icon-btn"
+        <UploadCart />
+        <IconButton
           :title="t('common.export_image')"
           :disabled="exporting || allRecords.length === 0"
           @click="exportImage"
         >
           <ImageDown v-if="!exporting" :size="18" />
           <Loader v-else class="spin" :size="18" />
-        </button>
-        <button class="icon-btn" :title="t('common.refresh')" @click="refreshData">
-          <RefreshCw :size="18" />
-        </button>
+        </IconButton>
+        <IconButton
+          :icon="RefreshCw"
+          :size="18"
+          :title="t('common.refresh')"
+          @click="refreshData"
+        />
       </div>
     </div>
 
@@ -105,7 +99,7 @@ import { saveAs } from 'file-saver'
 import { useI18n } from 'vue-i18n'
 import { NDataTable, NPopover, useMessage } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { ShoppingCart, ImageDown, Loader, RefreshCw, Plus, Upload } from '@lucide/vue';
+import { ImageDown, Loader, RefreshCw, Plus, Upload } from '@lucide/vue';
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { ScatterChart } from 'echarts/charts'
@@ -120,11 +114,12 @@ import { USE_MOCK, getMockB50 } from '@/api/mock'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
 import { renderB50Image } from '@/utils/b50Canvas'
 import BaseCard from '@/components/ui/BaseCard.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import StatCard from '@/components/business/StatCard.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
-import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
+import UploadCart from '@/components/business/UploadCart.vue'
 import VersionAnnounceBanner from '@/components/business/VersionAnnounceBanner.vue'
 
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
@@ -432,40 +427,6 @@ onMounted(loadData)
   -webkit-overflow-scrolling: touch;
 }
 
-.icon-btn {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background var(--transition-fast);
-}
-.badge {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-}
-@media (hover: hover) {
-  .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
-}
-
 :deep(.link-text) {
   color: var(--accent);
   cursor: pointer;
@@ -493,11 +454,6 @@ onMounted(loadData)
 }
 @media (hover: hover) {
   :deep(.action-btn:hover) { background: rgba(255,255,255,0.06); color: var(--text-primary); }
-}
-
-.icon-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 @keyframes spin {

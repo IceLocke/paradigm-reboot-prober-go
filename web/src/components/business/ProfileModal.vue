@@ -38,10 +38,10 @@
           :label="t('auth.upload_token')"
           :readonly="true"
         />
-        <button type="button" class="icon-btn token-action" @click="onCopyToken" :title="t('common.copy')">
+        <button type="button" class="icon-btn" @click="onCopyToken" :title="t('common.copy')">
           <Copy :size="16" />
         </button>
-        <button type="button" class="icon-btn token-action" @click="onRefreshToken" :title="t('common.refresh')">
+        <button type="button" class="icon-btn" @click="onRefreshToken" :title="t('common.refresh')">
           <RefreshCw :size="16" />
         </button>
       </div>
@@ -193,9 +193,6 @@ const onRefreshToken = async () => {
   align-items: flex-end;
 }
 .token-field > :first-child { flex: 1; }
-.token-action {
-  margin-bottom: 2px;
-}
 .form-field {
   display: flex;
   flex-direction: column;
