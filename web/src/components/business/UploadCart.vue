@@ -1,51 +1,59 @@
 <template>
-  <div class="upload-cart">
-    <div v-if="appStore.uploadList.length === 0" class="empty-state">
-      <p>{{ t('common.no_data') }}</p>
-    </div>
-    <template v-else>
-      <form class="cart-form" @submit.prevent="onSubmit">
-        <div class="cart-list">
-          <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
-            <div class="cart-info">
-              <span class="cart-title">{{ item.title }}</span>
-              <DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" />
+  <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
+    <template #trigger>
+      <IconButton :icon="ShoppingCart" :size="18" :title="t('term.upload_list')">
+        <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
+      </IconButton>
+    </template>
+    <div class="upload-cart">
+      <div v-if="appStore.uploadList.length === 0" class="empty-state">
+        <p>{{ t('common.no_data') }}</p>
+      </div>
+      <template v-else>
+        <form class="cart-form" @submit.prevent="onSubmit">
+          <div class="cart-list">
+            <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
+              <div class="cart-info">
+                <span class="cart-title">{{ item.title }}</span>
+                <DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" />
+              </div>
+              <div class="cart-score">
+                <input
+                  type="number"
+                  class="score-input"
+                  v-model.number="appStore.uploadList[index].new_score"
+                  v-bind:placeholder="String(appStore.uploadList[index].score ?? t('term.score'))"
+                  min="0"
+                  max="1010000"
+                />
+              </div>
+              <button type="button" class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
+                <X :size="16" />
+              </button>
             </div>
-            <div class="cart-score">
-              <input
-                type="number"
-                class="score-input"
-                v-model.number="appStore.uploadList[index].new_score"
-                v-bind:placeholder="String(appStore.uploadList[index].score ?? t('term.score'))"
-                min="0"
-                max="1010000"
-              />
-            </div>
-            <button type="button" class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
-              <X :size="16" />
+          </div>
+          <div class="cart-actions">
+            <button type="submit" class="btn btn--primary btn--sm" :disabled="loading">
+              {{ t('common.submit') }} ({{ appStore.uploadList.length }})
             </button>
           </div>
-        </div>
-        <div class="cart-actions">
-          <button type="submit" class="btn btn--primary btn--sm" :disabled="loading">
-            {{ t('common.submit') }} ({{ appStore.uploadList.length }})
-          </button>
-        </div>
-      </form>
-    </template>
-  </div>
+        </form>
+      </template>
+    </div>
+  </n-popover>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useMessage } from 'naive-ui'
+import { NPopover, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue';
+import { ShoppingCart, X } from '@lucide/vue';
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { uploadRecords } from '@/api/record'
 import type { Difficulty } from '@/api/types'
 import { USE_MOCK } from '@/api/mock'
+import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from './DifficultyBadge.vue'
 
 const { t } = useI18n()
@@ -81,6 +89,22 @@ const onSubmit = async () => {
 </script>
 
 <style scoped>
+.badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
 .upload-cart {
   min-width: 300px;
 }

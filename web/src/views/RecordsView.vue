@@ -3,24 +3,10 @@
     <div class="page-header">
       <h2>{{ t('term.records') }}</h2>
       <div class="page-actions">
-        <button class="icon-btn" :title="t('common.import_csv')" @click="showCsvImport = true">
-          <FileUp :size="18" />
-        </button>
-        <button class="icon-btn" :title="t('common.export_csv')" @click="onExportCsv">
-          <FileDown :size="18" />
-        </button>
-        <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
-          <template #trigger>
-            <button class="icon-btn" :title="t('term.upload_list')">
-              <ShoppingCart :size="18" />
-              <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
-            </button>
-          </template>
-          <UploadCartPanel />
-        </n-popover>
-        <button class="icon-btn" :title="t('common.refresh')" @click="refreshRecords">
-          <RefreshCw :size="18" />
-        </button>
+        <IconButton :icon="FileUp" :size="18" :title="t('common.import_csv')" @click="showCsvImport = true"/>
+        <IconButton :icon="FileDown" :size="18" :title="t('common.export_csv')" @click="onExportCsv"/>
+        <UploadCart />
+        <IconButton :icon="RefreshCw" :size="18" :title="t('common.refresh')" @click="refreshRecords"/>
       </div>
     </div>
 
@@ -72,9 +58,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
+import { NDataTable, NPagination, useMessage } from 'naive-ui'
 import type { DataTableColumns, DataTableSortState } from 'naive-ui'
-import { FileUp, FileDown, ShoppingCart, RefreshCw, Plus, Upload } from '@lucide/vue';
+import { FileUp, FileDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import dayjs from 'dayjs'
 
 import { useUserStore } from '@/stores/user'
@@ -86,10 +72,11 @@ import { exportCsv } from '@/utils/csv'
 import { saveAs } from 'file-saver'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
 import BaseTabs from '@/components/ui/BaseTabs.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
-import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
+import UploadCart from '@/components/business/UploadCart.vue'
 import CsvImportModal from '@/components/business/CsvImportModal.vue'
 
 const { t } = useI18n()
@@ -227,7 +214,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     key: 'difficulty',
     width: 110,
     render(row) {
-      return h(DifficultyBadge, { key: row.chart.id, difficulty: row.chart.difficulty, level: row.chart.level, short: true })
+      return h(DifficultyBadge, { difficulty: row.chart.difficulty, level: row.chart.level, short: true })
     },
   },
   {
@@ -355,23 +342,6 @@ onMounted(loadRecords)
   display: flex;
   justify-content: center;
   margin-top: var(--space-5);
-}
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background var(--transition-fast);
-  position: relative;
-}
-@media (hover: hover) {
-  .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
 }
 .badge {
   position: absolute;
