@@ -93,6 +93,23 @@ jobs:
       - name: Run ESLint
         run: pnpm lint
 
+      - name: Type check
+        run: pnpm type-check
+
+      - name: Generate OpenAPI types
+        run: pnpm generate:api
+
+      - name: Check OpenAPI types consistency
+        run: |
+          if [ -n "$(git status --porcelain src/api/)" ]; then
+            echo "Generated OpenAPI types are out of date. Please run 'pnpm generate:api' and commit the changes."
+            git diff src/api/
+            exit 1
+          fi
+
+      - name: Build application
+        run: pnpm build
+
   docker-build:
     name: Docker Build & Push
     runs-on: ubuntu-latest
