@@ -9,7 +9,7 @@ type SongBase struct {
 	Cover       string `gorm:"not null" json:"cover" example:"Cover_d3d3d3.jpg"`
 	Illustrator string `gorm:"not null" json:"illustrator" example:"Artist"`
 	Version     string `gorm:"not null" json:"version" example:"1.0.0"`
-	B15         bool   `gorm:"not null" json:"b15" example:"false"`
+	B15         bool   `gorm:"not null;index" json:"b15" example:"false"`
 	Album       string `gorm:"not null" json:"album" example:"First Album"`
 	BPM         string `gorm:"not null" json:"bpm" example:"180"`
 	Length      string `gorm:"not null" json:"length" example:"2:30"`

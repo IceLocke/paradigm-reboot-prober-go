@@ -106,7 +106,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
-		Where("play_records.username = ?", username)
+		Where("best_play_records.username = ?", username)
 
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
