@@ -58,7 +58,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
+import { NDataTable, NPagination, useMessage } from 'naive-ui'
 import type { DataTableColumns, DataTableSortState } from 'naive-ui'
 import { FileUp, FileDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import dayjs from 'dayjs'

@@ -16,8 +16,7 @@
 
 <script setup lang="ts">
 import { useAttrs } from 'vue'
-import { NTooltip } from 'naive-ui'
-import type { LucideIcon, LucideProps } from '@lucide/vue'
+import type { LucideIcon } from '@lucide/vue'
 
 const { icon, ...iconProps } = defineProps<{
   title?: string
