@@ -6,15 +6,10 @@
           <Sparkles :size="16" class="banner-icon" />
           <span class="banner-title">{{ t('announce.new_version', { version: latestVersion }) }}</span>
         </div>
-        <n-popconfirm @positive-click="dismiss">
-          <template #trigger>
-            <button class="banner-close">
-              <span class="dismiss-hint">{{ t('announce.dismiss') }}</span>
-              <X :size="14" />
-            </button>
-          </template>
-          {{ t('announce.dismiss_confirm') }}
-        </n-popconfirm>
+        <button class="banner-close" @click="confirmDismiss">
+          <span class="dismiss-hint">{{ t('announce.dismiss') }}</span>
+          <X :size="14" />
+        </button>
       </div>
       <div class="banner-body">
         <div class="song-scroll">
@@ -39,12 +34,30 @@
     :level="uploadTarget.level"
     :chart-id="uploadTarget.chartId"
   />
+
+  <n-modal
+    :show="showConfirm"
+    preset="card"
+    :title="t('common.confirm')"
+    style="width: 400px; max-width: 95vw;"
+    :bordered="false"
+    :auto-focus="false"
+    @update:show="showConfirm = $event"
+  >
+    <div class="confirm-body">
+      <p>{{ t('announce.dismiss_confirm') }}</p>
+      <div class="confirm-actions">
+        <button type="button" class="btn btn--secondary" @click="showConfirm = false">{{ t('common.cancel') }}</button>
+        <button type="button" class="btn btn--primary" @click="dismiss">{{ t('common.confirm') }}</button>
+      </div>
+    </div>
+  </n-modal>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NPopconfirm } from 'naive-ui'
+import { NModal } from 'naive-ui'
 import { Sparkles, X } from '@lucide/vue'
 
 import { useAppStore } from '@/stores/app'
@@ -121,6 +134,7 @@ const visible = computed(() => {
 })
 
 const showUpload = ref(false)
+const showConfirm = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
 function openUpload(chart: ChartInfo) {
@@ -133,8 +147,13 @@ function openUpload(chart: ChartInfo) {
   showUpload.value = true
 }
 
+function confirmDismiss() {
+  showConfirm.value = true
+}
+
 function dismiss() {
   appStore.dismissedVersion = latestVersion.value
+  showConfirm.value = false
 }
 </script>
 
@@ -218,6 +237,34 @@ function dismiss() {
 .song-scroll::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 2px;
+}
+
+/* Confirm modal */
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  font-weight: 500;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background var(--transition-base);
+  font-family: inherit;
+  font-size: var(--text-base);
+  min-height: 44px;
+}
+.btn--primary { background: var(--accent); color: #fff; }
+.btn--secondary { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
+@media (hover: hover) {
+  .btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn--secondary:hover { border-color: var(--border-hover); background: var(--bg-tertiary); }
 }
 
 /* Responsive */
