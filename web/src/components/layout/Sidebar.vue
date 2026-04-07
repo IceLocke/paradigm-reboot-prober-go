@@ -8,7 +8,9 @@
         :to="item.path"
         :class="['nav-item', { 'nav-item--active': $route.path === item.path }]"
       >
-        <span class="nav-icon" v-html="item.icon"></span>
+        <span class="nav-icon">
+          <component :is="item.icon" :size="20" />
+        </span>
         <span class="nav-label">{{ item.label }}</span>
       </router-link>
     </nav>
@@ -32,7 +34,9 @@
                 :class="['nav-item', { 'nav-item--active': $route.path === item.path }]"
                 @click="$emit('update:modelValue', false)"
               >
-                <span class="nav-icon" v-html="item.icon"></span>
+                <span class="nav-icon">
+                  <component :is="item.icon" :size="20" />
+                </span>
                 <span class="nav-label">{{ item.label }}</span>
               </router-link>
             </nav>
@@ -46,6 +50,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ChartNoAxesColumn, Music2, FileText, Info } from '@lucide/vue';
 import { useBreakpoint } from '@/composables/useBreakpoint'
 
 const { t } = useI18n()
@@ -54,18 +59,11 @@ const { isDesktop } = useBreakpoint()
 defineProps<{ modelValue: boolean }>()
 defineEmits<{ 'update:modelValue': [value: boolean] }>()
 
-const icons = {
-  b50: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg>',
-  songs: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="18" r="4"/><path d="M12 18V2l7 4"/></svg>',
-  records: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>',
-  about: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
-}
-
 const navItems = computed(() => [
-  { path: '/best50', label: t('term.b50'), icon: icons.b50 },
-  { path: '/songs', label: t('term.charts'), icon: icons.songs },
-  { path: '/records', label: t('term.records'), icon: icons.records },
-  { path: '/about', label: t('common.about'), icon: icons.about },
+  { path: '/best50', label: t('term.b50'), icon: ChartNoAxesColumn },
+  { path: '/songs', label: t('term.charts'), icon: Music2 },
+  { path: '/records', label: t('term.records'), icon: FileText },
+  { path: '/about', label: t('common.about'), icon: Info },
 ])
 </script>
 

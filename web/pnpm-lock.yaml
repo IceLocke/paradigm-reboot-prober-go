@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@lucide/vue':
+        specifier: ^1.7.0
+        version: 1.7.0(vue@3.5.32(typescript@5.7.3))
       '@vercel/analytics':
         specifier: ^2.0.1
         version: 2.0.1(vue-router@4.6.4(vue@3.5.32(typescript@5.7.3)))(vue@3.5.32(typescript@5.7.3))
@@ -365,6 +368,11 @@ packages:
 
   '@juggle/resize-observer@3.4.0':
     resolution: {integrity: sha512-dfLbk+PwWvFzSxwk3n5ySL0hfBog779o8h68wK/7/APo/7cgyWp5jcXockbxdk5kFRkbeXWm4Fbi9FrdN381sA==}
+
+  '@lucide/vue@1.7.0':
+    resolution: {integrity: sha512-X3gTarOkNh2ThNK7IaDa4gdjFAtZyoKH/eoScklvmtNTWE5uxkycBQOuchGExY5swCqh1WptEIAWrmbuQcy2fA==}
+    peerDependencies:
+      vue: '>=3.0.1'
 
   '@redocly/ajv@8.11.2':
     resolution: {integrity: sha512-io1JpnwtIcvojV7QKDUSIuMN/ikdOUd1ReEnUnMKGfDVridQZ31J0MmIuqwuRjWDZfmvr+Q0MqCcfHM2gTivOg==}
@@ -1775,6 +1783,10 @@ snapshots:
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
   '@juggle/resize-observer@3.4.0': {}
+
+  '@lucide/vue@1.7.0(vue@3.5.32(typescript@5.7.3))':
+    dependencies:
+      vue: 3.5.32(typescript@5.7.3)
 
   '@redocly/ajv@8.11.2':
     dependencies:

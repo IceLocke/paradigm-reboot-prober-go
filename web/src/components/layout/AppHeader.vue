@@ -2,9 +2,7 @@
   <header class="app-header">
     <div class="header-left">
       <button class="menu-btn" @click="$emit('toggleSidebar')" v-if="isMobile">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
+        <Menu :size="20" />
       </button>
       <div class="logo">
         <span class="logo-text">Paradigm</span>
@@ -15,10 +13,10 @@
       <template v-if="userStore.logged_in">
         <span class="welcome-text">{{ t('message.welcome', { username: userStore.username }) }}</span>
         <button class="icon-btn" :title="t('auth.profile')" @click="$emit('showProfile')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <UserRound :size="20" />
         </button>
         <button class="icon-btn" :title="t('auth.logout')" @click="$emit('showLogout')">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <LogOut :size="20" />
         </button>
       </template>
       <template v-else>
@@ -31,6 +29,7 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import { Menu, UserRound, LogOut } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 

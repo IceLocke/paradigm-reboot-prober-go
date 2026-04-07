@@ -19,7 +19,7 @@
           @change="onFileSelected"
         />
         <button type="button" class="btn btn--secondary file-btn" @click="fileInputRef?.click()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <File :size="16" />
           {{ fileName || t('common.select_file') }}
         </button>
       </div>
@@ -67,6 +67,7 @@
 import { ref, watch } from 'vue'
 import { NModal, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
+import { File } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'
 import { uploadRecords, getAllChartsWithScores } from '@/api/record'
 import { USE_MOCK, getMockAllCharts } from '@/api/mock'
