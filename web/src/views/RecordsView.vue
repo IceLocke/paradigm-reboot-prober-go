@@ -3,23 +3,23 @@
     <div class="page-header">
       <h2>{{ t('term.records') }}</h2>
       <div class="page-actions">
-        <button class="icon-btn" :title="t('common.export_csv')" @click="onExportCsv">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        </button>
         <button class="icon-btn" :title="t('common.import_csv')" @click="showCsvImport = true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <FileUp :size="18" />
+        </button>
+        <button class="icon-btn" :title="t('common.export_csv')" @click="onExportCsv">
+          <FileDown :size="18" />
         </button>
         <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
           <template #trigger>
             <button class="icon-btn" :title="t('term.upload_list')">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+              <ShoppingCart :size="18" />
               <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
             </button>
           </template>
           <UploadCartPanel />
         </n-popover>
         <button class="icon-btn" :title="t('common.refresh')" @click="refreshRecords">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <RefreshCw :size="18" />
         </button>
       </div>
     </div>
@@ -74,6 +74,7 @@ import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NDataTable, NPagination, NPopover, useMessage } from 'naive-ui'
 import type { DataTableColumns, DataTableSortState } from 'naive-ui'
+import { FileUp, FileDown, ShoppingCart, RefreshCw, Plus, Upload } from '@lucide/vue';
 import dayjs from 'dayjs'
 
 import { useUserStore } from '@/stores/user'
@@ -266,14 +267,16 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
           class: 'action-btn',
           title: t('message.add_to_upload_list'),
           onClick: () => onAddToCart(row),
-          innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>',
-        }),
+        }, [
+          h(Plus, { size: 14 })
+        ]),
         h('button', {
           class: 'action-btn',
           title: t('message.quick_upload'),
           onClick: () => onQuickUpload(row),
-          innerHTML: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
-        }),
+        }, [
+          h(Upload, { size: 14 })
+        ]),
       ])
     },
   },
@@ -398,7 +401,7 @@ onMounted(loadRecords)
 :deep(.action-btn) {
   display: flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; background: none; border: none;
-  color: var(--text-muted); cursor: pointer; border-radius: 6px;
+  color: var(--text-secondary); cursor: pointer; border-radius: 6px;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 @media (hover: hover) {
