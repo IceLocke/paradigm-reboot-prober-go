@@ -5,6 +5,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { Difficulty } from '@/api/types'
 
 const props = withDefaults(defineProps<{
@@ -30,9 +31,9 @@ const diffFullNames: Record<Difficulty, string> = {
   reboot: 'REBOOT',
 }
 
-const label = props.short
+const label = computed(() => props.short
   ? (props.level != null ? `${diffNames[props.difficulty]} ${props.level.toFixed(1)}` : diffNames[props.difficulty])
-  : (props.level != null ? `${diffFullNames[props.difficulty]} ${props.level.toFixed(1)}` : diffFullNames[props.difficulty])
+  : (props.level != null ? `${diffFullNames[props.difficulty]} ${props.level.toFixed(1)}` : diffFullNames[props.difficulty]))
 </script>
 
 <style scoped>
