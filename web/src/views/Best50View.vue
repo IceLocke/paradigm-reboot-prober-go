@@ -27,6 +27,9 @@
       </div>
     </div>
 
+    <!-- Version announcement -->
+    <VersionAnnounceBanner />
+
     <!-- Stats overview -->
     <div class="stats-row">
       <StatCard label="Rating" :value="b50Rating" :precision="4" />
@@ -122,6 +125,7 @@ import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 import UploadCartPanel from '@/components/business/UploadCartPanel.vue'
+import VersionAnnounceBanner from '@/components/business/VersionAnnounceBanner.vue'
 
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
 

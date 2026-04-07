@@ -14,6 +14,7 @@ interface AppState {
   charts: ChartInfo[] | null
   uploadList: UploadItem[]
   sidebarOpen: boolean
+  dismissedVersion: string
 }
 
 export const useAppStore = defineStore('appStore', {
@@ -21,5 +22,9 @@ export const useAppStore = defineStore('appStore', {
     charts: null,
     uploadList: [],
     sidebarOpen: false,
+    dismissedVersion: '',
   }),
+  persist: {
+    paths: ['dismissedVersion'],
+  },
 })

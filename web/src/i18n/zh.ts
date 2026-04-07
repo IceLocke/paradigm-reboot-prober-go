@@ -124,6 +124,11 @@ const zh = {
     csv_no_valid_records: '未发现有效成绩',
     csv_records_preview: '发现 {total} 条成绩，过滤后共 {count} 条待上传',
   },
+  announce: {
+    new_version: 'v{version} 新曲更新',
+    dismiss: '不再显示',
+    dismiss_confirm: '确定不再显示此版本的更新提示吗？',
+  },
   about: {
     title: '范式：起源 查分器',
     subtitle: '在线 Rating 计算器',

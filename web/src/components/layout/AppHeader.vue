@@ -5,8 +5,8 @@
         <Menu :size="20" />
       </button>
       <div class="logo">
-        <span class="logo-text">Paradigm</span>
-        <span class="logo-accent">Prober</span>
+        <span class="logo-accent">Paradigm</span>
+        <span class="logo-text">PROBER</span>
       </div>
     </div>
     <div class="header-right">
@@ -89,17 +89,20 @@ defineEmits<{
 .logo {
   display: flex;
   align-items: baseline;
-  gap: var(--space-2);
+  gap: 6px;
+  user-select: none;
 }
 .logo-text {
-  font-size: var(--text-lg);
-  font-weight: 600;
+  font-size: var(--text-base);
+  font-weight: 700;
   color: var(--text-primary);
+  letter-spacing: 0.1em;
 }
 .logo-accent {
   font-size: var(--text-lg);
   font-weight: 600;
   color: var(--accent);
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
 }
 .welcome-text {
   font-size: var(--text-sm);
