@@ -23,8 +23,8 @@
         <Transition name="slide">
           <div v-if="modelValue" class="drawer" @click.stop>
             <div class="drawer-header">
-              <span class="logo-text">Paradigm</span>
-              <span class="logo-accent">Prober</span>
+              <span class="logo-accent">Paradigm</span>
+              <span class="logo-text">PROBER</span>
             </div>
             <nav class="sidebar-nav">
               <router-link
@@ -140,8 +140,18 @@ const navItems = computed(() => [
   padding: var(--space-4);
   margin-bottom: var(--space-3);
 }
-.logo-text { font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); }
-.logo-accent { font-size: var(--text-lg); font-weight: 600; color: var(--accent); }
+.logo-text {
+  font-size: var(--text-base);
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.1em;
+}
+.logo-accent {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
 
 /* Transitions */
 .fade-enter-active, .fade-leave-active { transition: opacity var(--transition-base); }

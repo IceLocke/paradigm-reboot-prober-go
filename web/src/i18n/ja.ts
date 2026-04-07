@@ -124,6 +124,11 @@ const ja = {
     csv_no_valid_records: '有効な記録が見つかりません',
     csv_records_preview: '{total} 件にスコアあり、フィルター後 {count} 件アップロード予定',
   },
+  announce: {
+    new_version: 'v{version} 新曲追加',
+    dismiss: '非表示',
+    dismiss_confirm: 'このバージョンの更新通知を非表示にしますか？',
+  },
   about: {
     title: 'Paradigm: Reboot プローバー',
     subtitle: 'オンラインレーティング計算ツール',

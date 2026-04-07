@@ -124,6 +124,11 @@ const en = {
     csv_no_valid_records: 'No valid records found',
     csv_records_preview: 'Found {total} with scores, {count} to upload after filtering',
   },
+  announce: {
+    new_version: 'v{version} New Charts',
+    dismiss: 'Dismiss',
+    dismiss_confirm: 'Hide this version update permanently?',
+  },
   about: {
     title: 'Paradigm: Reboot Prober',
     subtitle: 'Online Rating Calculator',
