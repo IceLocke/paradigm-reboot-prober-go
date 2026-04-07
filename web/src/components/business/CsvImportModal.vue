@@ -16,6 +16,7 @@
           type="file"
           accept=".csv,text/csv,application/csv,text/comma-separated-values"
           class="file-input-hidden"
+          @click="clearFileInput"
           @change="onFileSelected"
         />
         <button type="button" class="btn btn--secondary file-btn" @click="fileInputRef?.click()">
@@ -96,6 +97,10 @@ const loading = ref(false)
 // Reset state when modal closes
 watch(() => userStore.logged_in, () => { /* noop — keep reactivity */ })
 
+const clearFileInput = () => {
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
 function resetState() {
   fileName.value = ''
   parsedRecords.value = []
@@ -104,7 +109,7 @@ function resetState() {
   errorMsg.value = ''
   isReplace.value = false
   loading.value = false
-  if (fileInputRef.value) fileInputRef.value.value = ''
+  clearFileInput()
 }
 
 const onFileSelected = async (e: Event) => {
@@ -143,14 +148,14 @@ const onFileSelected = async (e: Event) => {
     const filtered = filterUnchangedRecords(records, bestMap)
     filteredRecords.value = filtered
 
-    const skipped = records.length - filtered.length
+    // const skipped = records.length - filtered.length
     if (filtered.length === 0) {
       previewText.value = t('message.csv_no_valid_records')
     } else {
       previewText.value = t('message.csv_records_preview', {
         total: records.length,
         count: filtered.length,
-      }) + (skipped > 0 ? ` (${skipped} skipped)` : '')
+      }) // + (skipped > 0 ? ` (${skipped} skipped)` : '')
     }
   } catch {
     errorMsg.value = t('message.csv_parse_error')
