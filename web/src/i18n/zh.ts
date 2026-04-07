@@ -121,8 +121,8 @@ const zh = {
     csv_import_success: '成绩导入成功，共 {count} 条',
     csv_import_failed: '成绩导入失败：',
     csv_parse_error: 'CSV 解析失败，请检查文件格式',
-    csv_no_valid_records: '未找到有效记录',
-    csv_records_preview: '找到 {total} 条有成绩，过滤后 {count} 条待上传',
+    csv_no_valid_records: '未发现有效成绩',
+    csv_records_preview: '发现 {total} 条成绩，过滤后共 {count} 条待上传',
   },
   about: {
     title: '范式：起源 查分器',
