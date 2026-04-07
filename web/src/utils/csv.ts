@@ -81,7 +81,9 @@ export function parseCsvToRecords(csvText: string): CsvRecord[] {
   if (lines.length < 2) return []
 
   const headers = parseCsvRow(lines[0]).map((h) => h.toLowerCase())
-  const idIdx = headers.indexOf('id')
+  let idIdx = headers.indexOf('id')
+  if (idIdx === -1) idIdx = headers.indexOf('chart_id')
+  if (idIdx === -1) idIdx = headers.indexOf('song_level_id')
   const scoreIdx = headers.indexOf('score')
   if (idIdx === -1 || scoreIdx === -1) return []
 
