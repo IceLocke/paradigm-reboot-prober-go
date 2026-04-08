@@ -27,15 +27,11 @@
                   max="1010000"
                 />
               </div>
-              <button type="button" class="remove-btn" @click="removeItem(item.chart_id)" :title="t('common.cancel')">
-                <X :size="16" />
-              </button>
+              <IconButton type="button" class="remove-btn" :icon="X" :size="16" @click="removeItem(item.chart_id)" :title="t('common.cancel')" />
             </div>
           </div>
           <div class="cart-actions">
-            <button type="submit" class="btn btn--primary btn--sm" :disabled="loading">
-              {{ t('common.submit') }} ({{ appStore.uploadList.length }})
-            </button>
+            <BaseButton type="submit" size="sm" :disabled="loading" :text="t('common.submit') + '(' + appStore.uploadList.length + ')'" />
           </div>
         </form>
       </template>
@@ -53,6 +49,7 @@ import { useUserStore } from '@/stores/user'
 import { uploadRecords } from '@/api/record'
 import type { Difficulty } from '@/api/types'
 import { USE_MOCK } from '@/api/mock'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from './DifficultyBadge.vue'
 
@@ -156,16 +153,9 @@ const onSubmit = async () => {
 }
 .score-input:focus { border-color: var(--accent); }
 .remove-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 32px;
   height: 32px;
-  background: none;
-  border: none;
   color: var(--text-muted);
-  cursor: pointer;
-  border-radius: 6px;
   flex-shrink: 0;
 }
 @media (hover: hover) {
@@ -178,21 +168,4 @@ const onSubmit = async () => {
   margin-top: var(--space-2);
   border-top: 1px solid var(--border);
 }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-2);
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background var(--transition-base);
-  font-family: inherit;
-  white-space: nowrap;
-}
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn--sm { padding: 6px 12px; font-size: 13px; min-height: 36px; }
-.btn--primary { background: var(--accent); color: #fff; }
-@media (hover: hover) { .btn--primary:hover:not(:disabled) { background: var(--accent-hover); } }
 </style>

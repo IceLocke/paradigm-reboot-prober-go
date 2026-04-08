@@ -1,22 +1,25 @@
 <template>
   <button
-    :class="['btn', `btn--${variant}`, `btn--${size}`]"
+    :class="['btn', `btn--${variant}`, `btn--${size}`, { 'btn--full': full }]"
     :disabled="disabled"
     @click="$emit('click')"
   >
-    <slot />
+    <slot>{{ text }}</slot>
   </button>
 </template>
 
 <script setup lang="ts">
 withDefaults(defineProps<{
+  text?: string
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
+  full?: boolean
 }>(), {
   variant: 'primary',
   size: 'md',
   disabled: false,
+  full: false,
 })
 
 defineEmits<{ click: [] }>()
@@ -36,6 +39,7 @@ defineEmits<{ click: [] }>()
   white-space: nowrap;
   min-height: 44px;
   font-family: inherit;
+  line-height: 1;
 }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .btn--sm { padding: 6px 12px; font-size: 13px; min-height: 36px; }
@@ -54,4 +58,6 @@ defineEmits<{ click: [] }>()
 
 .btn--danger { background: var(--color-danger); color: #fff; }
 @media (hover: hover) { .btn--danger:hover:not(:disabled) { opacity: 0.85; } }
+
+.btn--full { width: 100% }
 </style>

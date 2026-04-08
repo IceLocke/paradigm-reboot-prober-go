@@ -3,7 +3,7 @@
     :show="show"
     preset="card"
     :title="t('auth.register')"
-    style="width: 420px; max-width: 95vw;"
+    style="width: 400px; max-width: 95vw;"
     :bordered="false"
     :auto-focus="false"
     @update:show="$emit('update:show', $event)"
@@ -32,11 +32,9 @@
         type="password"
       />
       <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
-      <button type="submit" class="btn btn--primary btn--full" :disabled="loading">
-        {{ t('auth.register') }}
-      </button>
+      <BaseButton type="submit" full :disabled="loading" :text="t('auth.register')" />
       <p class="auth-switch">
-        {{ t('auth.login') }}?
+        {{ t('auth.has_account') }}?
         <a @click.prevent="$emit('goLogin')" class="switch-link">{{ t('auth.login') }}</a>
       </p>
     </form>
@@ -49,6 +47,7 @@ import { NModal, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { register } from '@/api/user'
 import { USE_MOCK } from '@/api/mock'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
@@ -121,28 +120,10 @@ const onSubmit = async () => {
   background: rgba(239, 68, 68, 0.1);
   border-radius: 6px;
 }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 16px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background var(--transition-base);
-  font-family: inherit;
-  font-size: var(--text-base);
-  min-height: 44px;
-}
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn--primary { background: var(--accent); color: #fff; }
-.btn--full { width: 100%; }
-@media (hover: hover) {
-  .btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-}
 .auth-switch {
-  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2);
   font-size: var(--text-sm);
   color: var(--text-muted);
 }

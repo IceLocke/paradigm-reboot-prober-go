@@ -3,7 +3,7 @@
     type="button"
     class="icon-btn"
     v-bind="buttonAttrs"
-    @click="emit('click')"
+    @click="$emit('click')"
   >
     <component
       v-if="icon"
@@ -29,7 +29,7 @@ const { icon, ...iconProps } = defineProps<{
 
 const buttonAttrs = useAttrs()
 
-const emit = defineEmits<{ click: [] }>()
+defineEmits<{ click: [] }>()
 </script>
 
 <style scoped>

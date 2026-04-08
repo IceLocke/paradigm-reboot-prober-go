@@ -19,10 +19,10 @@
           @click="clearFileInput"
           @change="onFileSelected"
         />
-        <button type="button" class="btn btn--secondary file-btn" @click="fileInputRef?.click()">
+        <BaseButton type="button" class="file-btn" variant="secondary" @click="fileInputRef?.click()">
           <File :size="16" />
           {{ fileName || t('common.select_file') }}
-        </button>
+        </BaseButton>
       </div>
 
       <!-- Preview -->
@@ -50,15 +50,14 @@
 
       <!-- Actions -->
       <div class="form-actions">
-        <button type="button" class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
-        <button
+        <BaseButton type="button" variant="secondary" @click="$emit('update:show', false)" :text="t('common.cancel')" />
+        <BaseButton
           type="button"
-          class="btn btn--primary"
           :disabled="filteredRecords.length === 0 || loading"
           @click="onUpload"
         >
           {{ loading ? t('common.loading') : t('common.upload_to_server') }}
-        </button>
+        </BaseButton>
       </div>
     </div>
   </n-modal>
@@ -74,6 +73,7 @@ import { uploadRecords, getAllChartsWithScores } from '@/api/record'
 import { USE_MOCK, getMockAllCharts } from '@/api/mock'
 import { decodeFileBuffer, parseCsvToRecords, filterUnchangedRecords } from '@/utils/csv'
 import type { CsvRecord } from '@/utils/csv'
+import BaseButton from '@/components/ui/BaseButton.vue'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -101,7 +101,7 @@ const clearFileInput = () => {
   if (fileInputRef.value) fileInputRef.value.value = ''
 }
 
-function resetState() {
+const resetState = () => {
   fileName.value = ''
   parsedRecords.value = []
   filteredRecords.value = []
@@ -263,26 +263,5 @@ const onUpload = async () => {
   justify-content: flex-end;
   gap: var(--space-3);
   padding-top: var(--space-3);
-}
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 16px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background var(--transition-base);
-  font-family: inherit;
-  font-size: var(--text-base);
-  min-height: 44px;
-}
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn--primary { background: var(--accent); color: #fff; }
-.btn--secondary { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
-@media (hover: hover) {
-  .btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-  .btn--secondary:hover { border-color: var(--border-hover); background: var(--bg-tertiary); }
 }
 </style>

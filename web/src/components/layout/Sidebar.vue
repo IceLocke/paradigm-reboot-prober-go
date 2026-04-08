@@ -19,29 +19,28 @@
   <!-- Mobile drawer -->
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="!isDesktop && modelValue" class="drawer-overlay" @click="$emit('update:modelValue', false)">
-        <Transition name="slide">
-          <div v-if="modelValue" class="drawer" @click.stop>
-            <div class="drawer-header">
-              <span class="logo-accent">Paradigm</span>
-              <span class="logo-text">PROBER</span>
-            </div>
-            <nav class="sidebar-nav">
-              <router-link
-                v-for="item in navItems"
-                :key="item.path"
-                :to="item.path"
-                :class="['nav-item', { 'nav-item--active': $route.path === item.path }]"
-                @click="$emit('update:modelValue', false)"
-              >
-                <span class="nav-icon">
-                  <component :is="item.icon" :size="20" />
-                </span>
-                <span class="nav-label">{{ item.label }}</span>
-              </router-link>
-            </nav>
-          </div>
-        </Transition>
+      <div v-if="!isDesktop && modelValue" class="drawer-overlay" @click="$emit('update:modelValue', false)"></div>
+    </Transition>
+    <Transition name="slide">
+      <div v-if="modelValue" class="drawer" @click.stop>
+        <div class="drawer-header">
+          <span class="logo-accent">Paradigm</span>
+          <span class="logo-text">PROBER</span>
+        </div>
+        <nav class="sidebar-nav">
+          <router-link
+            v-for="item in navItems"
+            :key="item.path"
+            :to="item.path"
+            :class="['nav-item', { 'nav-item--active': $route.path === item.path }]"
+            @click="$emit('update:modelValue', false)"
+          >
+            <span class="nav-icon">
+              <component :is="item.icon" :size="20" />
+            </span>
+            <span class="nav-label">{{ item.label }}</span>
+          </router-link>
+        </nav>
       </div>
     </Transition>
   </Teleport>

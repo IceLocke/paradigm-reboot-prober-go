@@ -38,12 +38,8 @@
           :label="t('auth.upload_token')"
           :readonly="true"
         />
-        <button type="button" class="icon-btn" @click="onCopyToken" :title="t('common.copy')">
-          <Copy :size="16" />
-        </button>
-        <button type="button" class="icon-btn" @click="onRefreshToken" :title="t('common.refresh')">
-          <RefreshCw :size="16" />
-        </button>
+        <IconButton type="button" :icon="Copy" :size="16" @click="onCopyToken" :title="t('common.copy')" />
+        <IconButton type="button" :icon="RefreshCw" :size="16" @click="onRefreshToken" :title="t('common.refresh')" />
       </div>
 
       <!-- Anonymous probe -->
@@ -65,11 +61,17 @@
       <div v-if="successMsg" class="success-msg">{{ successMsg }}</div>
 
       <div class="form-actions">
-        <button type="button" class="btn btn--secondary" @click="$emit('update:show', false)">{{ t('common.cancel') }}</button>
-        <button type="submit" class="btn btn--primary" :disabled="loading">{{ t('common.save') }}</button>
+        <BaseButton type="button" variant="secondary" @click="$emit('update:show', false)" :text="t('common.cancel')" />
+        <BaseButton type="submit" :disabled="loading" :text="t('common.save')" />
       </div>
     </form>
   </n-modal>
+
+  <ConfirmModal
+    v-model:show="showConfirm"
+    :message="t('message.token_refresh_confirm')"
+    @confirm="refreshToken"
+  />
 </template>
 
 <script setup lang="ts">
@@ -80,7 +82,10 @@ import { Copy, RefreshCw } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'
 import { updateMyInfo, refreshUploadToken } from '@/api/user'
 import { USE_MOCK } from '@/api/mock'
+import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import ConfirmModal from '@/components/ui/ConfirmModal.vue'
+import IconButton from '@/components/ui/IconButton.vue'
 
 const { t } = useI18n()
 const message = useMessage()
@@ -97,6 +102,7 @@ const form = reactive({
 const loading = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
+const showConfirm = ref(false)
 
 const tokenDisplay = computed(() => userStore.profile?.upload_token ?? '')
 
@@ -147,7 +153,12 @@ const onCopyToken = async () => {
   }
 }
 
-const onRefreshToken = async () => {
+const onRefreshToken = () => {
+  showConfirm.value = true
+}
+
+const refreshToken = async () => {
+  showConfirm.value = false
   try {
     if (USE_MOCK) {
       if (userStore.profile) {
@@ -176,7 +187,6 @@ const onRefreshToken = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2) 0;
 }
 .form-label {
   font-size: 13px;
@@ -235,42 +245,5 @@ const onRefreshToken = async () => {
   justify-content: flex-end;
   gap: var(--space-3);
   padding-top: var(--space-3);
-}
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 16px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background var(--transition-base);
-  font-family: inherit;
-  font-size: var(--text-base);
-  min-height: 44px;
-}
-.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn--primary { background: var(--accent); color: #fff; }
-.btn--secondary { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
-@media (hover: hover) {
-  .btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-  .btn--secondary:hover { border-color: var(--border-hover); background: var(--bg-tertiary); }
-}
-.icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  border-radius: 8px;
-  transition: background var(--transition-fast);
-}
-@media (hover: hover) {
-  .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
 }
 </style>
