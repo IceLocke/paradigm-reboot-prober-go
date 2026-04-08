@@ -64,8 +64,9 @@ const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
 
+const show = defineModel<boolean>('show', { required: true })
+
 const props = defineProps<{
-  show: boolean
   title: string
   difficulty: Difficulty
   level: number
@@ -73,7 +74,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'update:show': [value: boolean]
   'success': []
 }>()
 
@@ -97,7 +97,7 @@ const onSubmit = async () => {
     }
     message.success(t('message.post_record_success'))
     emit('success')
-    emit('update:show', false)
+    show.value = false
     scoreStr.value = ''
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }

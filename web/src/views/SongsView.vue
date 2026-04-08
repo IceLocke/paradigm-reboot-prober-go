@@ -375,7 +375,7 @@ onMounted(() => {
   padding: 0 var(--space-3);
   min-height: 40px;
   flex: 1;
-  max-width: 300px;
+  max-width: 40vw;
 }
 .search-icon { color: var(--text-muted); flex-shrink: 0; }
 .search-input {

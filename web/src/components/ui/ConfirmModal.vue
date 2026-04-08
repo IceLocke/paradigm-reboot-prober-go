@@ -23,7 +23,7 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 
 const { t } = useI18n()
 
-const show = defineModel<boolean>('show')
+const show = defineModel<boolean>('show', { required: true })
 
 defineProps<{
   message: string

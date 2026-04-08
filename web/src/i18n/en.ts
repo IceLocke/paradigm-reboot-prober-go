@@ -80,7 +80,7 @@ const en = {
   },
   message: {
     welcome: 'Welcome, {username}!',
-    search_placeholder: 'Search by song title...',
+    search_placeholder: 'Search...',
     required: 'This field is required',
     username_length: 'Length should be 6 to 16',
     username_character: 'Username must consist of letters and numbers, 6-16 characters',

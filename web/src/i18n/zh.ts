@@ -80,7 +80,7 @@ const zh = {
   },
   message: {
     welcome: '欢迎，{username}！',
-    search_placeholder: '搜索曲名……',
+    search_placeholder: '搜索……',
     required: '请填写此字段',
     username_length: '用户名长度 6 到 16 位',
     username_character: '用户名由字母和数字组成，6-16 位',

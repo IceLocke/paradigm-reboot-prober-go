@@ -61,7 +61,7 @@
       <div v-if="successMsg" class="success-msg">{{ successMsg }}</div>
 
       <div class="form-actions">
-        <BaseButton type="button" variant="secondary" @click="$emit('update:show', false)" :text="t('common.cancel')" />
+        <BaseButton type="button" variant="secondary" @click="$emit('update:show', false)" :text="t('common.close')" />
         <BaseButton type="submit" :disabled="loading" :text="t('common.save')" />
       </div>
     </form>
@@ -91,8 +91,7 @@ const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
 
-const props = defineProps<{ show: boolean }>()
-defineEmits<{ 'update:show': [value: boolean] }>()
+const show = defineModel<boolean>('show', { required: true })
 
 const form = reactive({
   nickname: '',
@@ -106,7 +105,7 @@ const showConfirm = ref(false)
 
 const tokenDisplay = computed(() => userStore.profile?.upload_token ?? '')
 
-watch(() => props.show, (val) => {
+watch(show, (val) => {
   if (val && userStore.profile) {
     form.nickname = userStore.profile.nickname ?? ''
     form.qq_account = userStore.profile.qq_account ?? ''
