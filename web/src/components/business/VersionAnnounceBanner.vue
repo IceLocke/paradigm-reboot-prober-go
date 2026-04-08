@@ -24,6 +24,9 @@
           />
         </div>
       </div>
+      <!-- div class="banner-footer">
+        <span class="banner-text">{{ t('announce.click_to_upload') }}</span>
+      </div -->
     </div>
   </transition>
 
@@ -35,40 +38,28 @@
     :chart-id="uploadTarget.chartId"
   />
 
-  <n-modal
-    :show="showConfirm"
-    preset="card"
-    :title="t('common.confirm')"
-    style="width: 400px; max-width: 95vw;"
-    :bordered="false"
-    :auto-focus="false"
-    @update:show="showConfirm = $event"
-  >
-    <div class="confirm-body">
-      <p>{{ t('announce.dismiss_confirm') }}</p>
-      <div class="confirm-actions">
-        <button type="button" class="btn btn--secondary" @click="showConfirm = false">{{ t('common.cancel') }}</button>
-        <button type="button" class="btn btn--primary" @click="dismiss">{{ t('common.confirm') }}</button>
-      </div>
-    </div>
-  </n-modal>
+  <ConfirmModal
+    v-model:show="showConfirm"
+    :message="t('announce.dismiss_confirm')"
+    @confirm="dismiss"
+  />
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NModal } from 'naive-ui'
 import { Sparkles, X } from '@lucide/vue'
 
 import { useAppStore } from '@/stores/app'
 import type { ChartInfo, Difficulty } from '@/api/types'
+import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 import ChartCoverCard from '@/components/business/ChartCoverCard.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
 
-function compareVersion(a: string, b: string): number {
+const compareVersion = (a: string, b: string): number => {
   const pa = a.split('.').map(Number)
   const pb = b.split('.').map(Number)
   const len = Math.max(pa.length, pb.length)
@@ -137,7 +128,7 @@ const showUpload = ref(false)
 const showConfirm = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
-function openUpload(chart: ChartInfo) {
+const openUpload = (chart: ChartInfo) => {
   uploadTarget.value = {
     title: chart.title,
     difficulty: chart.difficulty,
@@ -147,13 +138,12 @@ function openUpload(chart: ChartInfo) {
   showUpload.value = true
 }
 
-function confirmDismiss() {
+const confirmDismiss = () => {
   showConfirm.value = true
 }
 
-function dismiss() {
+const dismiss = () => {
   appStore.dismissedVersion = latestVersion.value
-  showConfirm.value = false
 }
 </script>
 
@@ -226,7 +216,7 @@ function dismiss() {
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  padding-bottom: var(--space-1);
+  padding-bottom: var(--space-2);
 }
 .song-scroll::-webkit-scrollbar {
   height: 4px;
@@ -239,6 +229,19 @@ function dismiss() {
   border-radius: 2px;
 }
 
+.banner-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.banner-text {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
 /* Confirm modal */
 .confirm-actions {
   display: flex;
@@ -246,33 +249,12 @@ function dismiss() {
   gap: var(--space-3);
   padding-top: var(--space-3);
 }
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 16px;
-  font-weight: 500;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background var(--transition-base);
-  font-family: inherit;
-  font-size: var(--text-base);
-  min-height: 44px;
-}
-.btn--primary { background: var(--accent); color: #fff; }
-.btn--secondary { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
-@media (hover: hover) {
-  .btn--primary:hover:not(:disabled) { background: var(--accent-hover); }
-  .btn--secondary:hover { border-color: var(--border-hover); background: var(--bg-tertiary); }
-}
 
 /* Responsive */
 @media (max-width: 639px) {
-  .banner-header {
-    padding: var(--space-3) var(--space-4);
-  }
-  .banner-body {
+  .banner-header,
+  .banner-body,
+  .banner-footer {
     padding: var(--space-3) var(--space-4);
   }
 }
