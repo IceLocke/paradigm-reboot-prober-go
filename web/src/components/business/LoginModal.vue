@@ -44,9 +44,8 @@ const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
 
-defineProps<{ show: boolean }>()
+const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{
-  'update:show': [value: boolean]
   success: []
   goRegister: []
 }>()

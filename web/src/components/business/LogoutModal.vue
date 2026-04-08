@@ -16,8 +16,7 @@ const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
 
-const show = defineModel<boolean>('show')
-
+const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{
   success: []
 }>()

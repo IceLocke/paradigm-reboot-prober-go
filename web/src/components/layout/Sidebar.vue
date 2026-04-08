@@ -19,10 +19,10 @@
   <!-- Mobile drawer -->
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="!isDesktop && modelValue" class="drawer-overlay" @click="$emit('update:modelValue', false)"></div>
+      <div v-if="!isDesktop && show" class="drawer-overlay" @click="$emit('update:modelValue', false)"></div>
     </Transition>
     <Transition name="slide">
-      <div v-if="modelValue" class="drawer" @click.stop>
+      <div v-if="show" class="drawer" @click.stop>
         <div class="drawer-header">
           <span class="logo-accent">Paradigm</span>
           <span class="logo-text">PROBER</span>
@@ -55,8 +55,7 @@ import { useBreakpoint } from '@/composables/useBreakpoint'
 const { t } = useI18n()
 const { isDesktop } = useBreakpoint()
 
-defineProps<{ modelValue: boolean }>()
-defineEmits<{ 'update:modelValue': [value: boolean] }>()
+const show = defineModel<boolean>({ required: true })
 
 const navItems = computed(() => [
   { path: '/best50', label: t('term.b50'), icon: ChartNoAxesColumn },

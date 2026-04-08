@@ -79,9 +79,8 @@ const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
 
-defineProps<{ show: boolean }>()
+const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{
-  'update:show': [value: boolean]
   'success': []
 }>()
 
@@ -185,9 +184,9 @@ const onUpload = async () => {
     }
 
     message.success(t('message.csv_import_success', { count: uploaded }))
-    emit('success')
-    emit('update:show', false)
+    show.value = false
     resetState()
+    emit('success')
   } catch (err: unknown) {
     const e = err as { response?: { data?: { error?: string } } }
     errorMsg.value = t('message.csv_import_failed') + (e.response?.data?.error ?? '')

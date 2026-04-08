@@ -13,21 +13,18 @@
 </template>
 
 <script setup lang="ts">
+defineModel<string | number>({ default: '', required: true })
 withDefaults(defineProps<{
-  modelValue?: string | number
   label?: string
   type?: string
   placeholder?: string
   readonly?: boolean
 }>(), {
-  modelValue: '',
   label: '',
   type: 'text',
   placeholder: '',
   readonly: false,
 })
-
-defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <style scoped>

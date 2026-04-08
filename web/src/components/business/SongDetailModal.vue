@@ -81,12 +81,10 @@ import { useBreakpoint } from '@/composables/useBreakpoint'
 const { t } = useI18n()
 const { isMobile } = useBreakpoint()
 
+const show = defineModel<boolean>('show', { required: true })
 const props = defineProps<{
-  show: boolean
   song: Song | null
 }>()
-
-defineEmits<{ 'update:show': [value: boolean] }>()
 
 const modalStyle = computed(() =>
   isMobile.value

@@ -53,9 +53,8 @@ import BaseInput from '@/components/ui/BaseInput.vue'
 const { t } = useI18n()
 const message = useMessage()
 
-defineProps<{ show: boolean }>()
+const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{
-  'update:show': [value: boolean]
   success: []
   goLogin: []
 }>()

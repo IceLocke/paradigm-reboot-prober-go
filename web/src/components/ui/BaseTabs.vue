@@ -4,7 +4,7 @@
       <button
         v-for="tab in tabs"
         :key="tab.key"
-        :class="['tabs__tab', { 'tabs__tab--active': modelValue === tab.key }]"
+        :class="['tabs__tab', { 'tabs__tab--active': active === tab.key }]"
         @click="$emit('update:modelValue', tab.key)"
       >
         {{ tab.label }}
@@ -17,6 +17,8 @@
 </template>
 
 <script setup lang="ts">
+const active = defineModel<string>({ required: true })
+
 interface Tab {
   key: string
   label: string
@@ -24,10 +26,7 @@ interface Tab {
 
 defineProps<{
   tabs: Tab[]
-  modelValue: string
 }>()
-
-defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <style scoped>
