@@ -12,38 +12,98 @@
           />
         </div>
         <UploadCart />
-        <IconButton :icon="RefreshCw" :size="18" :title="t('common.refresh')" @click="loadCharts"/>
+        <IconButton :icon="RefreshCw" :size="18" :title="t('common.refresh')" @click="loadCharts" />
+        <div class="view-toggle">
+          <button
+            :class="['view-toggle-btn', { active: appStore.songsViewMode === 'grid' }]"
+            :title="t('term.grid_view')"
+            @click="appStore.songsViewMode = 'grid'"
+          >
+            <LayoutGrid :size="16" />
+          </button>
+          <button
+            :class="['view-toggle-btn', { active: appStore.songsViewMode === 'table' }]"
+            :title="t('term.table_view')"
+            @click="appStore.songsViewMode = 'table'"
+          >
+            <List :size="16" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search box (mobile: full width row) -->
+    <div class="search-row-mobile">
+      <div class="search-box search-box--mobile">
+        <Search :size="16" />
+        <input
+          v-model="search"
+          class="search-input"
+          :placeholder="t('message.search_placeholder')"
+        />
       </div>
     </div>
 
     <!-- Filters -->
     <div class="filters-row">
-      <BaseTabs v-model="diffFilter" :tabs="diffTabs" />
+      <div class="diff-toggle">
+        <button
+          :class="['diff-toggle-btn', { active: diffFilter.length === 0 }]"
+          @click="toggleDiff('all')"
+        >{{ t('common.all') }}</button>
+        <button
+          v-for="d in diffOptions"
+          :key="d.key"
+          :class="['diff-toggle-btn', { active: diffFilter.includes(d.key) }]"
+          @click="toggleDiff(d.key)"
+        >{{ d.label }}</button>
+      </div>
       <BaseTabs v-model="versionFilter" :tabs="versionTabs" />
     </div>
 
-    <!-- Table -->
-    <div class="table-wrapper">
-      <n-data-table
-        :columns="columns"
-        :data="paginatedData"
-        :bordered="false"
-        :scroll-x="650"
-        size="small"
-        striped
-        @update:sorter="handleSorterUpdate"
-      />
-    </div>
+    <!-- Advanced Filters -->
+    <SongFilterPanel
+      v-model:show="showAdvFilters"
+      v-model:level-min="levelMin"
+      v-model:level-max="levelMax"
+      v-model:version-select="versionSelect"
+      v-model:album-select="albumSelect"
+      v-model:group-by="groupBy"
+      :version-options="versionOptions"
+      :album-options="albumOptions"
+      :group-by-options="groupByOptions"
+      :b50-filter="b50Filter"
+      :b50-loading="b50Loading"
+      @toggle-b50="toggleB50Filter"
+    />
 
-    <!-- Pagination -->
-    <div class="pagination-row">
-      <n-pagination
-        v-model:page="pageIndex"
-        :page-size="pageSize"
-        :item-count="filteredData.length"
-        :page-slot="5"
-      />
-    </div>
+    <!-- Divider -->
+    <hr class="section-divider" />
+
+    <!-- Grid View -->
+    <SongGridView
+      v-if="appStore.songsViewMode === 'grid'"
+      :groups="groupedData"
+      :collapsed-levels="collapsedLevels"
+      :wrap="groupBy === 'album'"
+      @toggle-level="toggleLevel"
+      @click-chart="onClickTitle"
+      @add-to-cart="onAddToCart"
+      @quick-upload="onQuickUpload"
+    />
+
+    <!-- Table View -->
+    <SongTableView
+      v-else
+      v-model:page-index="pageIndex"
+      :data="paginatedData"
+      :filtered-count="filteredData.length"
+      :page-size="pageSize"
+      @click-title="onClickTitle"
+      @add-to-cart="onAddToCart"
+      @quick-upload="onQuickUpload"
+      @update:sorter="handleSorterUpdate"
+    />
 
     <!-- Modals -->
     <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
@@ -59,130 +119,69 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, h } from 'vue'
+import { ref, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, useMessage } from 'naive-ui'
-import type { DataTableColumns, DataTableSortState } from 'naive-ui'
-import { Search, RefreshCw, Plus, Upload } from '@lucide/vue';
+import { useMessage } from 'naive-ui'
+import { Search, RefreshCw, LayoutGrid, List } from '@lucide/vue'
 
 import { useAppStore } from '@/stores/app'
 import { getAllCharts, getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockCharts } from '@/api/mock'
 import type { ChartInfo, Song, Difficulty } from '@/api/types'
+
+import { useChartFilters } from '@/composables/useChartFilters'
+import { useChartGroups } from '@/composables/useChartGroups'
+
 import BaseTabs from '@/components/ui/BaseTabs.vue'
 import IconButton from '@/components/ui/IconButton.vue'
-import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 import UploadCart from '@/components/business/UploadCart.vue'
+import SongFilterPanel from '@/components/business/SongFilterPanel.vue'
+
+const SongGridView = defineAsyncComponent(() => import('@/components/business/SongGridView.vue'))
+const SongTableView = defineAsyncComponent(() => import('@/components/business/SongTableView.vue'))
 
 const { t } = useI18n()
 const message = useMessage()
 const appStore = useAppStore()
 
-const search = ref('')
-const diffFilter = ref('all')
-const versionFilter = ref('all')
-const pageIndex = ref(1)
-const pageSize = 20
+// --- Composables ---
+const {
+  search,
+  diffFilter,
+  diffOptions,
+  toggleDiff,
+  versionFilter,
+  pageIndex,
+  pageSize,
+  showAdvFilters,
+  levelMin,
+  levelMax,
+  versionSelect,
+  albumSelect,
+  b50Filter,
+  b50Loading,
+  groupBy,
+  versionTabs,
+  versionOptions,
+  albumOptions,
+  groupByOptions,
+  filteredData,
+  paginatedData,
+  handleSorterUpdate,
+  toggleB50Filter,
+} = useChartFilters()
 
-const sortState = ref<DataTableSortState | null>(null)
+const { groupedData, collapsedLevels, toggleLevel } = useChartGroups(filteredData, groupBy)
 
+// --- Modals ---
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const showQuickUpload = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
 
-const diffTabs = [
-  { key: 'all', label: t('common.all') },
-  { key: 'detected', label: 'DET' },
-  { key: 'invaded', label: 'IVD' },
-  { key: 'massive', label: 'MSV' },
-  { key: 'reboot', label: 'RBT' },
-]
-
-const versionTabs = [
-  { key: 'all', label: t('common.all') },
-  { key: 'new', label: t('term.current') },
-  { key: 'old', label: t('term.past') },
-]
-
-const compareVersions = (a: string, b: string): number => {
-  const aParts = a.split('.');
-  const bParts = b.split('.');
-  const len = Math.max(aParts.length, bParts.length);
-
-  for (let i = 0; i < len; i++) {
-    const diff = (Number(aParts[i]) || 0) - (Number(bParts[i]) || 0);
-    if (diff) return diff;
-  }
-  return 0;
-};
-
-const filteredData = computed(() => {
-  let data = Array.from(appStore.charts ?? [])
-
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    data = data.filter((c) => c.title.toLowerCase().includes(q) || c.artist.toLowerCase().includes(q))
-  }
-
-  if (diffFilter.value !== 'all') {
-    data = data.filter((c) => c.difficulty === diffFilter.value)
-  }
-
-  if (versionFilter.value === 'old') data = data.filter((c) => !c.b15)
-  else if (versionFilter.value === 'new') data = data.filter((c) => c.b15)
-
-  if (sortState.value && sortState.value.order) {
-    const { columnKey, order } = sortState.value
-
-    data.sort((a, b) => {
-      let result = 0
-
-      switch (columnKey) {
-        case 'title':
-          result = a.title.localeCompare(b.title)
-          break
-        case 'version':
-          result = compareVersions(a.version, b.version)
-          break
-        case 'level':
-          result = a.level - b.level
-          break
-        case 'fitting_level':
-          result = (a.fitting_level ?? 0) - (b.fitting_level ?? 0)
-          break
-      }
-
-      return order === 'ascend' ? result : -result
-    })
-  }
-
-  return data
-})
-
-watch(
-  () => filteredData.value.length,
-  (length: number) => {
-    const maxPage = Math.max(1, Math.ceil(length / pageSize))
-    pageIndex.value = Math.min(pageIndex.value, maxPage)
-  },
-)
-
-const paginatedData = computed(() => {
-  const start = (pageIndex.value - 1) * pageSize
-  return filteredData.value.slice(start, start + pageSize)
-})
-
-const handleSorterUpdate = (sorter: DataTableSortState | DataTableSortState[] | null) => {
-  if (Array.isArray(sorter)) {
-    sortState.value = sorter[0] ?? null
-  } else {
-    sortState.value = sorter
-  }
-}
-
+// --- Actions ---
 const onClickTitle = async (songId: number) => {
   showSongDetail.value = true
   selectedSong.value = null
@@ -253,92 +252,7 @@ const onUploadSuccess = () => {
   // Refresh could happen here
 }
 
-const columns = computed<DataTableColumns<ChartInfo>>(() => [
-  {
-    title: t('term.title'),
-    key: 'title',
-    minWidth: 150,
-    ellipsis: {
-      tooltip: {
-        zIndex: 1,
-      },
-    },
-    sorter: true,
-    fixed: "left",
-    render(row) {
-      return h('a', {
-        class: 'link-text',
-        onClick: () => onClickTitle(row.song_id),
-      }, row.title)
-    },
-  },
-  {
-    title: t('term.version'),
-    key: 'version',
-    width: 90,
-    sorter: true,
-  },
-  {
-    title: t('term.season'),
-    key: 'b15',
-    width: 90,
-    render(row) {
-      return h('span', {
-        class: row.b15 ? 'version-badge version-badge--new' : 'version-badge version-badge--old',
-      }, row.b15 ? t('term.current') : t('term.past'))
-    },
-  },
-  {
-    title: t('term.difficulty'),
-    key: 'difficulty',
-    width: 90,
-    render(row) {
-      return h(DifficultyBadge, { difficulty: row.difficulty, short: false })
-    },
-  },
-  {
-    title: t('term.level'),
-    key: 'level',
-    width: 80,
-    sorter: true,
-    render(row) {
-      return h('span', { class: 'mono' }, row.level.toFixed(1))
-    },
-  },
-  {
-    title: t('term.fitting_level'),
-    key: 'fitting_level',
-    width: 90,
-    sorter: true,
-    render(row) {
-      return h('span', { class: 'mono' }, row.fitting_level != null ? row.fitting_level.toFixed(1) : '-')
-    },
-  },
-  {
-    title: '',
-    key: 'actions',
-    width: 80,
-    render(row) {
-      return h('div', { class: 'action-btns' }, [
-        h('button', {
-          class: 'action-btn',
-          title: t('message.add_to_upload_list'),
-          onClick: () => onAddToCart(row),
-        }, [
-          h(Plus, { size: 14 })
-        ]),
-        h('button', {
-          class: 'action-btn',
-          title: t('message.quick_upload'),
-          onClick: () => onQuickUpload(row),
-        }, [
-          h(Upload, { size: 14 })
-        ]),
-      ])
-    },
-  },
-])
-
+// --- Load data ---
 const loadCharts = async () => {
   if (USE_MOCK) {
     appStore.charts = getMockCharts()
@@ -360,11 +274,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.filters-row {
-  display: flex;
-  gap: 0 var(--space-4);
-  flex-wrap: wrap;
-}
+/* Search box in header (desktop) */
 .search-box {
   display: flex;
   align-items: center;
@@ -377,7 +287,6 @@ onMounted(() => {
   flex: 1;
   max-width: 40vw;
 }
-.search-icon { color: var(--text-muted); flex-shrink: 0; }
 .search-input {
   border: none;
   background: none;
@@ -389,58 +298,111 @@ onMounted(() => {
 }
 .search-input::placeholder { color: var(--text-muted); }
 
-.table-wrapper {
-  -webkit-overflow-scrolling: touch;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  padding: var(--space-3);
+/* Mobile search row (hidden on desktop) */
+.search-row-mobile {
+  display: none;
+  margin-bottom: var(--space-3);
+}
+.search-box--mobile {
+  max-width: none;
 }
 
-.pagination-row {
+@media (max-width: 639px) {
+  .page-actions .search-box {
+    display: none;
+  }
+  .search-row-mobile {
+    display: block;
+  }
+}
+
+/* Filters row */
+.filters-row {
   display: flex;
-  justify-content: center;
-  margin-top: var(--space-5);
+  gap: 0 var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+.filters-row :deep(.tabs__content) {
+  display: none;
+}
+@media (max-width: 639px) {
+  .filters-row {
+    gap: var(--space-2) var(--space-3);
+  }
 }
 
-:deep(.link-text) {
-  color: var(--accent);
-  cursor: pointer;
-  text-decoration: none;
-  font-size: var(--text-sm);
-}
-:deep(.link-text:hover) { text-decoration: underline; }
-:deep(.mono) { font-family: var(--font-mono); font-size: var(--text-sm); }
-
-:deep(.version-badge) {
-  display: inline-flex;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: 500;
-}
-:deep(.version-badge--new) { background: var(--accent-muted); color: var(--accent); }
-:deep(.version-badge--old) { background: rgba(161,161,170,0.1); color: var(--text-secondary); }
-
-:deep(.action-btns) {
+/* Difficulty multi-select toggle */
+.diff-toggle {
   display: flex;
   gap: 2px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
-:deep(.action-btn) {
+.diff-toggle::-webkit-scrollbar { display: none; }
+
+.diff-toggle-btn {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--transition-base), background var(--transition-base);
+  white-space: nowrap;
+  min-height: 44px;
+  font-family: inherit;
+}
+@media (hover: hover) {
+  .diff-toggle-btn:hover { color: var(--text-secondary); }
+}
+.diff-toggle-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* View toggle */
+.view-toggle {
+  display: flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.view-toggle-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   cursor: pointer;
-  border-radius: 6px;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
+.view-toggle-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
 @media (hover: hover) {
-  :deep(.action-btn:hover) { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+  .view-toggle-btn:not(.active):hover {
+    color: var(--text-secondary);
+  }
+}
+
+/* Divider between filters and content */
+.section-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: var(--space-4) 0;
 }
 </style>

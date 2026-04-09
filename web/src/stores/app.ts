@@ -15,6 +15,8 @@ interface AppState {
   uploadList: UploadItem[]
   sidebarOpen: boolean
   dismissedVersion: string
+  songsViewMode: 'grid' | 'table'
+  b50ChartIds: number[] | null
 }
 
 export const useAppStore = defineStore('appStore', {
@@ -23,8 +25,10 @@ export const useAppStore = defineStore('appStore', {
     uploadList: [],
     sidebarOpen: false,
     dismissedVersion: '',
+    songsViewMode: 'grid',
+    b50ChartIds: null,
   }),
   persist: {
-    paths: ['dismissedVersion'],
+    paths: ['dismissedVersion', 'songsViewMode'],
   },
 })
