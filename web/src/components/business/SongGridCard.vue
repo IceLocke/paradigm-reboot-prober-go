@@ -126,8 +126,7 @@ const coverUrl = computed(() => {
   justify-content: center;
   width: 26px;
   height: 26px;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.75);
   border: none;
   color: #e4e4e7;
   cursor: pointer;
