@@ -333,7 +333,7 @@ function drawRecordCard(
   // ── Background: blurred cover or fallback ──
   if (coverImage) {
     const bleed = 20 // extra pixels to avoid blur edge artifacts
-    drawImageCoverBlurred(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed, 3)
+    drawImageCoverBlurred(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed, 5)
   } else {
     ctx.fillStyle = '#1a1a22'
     ctx.fillRect(x, y, w, h)
