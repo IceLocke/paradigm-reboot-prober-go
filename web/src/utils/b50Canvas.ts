@@ -112,20 +112,61 @@ function drawImageCover(
   ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h)
 }
 
-/** Detect whether the browser supports CanvasRenderingContext2D.filter */
-function detectFilterSupport(): boolean {
+/** Detect whether the browser actually renders CanvasRenderingContext2D.filter */
+const supportsFilter = (() => {
   try {
     const c = document.createElement('canvas')
+    c.width = 3
+    c.height = 1
     const ctx = c.getContext('2d')
     if (!ctx) return false
     ctx.filter = 'blur(1px)'
-    return ctx.filter === 'blur(1px)'
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(1, 0, 1, 1)
+    // If blur actually renders, white bleeds into the neighboring pixel
+    return ctx.getImageData(0, 0, 1, 1).data[3] > 0
   } catch {
     return false
   }
-}
+})()
 
-const supportsFilter = detectFilterSupport()
+/**
+ * Draw a cover image with blur.
+ * Uses native ctx.filter when available, otherwise falls back to an
+ * iterative downscale/upscale trick (fast, pure drawImage, no pixel ops).
+ */
+function drawImageCoverBlurred(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number, y: number, w: number, h: number,
+  blur: number,
+) {
+  if (supportsFilter) {
+    ctx.save()
+    ctx.filter = `blur(${blur}px)`
+    drawImageCover(ctx, img, x, y, w, h)
+    ctx.restore()
+    return
+  }
+
+  // Fallback: iterative downscale/upscale.
+  // Each pass roughly doubles the effective blur radius.
+  const offscreen = document.createElement('canvas')
+  offscreen.width = w
+  offscreen.height = h
+  const octx = offscreen.getContext('2d')!
+  drawImageCover(octx, img, 0, 0, w, h)
+
+  const passes = Math.max(1, Math.ceil(Math.log2(blur)))
+  for (let i = 0; i < passes; i++) {
+    const hw = Math.max(1, (offscreen.width / 2) | 0)
+    const hh = Math.max(1, (offscreen.height / 2) | 0)
+    octx.drawImage(offscreen, 0, 0, offscreen.width, offscreen.height, 0, 0, hw, hh)
+    octx.drawImage(offscreen, 0, 0, hw, hh, 0, 0, offscreen.width, offscreen.height)
+  }
+
+  ctx.drawImage(offscreen, 0, 0, w, h, x, y, w, h)
+}
 
 function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
   if (ctx.measureText(text).width <= maxWidth) return text
@@ -182,23 +223,14 @@ function drawBackground(
   bgImage: HTMLImageElement | null,
 ) {
   if (bgImage) {
-    // Dark base beneath the cover
+    // Dark base beneath the blurred cover
     ctx.fillStyle = '#0e0e12'
     ctx.fillRect(0, 0, width, height)
 
-    if (supportsFilter) {
-      ctx.save()
-      ctx.filter = 'blur(20px)'
-      // Draw larger than canvas to prevent white edges from blur
-      drawImageCover(ctx, bgImage, -40, -40, width + 80, height + 80)
-      ctx.restore()
-      ctx.fillStyle = 'rgba(14, 14, 18, 0.45)'
-    } else {
-      drawImageCover(ctx, bgImage, 0, 0, width, height)
-      ctx.fillStyle = 'rgba(14, 14, 18, 0.7)'
-    }
+    drawImageCover(ctx, bgImage, 0, 0, width, height)
 
-    // Overlay to ensure text readability
+    // Semi-transparent overlay to ensure text readability
+    ctx.fillStyle = 'rgba(14, 14, 18, 0.45)'
     ctx.fillRect(0, 0, width, height)
   } else {
     // No cover image — use a slightly lighter tinted background
@@ -300,20 +332,15 @@ function drawRecordCard(
 
   // ── Background: blurred cover or fallback ──
   if (coverImage) {
-    if (supportsFilter) {
-      ctx.save()
-      ctx.filter = 'blur(3px)'
-      const bleed = 20 // extra pixels to avoid blur edge artifacts
-      drawImageCover(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed)
-      ctx.restore()
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.42)'
-    } else {
-      drawImageCover(ctx, coverImage, x, y, w, h)
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
-    }
+    const bleed = 20 // extra pixels to avoid blur edge artifacts
+    drawImageCoverBlurred(ctx, coverImage, x - bleed, y - bleed, w + 2 * bleed, h + 2 * bleed, 3)
   } else {
     ctx.fillStyle = '#1a1a22'
+    ctx.fillRect(x, y, w, h)
   }
+
+  // Dark overlay for readability
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.42)'
   ctx.fillRect(x, y, w, h)
 
   // ── Text content ──
