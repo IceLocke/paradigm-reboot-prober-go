@@ -41,7 +41,6 @@
               :placeholder="t('term.version_select')"
               clearable
               multiple
-              size="small"
             />
           </div>
 
@@ -54,7 +53,6 @@
               :placeholder="t('term.album_select')"
               clearable
               multiple
-              size="small"
             />
           </div>
 
@@ -64,7 +62,6 @@
             <n-select
               v-model:value="groupBy"
               :options="groupByOptions"
-              size="small"
             />
           </div>
         </div>

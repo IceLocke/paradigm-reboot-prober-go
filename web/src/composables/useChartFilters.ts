@@ -46,7 +46,7 @@ export function useChartFilters() {
   // --- Basic filters ---
   const search = ref('')
   const searchDebounced = refDebounced(search, 300)
-  const diffFilter = ref('all')
+  const diffFilter = ref<string[]>([])
   const versionFilter = ref('all')
   const pageIndex = ref(1)
   const pageSize = 24
@@ -63,14 +63,29 @@ export function useChartFilters() {
   const b50Loading = ref(false)
   const groupBy = ref<'level' | 'version' | 'album'>('level')
 
-  // --- Tabs ---
-  const diffTabs = [
-    { key: 'all', label: t('common.all') },
+  // --- Difficulty options (multi-select) ---
+  const diffOptions = [
     { key: 'detected', label: 'DET' },
     { key: 'invaded', label: 'IVD' },
     { key: 'massive', label: 'MSV' },
     { key: 'reboot', label: 'RBT' },
   ]
+
+  const toggleDiff = (key: string) => {
+    if (key === 'all') {
+      diffFilter.value = []
+      return
+    }
+    const idx = diffFilter.value.indexOf(key)
+    if (idx >= 0) {
+      diffFilter.value = diffFilter.value.filter((k) => k !== key)
+    } else {
+      diffFilter.value = [...diffFilter.value, key]
+    }
+    if (diffFilter.value.length === diffOptions.length) {
+      diffFilter.value = []
+    }
+  }
 
   const versionTabs = [
     { key: 'all', label: t('common.all') },
@@ -105,8 +120,9 @@ export function useChartFilters() {
       data = data.filter((c) => matchesSearch(c, searchDebounced.value))
     }
 
-    if (diffFilter.value !== 'all') {
-      data = data.filter((c) => c.difficulty === diffFilter.value)
+    if (diffFilter.value.length > 0) {
+      const diffs = new Set(diffFilter.value)
+      data = data.filter((c) => diffs.has(c.difficulty))
     }
 
     if (versionFilter.value === 'old') data = data.filter((c) => !c.b15)
@@ -217,6 +233,8 @@ export function useChartFilters() {
   return {
     search,
     diffFilter,
+    diffOptions,
+    toggleDiff,
     versionFilter,
     pageIndex,
     pageSize,
@@ -228,7 +246,6 @@ export function useChartFilters() {
     b50Filter,
     b50Loading,
     groupBy,
-    diffTabs,
     versionTabs,
     versionOptions,
     albumOptions,

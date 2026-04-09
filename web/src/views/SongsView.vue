@@ -46,7 +46,18 @@
 
     <!-- Filters -->
     <div class="filters-row">
-      <BaseTabs v-model="diffFilter" :tabs="diffTabs" />
+      <div class="diff-toggle">
+        <button
+          :class="['diff-toggle-btn', { active: diffFilter.length === 0 }]"
+          @click="toggleDiff('all')"
+        >{{ t('common.all') }}</button>
+        <button
+          v-for="d in diffOptions"
+          :key="d.key"
+          :class="['diff-toggle-btn', { active: diffFilter.includes(d.key) }]"
+          @click="toggleDiff(d.key)"
+        >{{ d.label }}</button>
+      </div>
       <BaseTabs v-model="versionFilter" :tabs="versionTabs" />
     </div>
 
@@ -74,6 +85,7 @@
       v-if="appStore.songsViewMode === 'grid'"
       :groups="groupedData"
       :collapsed-levels="collapsedLevels"
+      :wrap="groupBy === 'album'"
       @toggle-level="toggleLevel"
       @click-chart="onClickTitle"
       @add-to-cart="onAddToCart"
@@ -138,6 +150,8 @@ const appStore = useAppStore()
 const {
   search,
   diffFilter,
+  diffOptions,
+  toggleDiff,
   versionFilter,
   pageIndex,
   pageSize,
@@ -149,7 +163,6 @@ const {
   b50Filter,
   b50Loading,
   groupBy,
-  diffTabs,
   versionTabs,
   versionOptions,
   albumOptions,
@@ -317,6 +330,43 @@ onMounted(() => {
   .filters-row {
     gap: var(--space-2) var(--space-3);
   }
+}
+
+/* Difficulty multi-select toggle */
+.diff-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.diff-toggle::-webkit-scrollbar { display: none; }
+
+.diff-toggle-btn {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--transition-base), background var(--transition-base);
+  white-space: nowrap;
+  min-height: 44px;
+  font-family: inherit;
+}
+@media (hover: hover) {
+  .diff-toggle-btn:hover { color: var(--text-secondary); }
+}
+.diff-toggle-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
 }
 
 /* View toggle */

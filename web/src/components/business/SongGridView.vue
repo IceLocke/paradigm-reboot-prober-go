@@ -4,7 +4,7 @@
       <div
         v-for="group in groups"
         :key="group.key"
-        :class="['level-row', { 'level-row--collapsed': collapsedLevels.has(group.key) }]"
+        :class="['level-row', { 'level-row--collapsed': collapsedLevels.has(group.key), 'level-row--stacked': wrap }]"
       >
         <button class="level-label" @click="$emit('toggle-level', group.key)">
           <ChevronRight :size="12" :class="['level-chevron', { open: !collapsedLevels.has(group.key) }]" />
@@ -42,6 +42,7 @@ const { t } = useI18n()
 defineProps<{
   groups: ChartGroup[]
   collapsedLevels: Set<string>
+  wrap: boolean
 }>()
 
 defineEmits<{
@@ -83,8 +84,8 @@ defineEmits<{
   align-items: baseline;
   gap: var(--space-1);
   flex-shrink: 0;
-  width: 140px;
-  min-width: 140px;
+  min-width: 100px;
+  max-width: 240px;
   padding: var(--space-1) 0;
   background: none;
   border: none;
@@ -92,7 +93,6 @@ defineEmits<{
   color: var(--text-primary);
   font-family: inherit;
   transition: color var(--transition-fast);
-  overflow: hidden;
 }
 @media (hover: hover) {
   .level-label:hover { color: var(--accent); }
@@ -112,6 +112,8 @@ defineEmits<{
   font-size: var(--text-lg);
   font-weight: 700;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .level-count {
@@ -150,6 +152,19 @@ defineEmits<{
   width: 130px;
 }
 
+/* Stacked mode: label on its own row, cards below */
+.level-row--stacked {
+  flex-wrap: wrap;
+}
+.level-row--stacked .level-label {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+}
+.level-row--stacked .level-cards {
+  width: 100%;
+}
+
 @media (max-width: 639px) {
   .level-row {
     flex-wrap: wrap;
@@ -159,6 +174,7 @@ defineEmits<{
   .level-label {
     width: 100%;
     min-width: 0;
+    max-width: none;
   }
   .level-value {
     font-size: var(--text-base);
