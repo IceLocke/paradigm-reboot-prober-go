@@ -10,9 +10,43 @@
       </div>
     </div>
 
-    <!-- Scope filter -->
+    <!-- Scope filter + Difficulty toggle -->
     <div class="filters-row">
       <BaseTabs v-model="scope" :tabs="scopeTabs" />
+      <div class="diff-toggle">
+        <button
+          :class="['diff-toggle-btn', { active: diffFilter.length === 0 }]"
+          @click="toggleDiff('all')"
+        >{{ t('common.all') }}</button>
+        <button
+          v-for="d in diffOptions"
+          :key="d.key"
+          :class="['diff-toggle-btn', { active: diffFilter.includes(d.key) }]"
+          @click="toggleDiff(d.key)"
+        >{{ d.label }}</button>
+      </div>
+    </div>
+
+    <!-- Level range filter -->
+    <div class="level-filter-row">
+      <span class="level-filter-label">{{ t('term.level_range') }}</span>
+      <input
+        v-model.number="levelMin"
+        type="number"
+        step="0.1"
+        class="level-input"
+        :placeholder="t('term.min_level')"
+        @change="onFilterChange"
+      />
+      <span class="level-filter-sep">–</span>
+      <input
+        v-model.number="levelMax"
+        type="number"
+        step="0.1"
+        class="level-input"
+        :placeholder="t('term.max_level')"
+        @change="onFilterChange"
+      />
     </div>
 
     <!-- Table -->
@@ -66,6 +100,7 @@ import dayjs from 'dayjs'
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { getRecords, getAllChartsWithScores } from '@/api/record'
+import type { RecordFilterParams } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockRecords, getMockAllCharts } from '@/api/mock'
 import { exportCsv } from '@/utils/csv'
@@ -92,6 +127,49 @@ const records = ref<PlayRecordInfo[]>([])
 const loading = ref(false)
 
 const sortState = ref<DataTableSortState | null>(null)
+
+// Filter state
+const diffFilter = ref<string[]>([])
+const levelMin = ref<number | null>(null)
+const levelMax = ref<number | null>(null)
+
+const diffOptions = [
+  { key: 'detected', label: 'DET' },
+  { key: 'invaded', label: 'IVD' },
+  { key: 'massive', label: 'MSV' },
+  { key: 'reboot', label: 'RBT' },
+]
+
+const toggleDiff = (key: string) => {
+  if (key === 'all') {
+    diffFilter.value = []
+  } else {
+    const idx = diffFilter.value.indexOf(key)
+    if (idx >= 0) {
+      diffFilter.value = diffFilter.value.filter((k) => k !== key)
+    } else {
+      diffFilter.value = [...diffFilter.value, key]
+    }
+    if (diffFilter.value.length === diffOptions.length) {
+      diffFilter.value = []
+    }
+  }
+  pageIndex.value = 1
+  loadRecords()
+}
+
+const onFilterChange = () => {
+  pageIndex.value = 1
+  loadRecords()
+}
+
+const buildFilter = (): RecordFilterParams => {
+  const f: RecordFilterParams = {}
+  if (levelMin.value != null && !isNaN(levelMin.value)) f.minLevel = levelMin.value
+  if (levelMax.value != null && !isNaN(levelMax.value)) f.maxLevel = levelMax.value
+  if (diffFilter.value.length > 0) f.difficulties = diffFilter.value as Difficulty[]
+  return f
+}
 
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
@@ -282,7 +360,8 @@ const loadRecords = async () => {
       const hasActiveSort = (order === 'ascend' || order === 'descend') && columnKey != null
       const sortBy = hasActiveSort ? String(columnKey) : 'rating'
       const sortOrder = hasActiveSort ? (order === 'ascend' ? 'asc' : 'desc') : 'desc'
-      const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value, sortBy, sortOrder)
+      const filter = buildFilter()
+      const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value, sortBy, sortOrder, filter)
       records.value = res.data.records
       total.value = res.data.total
     }
@@ -329,7 +408,81 @@ onMounted(loadRecords)
   display: flex;
   gap: 0 var(--space-4);
   flex-wrap: wrap;
+  align-items: center;
 }
+
+/* Level range filter */
+.level-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.level-filter-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.level-input {
+  width: 80px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: var(--font-mono), monospace;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+.level-input:focus {
+  border-color: var(--accent);
+}
+.level-input::placeholder {
+  color: var(--text-muted);
+  font-family: inherit;
+}
+.level-filter-sep {
+  color: var(--text-muted);
+}
+
+/* Difficulty multi-select toggle */
+.diff-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.diff-toggle::-webkit-scrollbar { display: none; }
+
+.diff-toggle-btn {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--transition-base), background var(--transition-base);
+  white-space: nowrap;
+  min-height: 44px;
+  font-family: inherit;
+}
+@media (hover: hover) {
+  .diff-toggle-btn:hover { color: var(--text-secondary); }
+}
+.diff-toggle-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
 .table-wrapper {
   -webkit-overflow-scrolling: touch;
   background: var(--bg-card);
@@ -358,6 +511,18 @@ onMounted(loadRecords)
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+}
+
+@media (max-width: 639px) {
+  .filters-row {
+    gap: var(--space-2) var(--space-3);
+  }
+  .level-filter-row {
+    flex-wrap: wrap;
+  }
+  .level-input {
+    width: 70px;
+  }
 }
 
 :deep(.link-text) { color: var(--accent); cursor: pointer; text-decoration: none; font-size: var(--text-sm); }

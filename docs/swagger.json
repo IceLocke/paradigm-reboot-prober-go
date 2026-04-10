@@ -80,6 +80,28 @@
                         "description": "Order (desc or asc)",
                         "name": "order",
                         "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Minimum chart level (inclusive)",
+                        "name": "min_level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Maximum chart level (inclusive)",
+                        "name": "max_level",
+                        "in": "query"
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "multi",
+                        "description": "Filter by difficulty (detected, invaded, massive, reboot)",
+                        "name": "difficulty",
+                        "in": "query"
                     }
                 ],
                 "responses": {

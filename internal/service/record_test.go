@@ -41,37 +41,37 @@ func TestRecordService(t *testing.T) {
 	})
 
 	t.Run("GetAllRecords", func(t *testing.T) {
-		records, err := recordService.GetAllRecords(ctx, "testuser", 10, 0, "score", "desc")
+		records, err := recordService.GetAllRecords(ctx, "testuser", 10, 0, "score", "desc", model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 		assert.Equal(t, 1000000, *records[0].Score)
 	})
 
 	t.Run("GetBest50Records", func(t *testing.T) {
-		records, err := recordService.GetBest50Records(ctx, "testuser", 0)
+		records, err := recordService.GetBest50Records(ctx, "testuser", 0, model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 	})
 
 	t.Run("GetBestRecords", func(t *testing.T) {
-		records, err := recordService.GetBestRecords(ctx, "testuser", 10, 0, "score", "desc")
+		records, err := recordService.GetBestRecords(ctx, "testuser", 10, 0, "score", "desc", model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 	})
 
 	t.Run("GetAllChartsWithBestScores", func(t *testing.T) {
-		charts, err := recordService.GetAllChartsWithBestScores(ctx, "testuser")
+		charts, err := recordService.GetAllChartsWithBestScores(ctx, "testuser", model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, charts)
 		assert.Equal(t, 1000000, charts[0].Score)
 	})
 
 	t.Run("CountRecords", func(t *testing.T) {
-		bestCount, err := recordService.CountBestRecords(ctx, "testuser")
+		bestCount, err := recordService.CountBestRecords(ctx, "testuser", model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), bestCount)
 
-		allCount, err := recordService.CountAllRecords(ctx, "testuser")
+		allCount, err := recordService.CountAllRecords(ctx, "testuser", model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.Equal(t, int64(1), allCount)
 	})

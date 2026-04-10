@@ -62,6 +62,37 @@ func parsePaginationParams(c *gin.Context) paginationParams {
 	}
 }
 
+// parseRecordFilter extracts and validates record filter parameters from the request
+func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
+	var filter model.RecordFilter
+
+	if minStr := c.Query("min_level"); minStr != "" {
+		v, err := strconv.ParseFloat(minStr, 64)
+		if err != nil {
+			return filter, errors.New("invalid min_level parameter")
+		}
+		filter.MinLevel = &v
+	}
+
+	if maxStr := c.Query("max_level"); maxStr != "" {
+		v, err := strconv.ParseFloat(maxStr, 64)
+		if err != nil {
+			return filter, errors.New("invalid max_level parameter")
+		}
+		filter.MaxLevel = &v
+	}
+
+	difficulties := c.QueryArray("difficulty")
+	for _, d := range difficulties {
+		if !model.ValidDifficulty(d) {
+			return filter, errors.New("invalid difficulty value: " + d)
+		}
+		filter.Difficulties = append(filter.Difficulties, model.Difficulty(d))
+	}
+
+	return filter, nil
+}
+
 // GetPlayRecords godoc
 // @Summary Get play records
 // @Description Retrieve play records for a user based on scope (b50, best, all, all-charts)
@@ -74,6 +105,9 @@ func parsePaginationParams(c *gin.Context) paginationParams {
 // @Param page_index query int false "Page index" default(1)
 // @Param sort_by query string false "Sort by (rating, score, record_time, etc.)" default(rating)
 // @Param order query string false "Order (desc or asc)" default(desc)
+// @Param min_level query number false "Minimum chart level (inclusive)"
+// @Param max_level query number false "Maximum chart level (inclusive)"
+// @Param difficulty query []string false "Filter by difficulty (detected, invaded, massive, reboot)" collectionFormat(multi)
 // @Success 200 {object} model.PlayRecordResponse "b50/best/all scope"
 // @Success 200 {object} model.AllChartsResponse "all-charts scope"
 // @Failure 400 {object} model.Response
@@ -86,6 +120,13 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	scope := c.DefaultQuery("scope", "b50")
 	underflow, _ := strconv.Atoi(c.DefaultQuery("underflow", "0"))
 	p := parsePaginationParams(c)
+
+	// Parse record filter
+	filter, err := parseRecordFilter(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		return
+	}
 
 	// Validate underflow
 	if underflow < 0 {
@@ -130,7 +171,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	switch scope {
 	case "b50":
-		records, err := ctrl.recordService.GetBest50Records(ctx, username, underflow)
+		records, err := ctrl.recordService.GetBest50Records(ctx, username, underflow, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
@@ -147,12 +188,12 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		})
 
 	case "best":
-		records, err := ctrl.recordService.GetBestRecords(ctx, username, p.pageSize, p.pageIndex-1, p.sortBy, p.order)
+		records, err := ctrl.recordService.GetBestRecords(ctx, username, p.pageSize, p.pageIndex-1, p.sortBy, p.order, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		total, err := ctrl.recordService.CountBestRecords(ctx, username)
+		total, err := ctrl.recordService.CountBestRecords(ctx, username, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
@@ -169,12 +210,12 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		})
 
 	case "all":
-		records, err := ctrl.recordService.GetAllRecords(ctx, username, p.pageSize, p.pageIndex-1, p.sortBy, p.order)
+		records, err := ctrl.recordService.GetAllRecords(ctx, username, p.pageSize, p.pageIndex-1, p.sortBy, p.order, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
 		}
-		total, err := ctrl.recordService.CountAllRecords(ctx, username)
+		total, err := ctrl.recordService.CountAllRecords(ctx, username, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
@@ -191,7 +232,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		})
 
 	case "all-charts":
-		charts, err := ctrl.recordService.GetAllChartsWithBestScores(ctx, username)
+		charts, err := ctrl.recordService.GetAllChartsWithBestScores(ctx, username, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return

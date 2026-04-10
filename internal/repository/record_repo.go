@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/pkg/rating"
@@ -31,6 +32,40 @@ type RecordRepository struct {
 
 func NewRecordRepository(db *gorm.DB) *RecordRepository {
 	return &RecordRepository{db: db}
+}
+
+// applyRecordFilter applies optional level range and difficulty filters to a GORM query
+// that has Chart joined via Joins("Chart").
+func applyRecordFilter(query *gorm.DB, filter model.RecordFilter) *gorm.DB {
+	if filter.MinLevel != nil {
+		query = query.Where(`"Chart".level >= ?`, *filter.MinLevel)
+	}
+	if filter.MaxLevel != nil {
+		query = query.Where(`"Chart".level <= ?`, *filter.MaxLevel)
+	}
+	if len(filter.Difficulties) > 0 {
+		query = query.Where(`"Chart".difficulty IN ?`, filter.Difficulties)
+	}
+	return query
+}
+
+// applyCountFilter applies optional level range and difficulty filters to a count query,
+// joining the charts table only when the filter is active.
+func applyCountFilter(query *gorm.DB, filter model.RecordFilter, chartIDColumn string) *gorm.DB {
+	if filter.IsEmpty() {
+		return query
+	}
+	query = query.Joins(fmt.Sprintf("JOIN charts ON charts.id = %s", chartIDColumn))
+	if filter.MinLevel != nil {
+		query = query.Where("charts.level >= ?", *filter.MinLevel)
+	}
+	if filter.MaxLevel != nil {
+		query = query.Where("charts.level <= ?", *filter.MaxLevel)
+	}
+	if len(filter.Difficulties) > 0 {
+		query = query.Where("charts.difficulty IN ?", filter.Difficulties)
+	}
+	return query
 }
 
 // CreateRecord creates a new play record and updates the best record if necessary
@@ -97,7 +132,7 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 }
 
 // GetBest50Records retrieves the best 35 (old) and 15 (new) records for B50 calculation
-func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]model.PlayRecord, []model.PlayRecord, error) {
+func (r *RecordRepository) GetBest50Records(username string, underflow int, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
 	var b35 []model.PlayRecord
 	var b15 []model.PlayRecord
 
@@ -107,6 +142,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where("best_play_records.username = ?", username)
+	baseQuery = applyRecordFilter(baseQuery, filter)
 
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
@@ -130,11 +166,12 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int) ([]m
 }
 
 // GetAllRecords retrieves all records for a user with pagination and sorting
-func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex int, sortBy string, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Where("username = ?", username).
 		Joins("Chart").
 		Joins("Chart.Song")
+	query = applyRecordFilter(query, filter)
 
 	orderStr := "desc"
 	if !order {
@@ -151,13 +188,14 @@ func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex in
 }
 
 // GetBestRecords retrieves the best records for a user with pagination and sorting
-func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy string, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Model(&model.PlayRecord{}).
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where("play_records.username = ?", username)
+	query = applyRecordFilter(query, filter)
 
 	orderStr := "desc"
 	if !order {
@@ -174,35 +212,49 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 }
 
 // GetAllChartsWithBestScores retrieves all charts with the user's best score (if any)
-func (r *RecordRepository) GetAllChartsWithBestScores(username string) ([]model.ChartWithScore, error) {
+func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter model.RecordFilter) ([]model.ChartWithScore, error) {
 	var results []model.ChartWithScore
 
-	err := r.db.Table("charts").
+	query := r.db.Table("charts").
 		Select("charts.id, COALESCE(charts.override_title, songs.title) as title, COALESCE(charts.override_version, songs.version) as version, charts.difficulty, charts.level, COALESCE(play_records.score, 0) as score").
 		Joins("JOIN songs ON charts.song_id = songs.id").
 		Joins("LEFT JOIN play_records ON charts.id = play_records.chart_id AND play_records.username = ?", username).
 		Joins("LEFT JOIN best_play_records ON play_records.id = best_play_records.play_record_id").
-		Where("play_records.id IS NULL OR best_play_records.play_record_id IS NOT NULL").
-		Scan(&results).Error
+		Where("play_records.id IS NULL OR best_play_records.play_record_id IS NOT NULL")
+
+	// Apply filters directly on charts table
+	if filter.MinLevel != nil {
+		query = query.Where("charts.level >= ?", *filter.MinLevel)
+	}
+	if filter.MaxLevel != nil {
+		query = query.Where("charts.level <= ?", *filter.MaxLevel)
+	}
+	if len(filter.Difficulties) > 0 {
+		query = query.Where("charts.difficulty IN ?", filter.Difficulties)
+	}
+
+	err := query.Scan(&results).Error
 
 	return results, err
 }
 
 // CountBestRecords counts the number of best records for a user
-func (r *RecordRepository) CountBestRecords(username string) (int64, error) {
+func (r *RecordRepository) CountBestRecords(username string, filter model.RecordFilter) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.BestPlayRecord{}).
-		Where("username = ?", username).
-		Count(&count).Error
+	query := r.db.Model(&model.BestPlayRecord{}).
+		Where("username = ?", username)
+	query = applyCountFilter(query, filter, "best_play_records.chart_id")
+	err := query.Count(&count).Error
 	return count, err
 }
 
 // CountAllRecords counts the total number of records for a user
-func (r *RecordRepository) CountAllRecords(username string) (int64, error) {
+func (r *RecordRepository) CountAllRecords(username string, filter model.RecordFilter) (int64, error) {
 	var count int64
-	err := r.db.Model(&model.PlayRecord{}).
-		Where("username = ?", username).
-		Count(&count).Error
+	query := r.db.Model(&model.PlayRecord{}).
+		Where("play_records.username = ?", username)
+	query = applyCountFilter(query, filter, "play_records.chart_id")
+	err := query.Count(&count).Error
 	return count, err
 }
 

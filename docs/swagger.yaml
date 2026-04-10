@@ -622,6 +622,21 @@ paths:
         in: query
         name: order
         type: string
+      - description: Minimum chart level (inclusive)
+        in: query
+        name: min_level
+        type: number
+      - description: Maximum chart level (inclusive)
+        in: query
+        name: max_level
+        type: number
+      - collectionFormat: multi
+        description: Filter by difficulty (detected, invaded, massive, reboot)
+        in: query
+        items:
+          type: string
+        name: difficulty
+        type: array
       produces:
       - application/json
       responses:
