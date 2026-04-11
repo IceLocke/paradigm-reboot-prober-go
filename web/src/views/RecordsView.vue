@@ -25,28 +25,31 @@
         >{{ d.label }}</button>
       </div>
       <BaseTabs v-model="scope" :tabs="scopeTabs" />
-    </div>
-
-    <!-- Level range filter -->
-    <div class="level-filter-row">
-      <span class="level-filter-label">{{ t('term.level_range') }}</span>
-      <input
-        v-model.number="levelMin"
-        type="number"
-        step="0.1"
-        class="level-input"
-        :placeholder="t('term.min_level')"
-        @change="onFilterChange"
-      />
-      <span class="level-filter-sep">–</span>
-      <input
-        v-model.number="levelMax"
-        type="number"
-        step="0.1"
-        class="level-input"
-        :placeholder="t('term.max_level')"
-        @change="onFilterChange"
-      />
+      <div class="level-filter-group">
+        <n-select
+          :value="bracketValue"
+          :options="bracketOptions"
+          :placeholder="t('term.level')"
+          clearable
+          class="level-bracket-select"
+          @update:value="onBracketSelect"
+        />
+        <n-input-number
+          v-model:value="levelMin"
+          :show-button="false"
+          :placeholder="t('term.min_level')"
+          class="level-num-input"
+          @update:value="onFilterChange"
+        />
+        <span class="level-filter-sep">–</span>
+        <n-input-number
+          v-model:value="levelMax"
+          :show-button="false"
+          :placeholder="t('term.max_level')"
+          class="level-num-input"
+          @update:value="onFilterChange"
+        />
+      </div>
     </div>
 
     <!-- Table -->
@@ -92,8 +95,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, useMessage } from 'naive-ui'
-import type { DataTableColumns, DataTableSortState } from 'naive-ui'
+import { NDataTable, NInputNumber, NPagination, NSelect, useMessage } from 'naive-ui'
+import type { DataTableColumns, DataTableSortState, SelectOption } from 'naive-ui'
 import { FileUp, FileDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import dayjs from 'dayjs'
 
@@ -106,6 +109,7 @@ import { USE_MOCK, getMockRecords, getMockAllCharts } from '@/api/mock'
 import { exportCsv } from '@/utils/csv'
 import { saveAs } from 'file-saver'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
+import { buildLevelBrackets } from '@/utils/levelBrackets'
 import BaseTabs from '@/components/ui/BaseTabs.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
@@ -139,6 +143,33 @@ const diffOptions = [
   { key: 'massive', label: 'MSV' },
   { key: 'reboot', label: 'RBT' },
 ]
+
+// --- Level bracket quick-select ---
+const levelBrackets = computed(() => {
+  if (!appStore.charts) return []
+  return buildLevelBrackets(appStore.charts)
+})
+const bracketOptions = computed<SelectOption[]>(() =>
+  levelBrackets.value.map((b, i) => ({ label: b.label, value: i }))
+)
+const bracketValue = computed<number | null>(() => {
+  if (levelMin.value == null || levelMax.value == null) return null
+  const idx = levelBrackets.value.findIndex(
+    (b) => b.minVal === levelMin.value && b.maxVal === levelMax.value
+  )
+  return idx >= 0 ? idx : null
+})
+const onBracketSelect = (val: number | null) => {
+  if (val == null) {
+    levelMin.value = null
+    levelMax.value = null
+  } else {
+    const b = levelBrackets.value[val]
+    levelMin.value = b.minVal
+    levelMax.value = b.maxVal
+  }
+  onFilterChange()
+}
 
 const toggleDiff = (key: string) => {
   if (key === 'all') {
@@ -406,44 +437,25 @@ onMounted(loadRecords)
 <style scoped>
 .filters-row {
   display: flex;
-  gap: 0 var(--space-4);
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-3);
 }
 .filters-row :deep(.tabs__content) {
   display: none;
 }
 
-/* Level range filter */
-.level-filter-row {
+/* Level range filter (inline in filters-row) */
+.level-filter-group {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-bottom: var(--space-3);
 }
-.level-filter-label {
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-.level-input {
+.level-bracket-select,
+.level-num-input {
   width: 80px;
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: var(--font-mono), monospace;
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-.level-input:focus {
-  border-color: var(--accent);
-}
-.level-input::placeholder {
-  color: var(--text-muted);
-  font-family: inherit;
+  flex-shrink: 0;
 }
 .level-filter-sep {
   color: var(--text-muted);
@@ -520,11 +532,9 @@ onMounted(loadRecords)
   .filters-row {
     gap: var(--space-2) var(--space-3);
   }
-  .level-filter-row {
-    flex-wrap: wrap;
-  }
-  .level-input {
-    width: 70px;
+  .level-bracket-select,
+  .level-num-input {
+    width: 72px;
   }
 }
 

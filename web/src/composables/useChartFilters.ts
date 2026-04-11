@@ -9,6 +9,8 @@ import { useUserStore } from '@/stores/user'
 import { getRecords } from '@/api/record'
 import { USE_MOCK, getMockB50 } from '@/api/mock'
 import type { ChartInfo } from '@/api/types'
+import { buildLevelBrackets } from '@/utils/levelBrackets'
+import type { LevelBracket } from '@/utils/levelBrackets'
 
 const compareVersions = (a: string, b: string): number => {
   const aParts = a.split('.')
@@ -111,6 +113,12 @@ export function useChartFilters() {
     { label: t('term.version'), value: 'version' },
     { label: t('term.album'), value: 'album' },
   ])
+
+  // --- Level bracket quick-select options ---
+  const levelBrackets = computed<LevelBracket[]>(() => {
+    if (!appStore.charts) return []
+    return buildLevelBrackets(appStore.charts)
+  })
 
   // --- Filtered data ---
   const filteredData = computed(() => {
@@ -250,6 +258,7 @@ export function useChartFilters() {
     versionOptions,
     albumOptions,
     groupByOptions,
+    levelBrackets,
     filteredData,
     paginatedData,
     handleSorterUpdate,

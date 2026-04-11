@@ -13,21 +13,27 @@
           <!-- Level range -->
           <div class="filter-group">
             <label class="filter-label">{{ t('term.level_range') }}</label>
-            <div class="level-range-inputs">
-              <input
-                v-model.number="levelMin"
-                type="number"
-                step="0.1"
-                class="level-input"
+            <div class="level-range-row">
+              <n-select
+                :value="bracketValue"
+                :options="bracketOptions"
+                :placeholder="t('term.level')"
+                clearable
+                class="level-bracket-select"
+                @update:value="onBracketSelect"
+              />
+              <n-input-number
+                v-model:value="levelMin"
+                :show-button="false"
                 :placeholder="t('term.min_level')"
+                class="level-num-input"
               />
               <span class="range-sep">~</span>
-              <input
-                v-model.number="levelMax"
-                type="number"
-                step="0.1"
-                class="level-input"
+              <n-input-number
+                v-model:value="levelMax"
+                :show-button="false"
                 :placeholder="t('term.max_level')"
+                class="level-num-input"
               />
             </div>
           </div>
@@ -82,17 +88,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NSelect } from 'naive-ui'
+import { NInputNumber, NSelect } from 'naive-ui'
 import type { SelectOption } from 'naive-ui'
 import { ChevronRight, Star } from '@lucide/vue'
+import type { LevelBracket } from '@/utils/levelBrackets'
 
 const { t } = useI18n()
 
-defineProps<{
+const props = defineProps<{
   versionOptions: SelectOption[]
   albumOptions: SelectOption[]
   groupByOptions: SelectOption[]
+  levelBrackets: LevelBracket[]
   b50Filter: boolean
   b50Loading: boolean
 }>()
@@ -107,6 +116,28 @@ const levelMax = defineModel<number | null>('levelMax', { required: true })
 const versionSelect = defineModel<string[] | null>('versionSelect', { required: true })
 const albumSelect = defineModel<string[] | null>('albumSelect', { required: true })
 const groupBy = defineModel<'level' | 'version' | 'album'>('groupBy', { required: true })
+
+// --- Level bracket quick-select ---
+const bracketOptions = computed<SelectOption[]>(() =>
+  props.levelBrackets.map((b, i) => ({ label: b.label, value: i }))
+)
+const bracketValue = computed<number | null>(() => {
+  if (levelMin.value == null || levelMax.value == null) return null
+  const idx = props.levelBrackets.findIndex(
+    (b) => b.minVal === levelMin.value && b.maxVal === levelMax.value
+  )
+  return idx >= 0 ? idx : null
+})
+const onBracketSelect = (val: number | null) => {
+  if (val == null) {
+    levelMin.value = null
+    levelMax.value = null
+  } else {
+    const b = props.levelBrackets[val]
+    levelMin.value = b.minVal
+    levelMax.value = b.maxVal
+  }
+}
 </script>
 
 <style scoped>
@@ -166,36 +197,24 @@ const groupBy = defineModel<'level' | 'version' | 'album'>('groupBy', { required
   letter-spacing: 0.03em;
 }
 
-.level-range-inputs {
+/* Level range row: [select] [input] ~ [input] */
+.level-range-row {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  flex-wrap: wrap;
 }
 
-.level-input {
-  width: 80px;
-  min-height: 34px;
-  padding: 0 var(--space-2);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 16px;
-  font-family: var(--font-mono);
-  outline: none;
-  transition: border-color var(--transition-fast);
-}
-.level-input:focus {
-  border-color: var(--accent);
-}
-.level-input::placeholder {
-  color: var(--text-muted);
-  font-family: var(--font-sans);
+.level-bracket-select,
+.level-num-input {
+  width: 72px;
+  flex-shrink: 0;
 }
 
 .range-sep {
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  flex-shrink: 0;
 }
 
 .adv-filters-bottom {

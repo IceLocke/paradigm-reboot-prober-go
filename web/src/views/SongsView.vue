@@ -72,6 +72,7 @@
       :version-options="versionOptions"
       :album-options="albumOptions"
       :group-by-options="groupByOptions"
+      :level-brackets="levelBrackets"
       :b50-filter="b50Filter"
       :b50-loading="b50Loading"
       @toggle-b50="toggleB50Filter"
@@ -171,6 +172,7 @@ const {
   paginatedData,
   handleSorterUpdate,
   toggleB50Filter,
+  levelBrackets,
 } = useChartFilters()
 
 const { groupedData, collapsedLevels, toggleLevel } = useChartGroups(filteredData, groupBy)
