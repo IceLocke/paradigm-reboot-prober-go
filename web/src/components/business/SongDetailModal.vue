@@ -1,5 +1,6 @@
 <template>
   <n-modal
+    content-scrollable
     :show="show"
     preset="card"
     :title="song?.title ?? ''"
@@ -87,9 +88,10 @@ const props = defineProps<{
 }>()
 
 const modalStyle = computed(() =>
-  isMobile.value
-    ? 'width: 95vw; max-width: none;'
-    : 'width: 700px; max-width: 90vw;'
+  (isMobile.value
+    ? 'width: 95vw; max-width: 90vw;'
+    : 'width: 700px; max-width: 90vw;') +
+  'max-height: 90vh;'
 )
 
 const coverUrl = computed(() => {

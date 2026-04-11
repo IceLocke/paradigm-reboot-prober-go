@@ -1,82 +1,92 @@
 <template>
-  <n-modal
-    :show="show"
-    preset="card"
-    :title="t('auth.profile')"
-    style="width: 500px; max-width: 95vw;"
-    :bordered="false"
-    :auto-focus="false"
-    @update:show="$emit('update:show', $event)"
-  >
-    <form v-if="userStore.profile" class="profile-form" @submit.prevent="onSave">
+  <div v-if="!userStore.logged_in" class="login">
+    <h2>{{ t('message.not_logged_in') }}</h2>
+  </div>
+  <div v-else class="page-container">
+    <div class="page-header">
+      <h2>{{ t('auth.profile') }}</h2>
+    </div>
+
+    <div v-if="userStore.profile" class="profile-form">
       <!-- Read-only info -->
-      <div class="form-row">
-        <span class="form-label">{{ t('auth.username') }}</span>
-        <span class="form-value">{{ userStore.profile.username }}</span>
-      </div>
-      <div class="form-row">
-        <span class="form-label">{{ t('auth.email') }}</span>
-        <span class="form-value">{{ userStore.profile.email }}</span>
-      </div>
+      <div class="form-section">
+        <div class="form-row">
+          <span class="form-label">{{ t('auth.username') }}</span>
+          <span class="form-value">{{ userStore.profile.username }}</span>
+        </div>
 
-      <!-- Editable fields -->
-      <BaseInput
-        v-model="form.nickname"
-        :label="t('auth.nickname')"
-      />
+        <div class="form-row">
+          <span class="form-label">{{ t('auth.email') }}</span>
+          <span class="form-value">{{ userStore.profile.email }}</span>
+        </div>
 
-      <BaseInput
-        v-model="form.qq_account"
-        :label="t('auth.qq_account')"
-        :placeholder="t('auth.qq_account')"
-      />
+        <!-- Upload Token -->
+        <div class="token-field">
+          <BaseInput
+            v-model="tokenDisplay"
+            :label="t('auth.upload_token')"
+            :readonly="true"
+          />
+          <IconButton type="button" :icon="Copy" :size="16" @click="onCopyToken" :title="t('common.copy')" />
+          <IconButton type="button" :icon="RefreshCw" :size="16" @click="onRefreshToken" :title="t('common.refresh')" />
+        </div>
 
-      <!-- Upload Token -->
-      <div class="token-field">
-        <BaseInput
-          v-model="tokenDisplay"
-          :label="t('auth.upload_token')"
-          :readonly="true"
-        />
-        <IconButton type="button" :icon="Copy" :size="16" @click="onCopyToken" :title="t('common.copy')" />
-        <IconButton type="button" :icon="RefreshCw" :size="16" @click="onRefreshToken" :title="t('common.refresh')" />
-      </div>
-
-      <!-- Anonymous probe -->
-      <div class="form-field">
-        <label class="form-label">{{ t('auth.anonymous_probe') }}</label>
-        <div class="radio-group">
-          <label class="radio-item">
-            <input type="radio" :value="true" v-model="form.anonymous_probe" />
-            <span>{{ t('common.yes') }}</span>
-          </label>
-          <label class="radio-item">
-            <input type="radio" :value="false" v-model="form.anonymous_probe" />
-            <span>{{ t('common.no') }}</span>
-          </label>
+        <div class="form-row">
+          <span class="form-label">{{ t('auth.password') }}</span>
+          <BaseButton type="button" variant="secondary" size="sm" @click="showChangePassword = true" :text="t('auth.change_password')" />
         </div>
       </div>
 
-      <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
-      <div v-if="successMsg" class="success-msg">{{ successMsg }}</div>
+      <n-divider />
 
-      <div class="form-actions">
-        <BaseButton type="button" variant="secondary" @click="$emit('update:show', false)" :text="t('common.close')" />
-        <BaseButton type="submit" :disabled="loading" :text="t('common.save')" />
-      </div>
-    </form>
-  </n-modal>
+      <form @submit.prevent="onSave" class="form-section">
+        <!-- Editable fields -->
+        <BaseInput
+          v-model="form.nickname"
+          :label="t('auth.nickname')"
+        />
+
+        <BaseInput
+          v-model="form.qq_account"
+          :label="t('auth.qq_account')"
+          :placeholder="t('auth.qq_account')"
+        />
+
+        <!-- Anonymous probe -->
+        <div class="form-row">
+          <label class="form-label">{{ t('auth.anonymous_probe') }}</label>
+          <span class="radio-group">
+            <label class="radio-item">
+              <input type="radio" :value="true" v-model="form.anonymous_probe" />
+              <span>{{ t('common.yes') }}</span>
+            </label>
+            <label class="radio-item">
+              <input type="radio" :value="false" v-model="form.anonymous_probe" />
+              <span>{{ t('common.no') }}</span>
+            </label>
+          </span>
+        </div>
+
+        <div class="form-actions">
+          <BaseButton type="submit" :disabled="loading" :text="t('common.save')" />
+        </div>
+      </form>
+    </div>
+  </div>
 
   <ConfirmModal
     v-model:show="showConfirm"
     :message="t('message.token_refresh_confirm')"
     @confirm="refreshToken"
   />
+  <ChangePasswordModal
+    v-model:show="showChangePassword"
+  />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, computed } from 'vue'
-import { NModal, useMessage } from 'naive-ui'
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useMessage, NDivider } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { Copy, RefreshCw } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'
@@ -86,12 +96,11 @@ import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 import IconButton from '@/components/ui/IconButton.vue'
+import ChangePasswordModal from '@/components/business/ChangePasswordModal.vue'
 
 const { t } = useI18n()
 const message = useMessage()
 const userStore = useUserStore()
-
-const show = defineModel<boolean>('show', { required: true })
 
 const form = reactive({
   nickname: '',
@@ -99,26 +108,26 @@ const form = reactive({
   anonymous_probe: false,
 })
 const loading = ref(false)
-const errorMsg = ref('')
-const successMsg = ref('')
 const showConfirm = ref(false)
-
+const showChangePassword = ref(false)
 const tokenDisplay = computed(() => userStore.profile?.upload_token ?? '')
 
-watch(show, (val) => {
-  if (val && userStore.profile) {
+const resetForm = () => {
+  if (userStore.profile) {
     form.nickname = userStore.profile.nickname ?? ''
     form.qq_account = userStore.profile.qq_account ?? ''
     form.anonymous_probe = userStore.profile.anonymous_probe ?? false
-    errorMsg.value = ''
-    successMsg.value = ''
+  } else {
+    form.nickname = ''
+    form.qq_account = ''
+    form.anonymous_probe = false
   }
-})
+}
+onMounted(resetForm)
+watch(() => userStore.profile, resetForm)
 
 const onSave = async () => {
   loading.value = true
-  errorMsg.value = ''
-  successMsg.value = ''
 
   try {
     if (!USE_MOCK) {
@@ -133,10 +142,8 @@ const onSave = async () => {
       userStore.profile.qq_account = form.qq_account
       userStore.profile.anonymous_probe = form.anonymous_probe
     }
-    successMsg.value = t('message.update_profile_success')
     message.success(t('message.update_profile_success'))
   } catch {
-    errorMsg.value = t('message.update_profile_failed')
     message.error(t('message.update_profile_failed'))
   } finally {
     loading.value = false
@@ -177,10 +184,21 @@ const refreshToken = async () => {
 </script>
 
 <style scoped>
+.login {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
 .profile-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 .form-row {
   display: flex;
@@ -202,11 +220,6 @@ const refreshToken = async () => {
   align-items: flex-end;
 }
 .token-field > :first-child { flex: 1; }
-.form-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
 .radio-group {
   display: flex;
   gap: var(--space-4);
@@ -218,31 +231,15 @@ const refreshToken = async () => {
   cursor: pointer;
   color: var(--text-primary);
   font-size: var(--text-base);
-  min-height: 44px;
 }
 .radio-item input[type="radio"] {
   accent-color: var(--accent);
   width: 18px;
   height: 18px;
 }
-.error-msg {
-  font-size: var(--text-sm);
-  color: var(--color-danger);
-  padding: var(--space-2) var(--space-3);
-  background: rgba(239, 68, 68, 0.1);
-  border-radius: 6px;
-}
-.success-msg {
-  font-size: var(--text-sm);
-  color: var(--color-success);
-  padding: var(--space-2) var(--space-3);
-  background: rgba(34, 197, 94, 0.1);
-  border-radius: 6px;
-}
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  padding-top: var(--space-3);
+  gap: var(--space-2);
 }
 </style>

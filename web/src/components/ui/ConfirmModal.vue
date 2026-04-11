@@ -3,7 +3,7 @@
     :show="show"
     preset="card"
     :title="t('common.confirm')"
-    style="width: 400px; max-width: 95vw;"
+    style="width: 400px; max-width: 90vw; max-height: 90vh;"
     :bordered="false"
     :auto-focus="false"
     @update:show="$emit('update:show', $event)"

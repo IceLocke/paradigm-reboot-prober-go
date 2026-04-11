@@ -8,6 +8,11 @@ const router = createRouter({
       redirect: '/best50',
     },
     {
+      path: '/profile',
+      name: 'profile',
+      component: () => import('@/views/ProfileView.vue'),
+    },
+    {
       path: '/best50',
       name: 'best50',
       component: () => import('@/views/Best50View.vue'),

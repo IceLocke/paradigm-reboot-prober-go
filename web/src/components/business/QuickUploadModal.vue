@@ -3,7 +3,7 @@
     :show="show"
     preset="card"
     :title="t('common.upload_record')"
-    style="width: 400px; max-width: 95vw;"
+    style="width: 400px; max-width: 9Ovw; max-height: 90vh;"
     :bordered="false"
     @update:show="$emit('update:show', $event)"
   >

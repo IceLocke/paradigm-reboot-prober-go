@@ -49,7 +49,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChartNoAxesColumn, Music2, FileText, Info } from '@lucide/vue';
+import { UserRound, ChartNoAxesColumn, Music2, FileText, Info } from '@lucide/vue';
 import { useBreakpoint } from '@/composables/useBreakpoint'
 
 const { t } = useI18n()
@@ -58,6 +58,7 @@ const { isDesktop } = useBreakpoint()
 const show = defineModel<boolean>({ required: true })
 
 const navItems = computed(() => [
+  { path: '/profile', label: t('auth.profile'), icon: UserRound },
   { path: '/best50', label: t('term.b50'), icon: ChartNoAxesColumn },
   { path: '/songs', label: t('term.charts'), icon: Music2 },
   { path: '/records', label: t('term.records'), icon: FileText },
@@ -67,7 +68,9 @@ const navItems = computed(() => [
 
 <style scoped>
 .sidebar {
-  width: 220px;
+  position: sticky;
+  top: var(--app-header-height);
+  width: var(--side-bar-width);
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   padding: var(--space-3);

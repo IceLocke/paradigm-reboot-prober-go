@@ -50,7 +50,7 @@ defineEmits<{ click: [] }>()
 .btn--primary { background: var(--accent); color: #fff; }
 @media (hover: hover) { .btn--primary:hover:not(:disabled) { background: var(--accent-hover); } }
 
-.btn--secondary { background: transparent; border: 1px solid var(--border); color: var(--text-primary); }
+.btn--secondary { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-primary); }
 @media (hover: hover) { .btn--secondary:hover:not(:disabled) { border-color: var(--border-hover); background: var(--bg-tertiary); } }
 
 .btn--ghost { background: transparent; color: var(--text-secondary); }

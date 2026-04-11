@@ -27,15 +27,18 @@ export function buildLevelBrackets(charts: ChartInfo[]): LevelBracket[] {
   }
 
   const result: LevelBracket[] = []
-  for (const [base, flags] of [...intMap.entries()].sort((a, b) => a[0] - b[0])) {
+  for (const [base, flags] of 
+    Array.from(intMap.entries())
+      .sort((a, b) => (b[0] - a[0]))
+  ) {
     if (base <= 12) {
       result.push({ label: String(base), minVal: base, maxVal: base + 0.9 })
     } else {
-      if (flags.hasBase) {
-        result.push({ label: String(base), minVal: base, maxVal: base + 0.5 })
-      }
       if (flags.hasPlus) {
         result.push({ label: `${base}+`, minVal: base + 0.6, maxVal: base + 0.9 })
+      }
+      if (flags.hasBase) {
+        result.push({ label: String(base), minVal: base, maxVal: base + 0.5 })
       }
     }
   }

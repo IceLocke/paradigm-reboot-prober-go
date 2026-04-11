@@ -89,6 +89,10 @@ export function useChartGroups(
     return groups
   })
 
+  watch(filteredData, () => {
+    collapsedLevels.value = computeAutoCollapsed(groupedData.value)
+  })
+
   watch(groupBy, () => {
     collapsedLevels.value = computeAutoCollapsed(groupedData.value)
   })

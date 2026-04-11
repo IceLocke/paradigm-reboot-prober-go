@@ -5,7 +5,6 @@
       <div class="page-actions">
         <IconButton :icon="FileUp" :size="18" :title="t('common.import_csv')" @click="showCsvImport = true"/>
         <IconButton :icon="FileDown" :size="18" :title="t('common.export_csv')" @click="onExportCsv"/>
-        <UploadCart />
         <IconButton :icon="RefreshCw" :size="18" :title="t('common.refresh')" @click="refreshRecords"/>
       </div>
     </div>
@@ -41,7 +40,7 @@
           class="level-num-input"
           @update:value="onFilterChange"
         />
-        <span class="level-filter-sep">–</span>
+        <span class="level-filter-sep">~</span>
         <n-input-number
           v-model:value="levelMax"
           :show-button="false"
@@ -115,7 +114,6 @@ import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
-import UploadCart from '@/components/business/UploadCart.vue'
 import CsvImportModal from '@/components/business/CsvImportModal.vue'
 
 const { t } = useI18n()
@@ -297,7 +295,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     minWidth: 150,
     ellipsis: {
       tooltip: {
-        zIndex: 1,
+        zIndex: 99,
       },
     },
     fixed: "left",

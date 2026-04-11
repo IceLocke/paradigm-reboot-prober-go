@@ -1,5 +1,5 @@
 <template>
-  <n-popover trigger="click" placement="bottom-end" :style="{ maxWidth: '500px' }">
+  <n-popover trigger="click" placement="bottom-end" :show-arrow="false" :style="{ maxWidth: '500px' }">
     <template #trigger>
       <IconButton :icon="ShoppingCart" :size="18" :title="t('term.upload_list')">
         <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
@@ -15,7 +15,7 @@
             <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
               <div class="cart-info">
                 <span class="cart-title">{{ item.title }}</span>
-                <DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" />
+                <span><DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" /></span>
               </div>
               <div class="cart-score">
                 <input

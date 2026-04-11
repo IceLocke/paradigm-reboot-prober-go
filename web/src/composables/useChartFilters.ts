@@ -11,6 +11,7 @@ import { USE_MOCK, getMockB50 } from '@/api/mock'
 import type { ChartInfo } from '@/api/types'
 import { buildLevelBrackets } from '@/utils/levelBrackets'
 import type { LevelBracket } from '@/utils/levelBrackets'
+import KanaUtils from '@/utils/kana'
 
 const compareVersions = (a: string, b: string): number => {
   const aParts = a.split('.')
@@ -25,16 +26,16 @@ const compareVersions = (a: string, b: string): number => {
 
 const matchesSearch = (chart: ChartInfo, query: string): boolean => {
   if (!query) return true
-  const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+  const tokens = KanaUtils.toHiraganaCase(KanaUtils.toZenkanaCase(query))
+    .toLowerCase().split(/\s+/).filter(Boolean)
   if (tokens.length === 0) return true
 
   const fields = [
     chart.title,
     chart.artist,
-    chart.album ?? '',
     chart.genre ?? '',
     chart.level_design ?? '',
-  ].map((f) => f.toLowerCase())
+  ].map((f) => KanaUtils.toHiraganaCase(KanaUtils.toZenkanaCase(f)).toLowerCase())
 
   return tokens.every((token) => fields.some((field) => field.includes(token)))
 }
@@ -98,7 +99,7 @@ export function useChartFilters() {
   // --- Dynamic filter options ---
   const versionOptions = computed(() => {
     if (!appStore.charts) return []
-    const versions = [...new Set(appStore.charts.map((c) => c.version))].sort((a, b) => compareVersions(a, b))
+    const versions = [...new Set(appStore.charts.map((c) => c.version))].sort((a, b) => compareVersions(b, a))
     return versions.map((v) => ({ label: v, value: v }))
   })
 
