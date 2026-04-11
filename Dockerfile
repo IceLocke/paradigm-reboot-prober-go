@@ -18,8 +18,6 @@ WORKDIR /app/
 
 COPY --from=builder /app/server .
 
-RUN mkdir -p uploads/csv uploads/img
-
 EXPOSE 8080
 
 CMD ["./server"]
