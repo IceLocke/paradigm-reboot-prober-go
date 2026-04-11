@@ -10,9 +10,8 @@
       </div>
     </div>
 
-    <!-- Scope filter + Difficulty toggle -->
+    <!-- Filters -->
     <div class="filters-row">
-      <BaseTabs v-model="scope" :tabs="scopeTabs" />
       <div class="diff-toggle">
         <button
           :class="['diff-toggle-btn', { active: diffFilter.length === 0 }]"
@@ -25,6 +24,7 @@
           @click="toggleDiff(d.key)"
         >{{ d.label }}</button>
       </div>
+      <BaseTabs v-model="scope" :tabs="scopeTabs" />
     </div>
 
     <!-- Level range filter -->
@@ -408,7 +408,10 @@ onMounted(loadRecords)
   display: flex;
   gap: 0 var(--space-4);
   flex-wrap: wrap;
-  align-items: center;
+  margin-bottom: var(--space-2);
+}
+.filters-row :deep(.tabs__content) {
+  display: none;
 }
 
 /* Level range filter */
