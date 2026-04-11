@@ -4,18 +4,16 @@
   <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
     <n-message-provider>
       <n-notification-provider>
-        <div class="app-layout">
+        <div :class="['app-layout', { 'app-layout--desktop': isDesktop }]">
           <AppHeader
             @toggle-sidebar="appStore.sidebarOpen = !appStore.sidebarOpen"
             @show-login="showLogin = true"
             @show-register="showRegister = true"
           />
-          <div class="app-body">
-            <Sidebar v-model="appStore.sidebarOpen" />
-            <main class="app-main">
-              <router-view />
-            </main>
-          </div>
+          <Sidebar v-model="appStore.sidebarOpen" />
+          <main class="app-main">
+            <router-view />
+          </main>
         </div>
 
         <!-- Auth Modals -->
@@ -44,6 +42,7 @@ import { useAppStore } from '@/stores/app'
 import { getMyInfo } from '@/api/user'
 import { getAllCharts } from '@/api/song'
 import { USE_MOCK, getMockCharts, getMockUser } from '@/api/mock'
+import { useBreakpoint } from '@/composables/useBreakpoint'
 import { SpeedInsights } from '@vercel/speed-insights/vue';
 import { Analytics } from "@vercel/analytics/vue"
 
@@ -54,6 +53,7 @@ import RegisterModal from '@/components/business/RegisterModal.vue'
 
 const userStore = useUserStore()
 const appStore = useAppStore()
+const { isDesktop } = useBreakpoint()
 
 const showLogin = ref(false)
 const showRegister = ref(false)
@@ -112,17 +112,28 @@ onMounted(() => {
 
 <style scoped>
 .app-layout {
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
+  display: grid;
+  grid-template-areas:
+    "header"
+    "content";
+  grid-template-columns: 1fr;
+  grid-template-rows: var(--app-header-height) 1fr;
+  height: 100vh;
 }
-.app-body {
-  display: flex;
-  flex: 1;
-  margin-top: var(--app-header-height);
+.app-layout--desktop {
+  grid-template-areas:
+    "header header"
+    "sidebar content";
+  grid-template-columns: var(--app-sidebar-width) 1fr;
+}
+:deep(.app-header) {
+  grid-area: header;
+}
+:deep(.app-sidebar) {
+  grid-area: sidebar;
 }
 .app-main {
-  flex: 1;
+  grid-area: content;
   overflow-x: hidden;
 }
 </style>

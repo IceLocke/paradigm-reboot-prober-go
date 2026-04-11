@@ -28,6 +28,8 @@ const en = {
     logout: 'Log Out',
     profile: 'Profile',
     account: 'Account',
+    account_info: 'Account Info',
+    prober_settings: 'Prober Settings',
     nickname: 'Nickname',
     username: 'Username',
     password: 'Password',

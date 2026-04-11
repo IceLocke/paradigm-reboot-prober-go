@@ -9,7 +9,7 @@
     </div>
     <div class="header-right">
       <template v-if="userStore.logged_in">
-        <span class="welcome-text">{{ t('message.welcome', { username: userStore.username }) }}</span>
+        <span class="welcome-text">{{ t('message.welcome', { username: userStore.profile?.nickname || userStore.username }) }}</span>
         <UploadCart />
         <n-popover
           trigger="manual"
@@ -104,8 +104,6 @@ const profileItems = computed(() => [
   border-bottom: 1px solid var(--border);
   width: 100%;
   z-index: 100;
-  position: fixed;
-  top: 0;
 }
 @media (min-width: 768px) {
   .app-header { padding: 0 var(--space-6); }
