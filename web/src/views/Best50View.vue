@@ -3,7 +3,6 @@
     <div class="page-header">
       <h2>{{ t('term.b50') }}</h2>
       <div class="page-actions">
-        <UploadCart />
         <IconButton
           :title="t('common.export_image')"
           :disabled="exporting || allRecords.length === 0"
@@ -119,7 +118,6 @@ import StatCard from '@/components/business/StatCard.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
-import UploadCart from '@/components/business/UploadCart.vue'
 import VersionAnnounceBanner from '@/components/business/VersionAnnounceBanner.vue'
 
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
@@ -215,7 +213,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     minWidth: 140,
     ellipsis: {
       tooltip: {
-        zIndex: 1,
+        zIndex: 99,
       },
     },
     fixed: "left",

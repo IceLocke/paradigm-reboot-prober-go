@@ -39,6 +39,7 @@ const label = computed(() => props.short
 <style scoped>
 .diff-badge {
   display: inline-flex;
+  justify-content: center;
   align-items: center;
   padding: 2px 8px;
   border-radius: 4px;

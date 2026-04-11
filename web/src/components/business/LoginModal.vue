@@ -3,7 +3,7 @@
     :show="show"
     preset="card"
     :title="t('auth.login')"
-    style="width: 400px; max-width: 95vw;"
+    style="width: 400px; max-width: 90vw; max-height: 90vh;"
     :bordered="false"
     :auto-focus="false"
     @update:show="$emit('update:show', $event)"
@@ -83,10 +83,13 @@ const onSubmit = async () => {
     message.success(t('message.login_success'))
     emit('success')
   } catch (err: unknown) {
-    const error = err as { response?: { data?: { error?: string } } }
-    const msg = t('message.login_failed') + (error.response?.data?.error ?? '')
-    errorMsg.value = msg
-    message.error(msg)
+    const error = err as { status: number, response?: { data?: { error?: string } } }
+    if (error.status === 401) {
+      errorMsg.value = t('message.password_incorrect')
+    } else {
+      const msg = t('message.login_failed') + (error.response?.data?.error ?? '')
+      errorMsg.value = msg
+    }
   } finally {
     loading.value = false
   }

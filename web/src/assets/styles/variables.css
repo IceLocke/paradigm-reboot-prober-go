@@ -1,6 +1,9 @@
 :root {
   color-scheme: dark;
 
+  --app-header-height: 60px;
+  --side-bar-width: 220px;
+
   /* Background - three-layer progression */
   --bg-primary: #0e0e12;
   --bg-secondary: #16161c;

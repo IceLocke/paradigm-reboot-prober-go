@@ -30,7 +30,7 @@
     <div class="card-info">
       <span class="card-title" :title="chart.title">{{ chart.title }}</span>
       <span :class="['card-version', { 'card-version--new': chart.b15 }]">v{{ chart.version }}{{ chart.b15 ? ' ✦' : '' }}</span>
-      <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" :short="true" />
+      <span><DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" :short="true" /></span>
     </div>
   </div>
 </template>

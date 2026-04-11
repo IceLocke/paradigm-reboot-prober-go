@@ -9,8 +9,6 @@
             @toggle-sidebar="appStore.sidebarOpen = !appStore.sidebarOpen"
             @show-login="showLogin = true"
             @show-register="showRegister = true"
-            @show-profile="showProfile = true"
-            @show-logout="showLogout = true"
           />
           <div class="app-body">
             <Sidebar v-model="appStore.sidebarOpen" />
@@ -30,10 +28,6 @@
           v-model:show="showRegister"
           @success="showRegister = false; showLogin = true"
           @go-login="showRegister = false; showLogin = true"
-        />
-        <LogoutModal v-model:show="showLogout" />
-        <ProfileModal
-          v-model:show="showProfile"
         />
       </n-notification-provider>
     </n-message-provider>
@@ -57,16 +51,12 @@ import AppHeader from '@/components/layout/AppHeader.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import LoginModal from '@/components/business/LoginModal.vue'
 import RegisterModal from '@/components/business/RegisterModal.vue'
-import LogoutModal from '@/components/business/LogoutModal.vue'
-import ProfileModal from '@/components/business/ProfileModal.vue'
 
 const userStore = useUserStore()
 const appStore = useAppStore()
 
 const showLogin = ref(false)
-const showLogout = ref(false)
 const showRegister = ref(false)
-const showProfile = ref(false)
 
 const onLoginSuccess = () => {
   showLogin.value = false
@@ -124,17 +114,15 @@ onMounted(() => {
 .app-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 .app-body {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  margin-top: var(--app-header-height);
 }
 .app-main {
   flex: 1;
-  overflow-y: auto;
   overflow-x: hidden;
 }
 </style>

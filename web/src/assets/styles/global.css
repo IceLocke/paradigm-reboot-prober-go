@@ -74,11 +74,6 @@
   white-space: nowrap;
 }
 
-.page-header h2 {
-  font-size: var(--text-xl);
-  font-weight: 600;
-}
-
 .page-actions {
   display: flex;
   gap: var(--space-2);

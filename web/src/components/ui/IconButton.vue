@@ -45,7 +45,7 @@ defineEmits<{ click: [] }>()
   color: var(--text-secondary);
   cursor: pointer;
   border-radius: 8px;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 .icon-btn:disabled {
   opacity: 0.4;
@@ -53,5 +53,8 @@ defineEmits<{ click: [] }>()
 }
 @media (hover: hover) {
   .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+}
+.icon-btn * {
+  pointer-events: none;
 }
 </style>

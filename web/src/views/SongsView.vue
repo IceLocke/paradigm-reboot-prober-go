@@ -11,23 +11,22 @@
             :placeholder="t('message.search_placeholder')"
           />
         </div>
-        <UploadCart />
         <IconButton :icon="RefreshCw" :size="18" :title="t('common.refresh')" @click="loadCharts" />
         <div class="view-toggle">
-          <button
+          <IconButton
             :class="['view-toggle-btn', { active: appStore.songsViewMode === 'grid' }]"
+            :icon="LayoutGrid"
+            :size="16"
             :title="t('term.grid_view')"
             @click="appStore.songsViewMode = 'grid'"
-          >
-            <LayoutGrid :size="16" />
-          </button>
-          <button
+          />
+          <IconButton
             :class="['view-toggle-btn', { active: appStore.songsViewMode === 'table' }]"
+            :icon="List"
+            :size="16"
             :title="t('term.table_view')"
             @click="appStore.songsViewMode = 'table'"
-          >
-            <List :size="16" />
-          </button>
+          />
         </div>
       </div>
     </div>
@@ -79,7 +78,7 @@
     />
 
     <!-- Divider -->
-    <hr class="section-divider" />
+    <n-divider />
 
     <!-- Grid View -->
     <SongGridView
@@ -122,7 +121,7 @@
 <script setup lang="ts">
 import { ref, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useMessage } from 'naive-ui'
+import { useMessage, NDivider } from 'naive-ui'
 import { Search, RefreshCw, LayoutGrid, List } from '@lucide/vue'
 
 import { useAppStore } from '@/stores/app'
@@ -137,7 +136,6 @@ import BaseTabs from '@/components/ui/BaseTabs.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
-import UploadCart from '@/components/business/UploadCart.vue'
 import SongFilterPanel from '@/components/business/SongFilterPanel.vue'
 
 const SongGridView = defineAsyncComponent(() => import('@/components/business/SongGridView.vue'))
@@ -288,6 +286,10 @@ onMounted(() => {
   min-height: 40px;
   flex: 1;
   max-width: 40vw;
+  transition: border-color var(--transition-base);
+}
+.search-box:focus-within {
+  border-color: var(--accent);
 }
 .search-input {
   border: none;
@@ -298,12 +300,14 @@ onMounted(() => {
   width: 100%;
   font-family: inherit;
 }
-.search-input::placeholder { color: var(--text-muted); }
+.search-input::placeholder {
+  color: var(--text-muted);
+}
 
 /* Mobile search row (hidden on desktop) */
 .search-row-mobile {
   display: none;
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 .search-box--mobile {
   max-width: none;
@@ -399,12 +403,5 @@ onMounted(() => {
   .view-toggle-btn:not(.active):hover {
     color: var(--text-secondary);
   }
-}
-
-/* Divider between filters and content */
-.section-divider {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: var(--space-4) 0;
 }
 </style>
