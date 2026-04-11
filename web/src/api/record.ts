@@ -1,5 +1,11 @@
 import client from './client'
-import type { PlayRecordResponse, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse } from './types'
+import type { PlayRecordResponse, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse, Difficulty } from './types'
+
+export interface RecordFilterParams {
+  minLevel?: number | null
+  maxLevel?: number | null
+  difficulties?: Difficulty[]
+}
 
 export const getRecords = (
   username: string,
@@ -7,15 +13,25 @@ export const getRecords = (
   pageSize: number = 50,
   pageIndex: number = 1,
   sortBy: string = 'rating',
-  order: string = 'desc'
+  order: string = 'desc',
+  filter?: RecordFilterParams
 ) => {
+  const params: Record<string, unknown> = {
+    scope,
+    page_size: pageSize,
+    page_index: pageIndex,
+    sort_by: sortBy,
+    order,
+  }
+  if (filter?.minLevel != null) params.min_level = filter.minLevel
+  if (filter?.maxLevel != null) params.max_level = filter.maxLevel
+  if (filter?.difficulties && filter.difficulties.length > 0) {
+    params.difficulty = filter.difficulties
+  }
   return client.get<PlayRecordResponse>(`/records/${username}`, {
-    params: {
-      scope,
-      page_size: pageSize,
-      page_index: pageIndex,
-      sort_by: sortBy,
-      order,
+    params,
+    paramsSerializer: {
+      indexes: null,
     },
   })
 }
@@ -25,7 +41,5 @@ export const uploadRecords = (username: string, data: BatchCreatePlayRecordReque
 }
 
 export const getAllChartsWithScores = (username: string) => {
-  return client.get<AllChartsResponse>(`/records/${username}`, {
-    params: { scope: 'all-charts' },
-  })
+  return client.get<AllChartsResponse>(`/records/${username}`, { params: { scope: 'all-charts' } })
 }

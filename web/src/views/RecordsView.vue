@@ -10,9 +10,46 @@
       </div>
     </div>
 
-    <!-- Scope filter -->
+    <!-- Filters -->
     <div class="filters-row">
+      <div class="diff-toggle">
+        <button
+          :class="['diff-toggle-btn', { active: diffFilter.length === 0 }]"
+          @click="toggleDiff('all')"
+        >{{ t('common.all') }}</button>
+        <button
+          v-for="d in diffOptions"
+          :key="d.key"
+          :class="['diff-toggle-btn', { active: diffFilter.includes(d.key) }]"
+          @click="toggleDiff(d.key)"
+        >{{ d.label }}</button>
+      </div>
       <BaseTabs v-model="scope" :tabs="scopeTabs" />
+      <div class="level-filter-group">
+        <n-select
+          :value="bracketValue"
+          :options="bracketOptions"
+          :placeholder="t('term.level')"
+          clearable
+          class="level-bracket-select"
+          @update:value="onBracketSelect"
+        />
+        <n-input-number
+          v-model:value="levelMin"
+          :show-button="false"
+          :placeholder="t('term.min_level')"
+          class="level-num-input"
+          @update:value="onFilterChange"
+        />
+        <span class="level-filter-sep">–</span>
+        <n-input-number
+          v-model:value="levelMax"
+          :show-button="false"
+          :placeholder="t('term.max_level')"
+          class="level-num-input"
+          @update:value="onFilterChange"
+        />
+      </div>
     </div>
 
     <!-- Table -->
@@ -58,19 +95,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NPagination, useMessage } from 'naive-ui'
-import type { DataTableColumns, DataTableSortState } from 'naive-ui'
+import { NDataTable, NInputNumber, NPagination, NSelect, useMessage } from 'naive-ui'
+import type { DataTableColumns, DataTableSortState, SelectOption } from 'naive-ui'
 import { FileUp, FileDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import dayjs from 'dayjs'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { getRecords, getAllChartsWithScores } from '@/api/record'
+import type { RecordFilterParams } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockRecords, getMockAllCharts } from '@/api/mock'
 import { exportCsv } from '@/utils/csv'
 import { saveAs } from 'file-saver'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
+import { buildLevelBrackets } from '@/utils/levelBrackets'
 import BaseTabs from '@/components/ui/BaseTabs.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
@@ -92,6 +131,76 @@ const records = ref<PlayRecordInfo[]>([])
 const loading = ref(false)
 
 const sortState = ref<DataTableSortState | null>(null)
+
+// Filter state
+const diffFilter = ref<string[]>([])
+const levelMin = ref<number | null>(null)
+const levelMax = ref<number | null>(null)
+
+const diffOptions = [
+  { key: 'detected', label: 'DET' },
+  { key: 'invaded', label: 'IVD' },
+  { key: 'massive', label: 'MSV' },
+  { key: 'reboot', label: 'RBT' },
+]
+
+// --- Level bracket quick-select ---
+const levelBrackets = computed(() => {
+  if (!appStore.charts) return []
+  return buildLevelBrackets(appStore.charts)
+})
+const bracketOptions = computed<SelectOption[]>(() =>
+  levelBrackets.value.map((b, i) => ({ label: b.label, value: i }))
+)
+const bracketValue = computed<number | null>(() => {
+  if (levelMin.value == null || levelMax.value == null) return null
+  const idx = levelBrackets.value.findIndex(
+    (b) => b.minVal === levelMin.value && b.maxVal === levelMax.value
+  )
+  return idx >= 0 ? idx : null
+})
+const onBracketSelect = (val: number | null) => {
+  if (val == null) {
+    levelMin.value = null
+    levelMax.value = null
+  } else {
+    const b = levelBrackets.value[val]
+    levelMin.value = b.minVal
+    levelMax.value = b.maxVal
+  }
+  onFilterChange()
+}
+
+const toggleDiff = (key: string) => {
+  if (key === 'all') {
+    diffFilter.value = []
+  } else {
+    const idx = diffFilter.value.indexOf(key)
+    if (idx >= 0) {
+      diffFilter.value = diffFilter.value.filter((k) => k !== key)
+    } else {
+      diffFilter.value = [...diffFilter.value, key]
+    }
+    if (diffFilter.value.length === diffOptions.length) {
+      diffFilter.value = []
+    }
+  }
+  pageIndex.value = 1
+  loadRecords()
+}
+
+const onFilterChange = () => {
+  pageIndex.value = 1
+  loadRecords()
+}
+
+const buildFilter = (): RecordFilterParams => {
+  const f: RecordFilterParams = {}
+  if (levelMin.value != null && !isNaN(levelMin.value)) f.minLevel = levelMin.value
+  if (levelMax.value != null && !isNaN(levelMax.value)) f.maxLevel = levelMax.value
+  if (diffFilter.value.length > 0) f.difficulties = diffFilter.value as Difficulty[]
+  return f
+}
 
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
@@ -282,7 +391,8 @@ const loadRecords = async () => {
       const hasActiveSort = (order === 'ascend' || order === 'descend') && columnKey != null
       const sortBy = hasActiveSort ? String(columnKey) : 'rating'
       const sortOrder = hasActiveSort ? (order === 'ascend' ? 'asc' : 'desc') : 'desc'
-      const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value, sortBy, sortOrder)
+      const filter = buildFilter()
+      const res = await getRecords(userStore.username, scope.value, pageSize, pageIndex.value, sortBy, sortOrder, filter)
       records.value = res.data.records
       total.value = res.data.total
     }
@@ -327,9 +437,67 @@ onMounted(loadRecords)
 <style scoped>
 .filters-row {
   display: flex;
-  gap: 0 var(--space-4);
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
   flex-wrap: wrap;
+  margin-bottom: var(--space-3);
 }
+.filters-row :deep(.tabs__content) {
+  display: none;
+}
+
+/* Level range filter (inline in filters-row) */
+.level-filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.level-bracket-select,
+.level-num-input {
+  width: 80px;
+  flex-shrink: 0;
+}
+.level-filter-sep {
+  color: var(--text-muted);
+}
+
+/* Difficulty multi-select toggle */
+.diff-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.diff-toggle::-webkit-scrollbar { display: none; }
+
+.diff-toggle-btn {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--transition-base), background var(--transition-base);
+  white-space: nowrap;
+  min-height: 44px;
+  font-family: inherit;
+}
+@media (hover: hover) {
+  .diff-toggle-btn:hover { color: var(--text-secondary); }
+}
+.diff-toggle-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
 .table-wrapper {
   -webkit-overflow-scrolling: touch;
   background: var(--bg-card);
@@ -358,6 +526,16 @@ onMounted(loadRecords)
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+}
+
+@media (max-width: 639px) {
+  .filters-row {
+    gap: var(--space-2) var(--space-3);
+  }
+  .level-bracket-select,
+  .level-num-input {
+    width: 72px;
+  }
 }
 
 :deep(.link-text) { color: var(--accent); cursor: pointer; text-decoration: none; font-size: var(--text-sm); }

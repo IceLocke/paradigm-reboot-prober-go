@@ -37,3 +37,5 @@ func setupTestDB(t *testing.T) *gorm.DB {
 }
 
 func intPtr(v int) *int { return &v }
+
+func float64Ptr(v float64) *float64 { return &v }

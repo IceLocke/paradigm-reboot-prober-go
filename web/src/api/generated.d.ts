@@ -30,6 +30,12 @@ export interface paths {
                     sort_by?: string;
                     /** @description Order (desc or asc) */
                     order?: string;
+                    /** @description Minimum chart level (inclusive) */
+                    min_level?: number;
+                    /** @description Maximum chart level (inclusive) */
+                    max_level?: number;
+                    /** @description Filter by difficulty (detected, invaded, massive, reboot) */
+                    difficulty?: string[];
                 };
                 header?: never;
                 path: {
