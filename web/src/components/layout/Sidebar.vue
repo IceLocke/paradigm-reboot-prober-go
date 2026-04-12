@@ -1,6 +1,6 @@
 <template>
   <!-- Desktop sidebar -->
-  <aside v-if="isDesktop" class="sidebar">
+  <aside v-if="isDesktop" class="sidebar app-sidebar">
     <nav class="sidebar-nav">
       <router-link
         v-for="item in navItems"
@@ -50,15 +50,17 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UserRound, ChartNoAxesColumn, Music2, FileText, Info } from '@lucide/vue';
+import { useUserStore } from '@/stores/user'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const { isDesktop } = useBreakpoint()
 
 const show = defineModel<boolean>({ required: true })
 
 const navItems = computed(() => [
-  { path: '/profile', label: t('auth.profile'), icon: UserRound },
+  { path: '/profile', label: userStore.profile?.nickname || userStore.username || t('auth.profile'), icon: UserRound },
   { path: '/best50', label: t('term.b50'), icon: ChartNoAxesColumn },
   { path: '/songs', label: t('term.charts'), icon: Music2 },
   { path: '/records', label: t('term.records'), icon: FileText },
@@ -68,13 +70,9 @@ const navItems = computed(() => [
 
 <style scoped>
 .sidebar {
-  position: sticky;
-  top: var(--app-header-height);
-  width: var(--side-bar-width);
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   padding: var(--space-3);
-  flex-shrink: 0;
   overflow-y: auto;
 }
 .sidebar-nav {

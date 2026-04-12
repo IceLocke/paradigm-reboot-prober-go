@@ -75,6 +75,7 @@ export function useChartGroups(
 
     const groups: ChartGroup[] = []
     for (const [key, charts] of map) {
+      charts.sort((a, b) => b.level - a.level)
       groups.push({ key, charts })
     }
 

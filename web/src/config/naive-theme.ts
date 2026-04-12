@@ -52,4 +52,7 @@ export const themeOverrides: GlobalThemeOverrides = {
   Pagination: {
     itemBorderRadius: '6px',
   },
+  Radio: {
+    textColor: 'e4e4e7',
+  },
 }

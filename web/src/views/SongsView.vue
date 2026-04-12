@@ -113,7 +113,6 @@
       :difficulty="uploadTarget.difficulty"
       :level="uploadTarget.level"
       :chart-id="uploadTarget.chartId"
-      @success="onUploadSuccess"
     />
   </div>
 </template>
@@ -246,10 +245,6 @@ const onAddToCart = (chart: ChartInfo) => {
     chart_id: chart.id,
   })
   message.success(t('message.add_to_upload_list_success'))
-}
-
-const onUploadSuccess = () => {
-  // Refresh could happen here
 }
 
 // --- Load data ---
