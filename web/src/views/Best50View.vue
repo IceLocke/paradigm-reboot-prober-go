@@ -78,18 +78,18 @@
         </div>
       </BaseCard>
     </div>
-
-    <!-- Song detail modal -->
-    <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
-    <QuickUploadModal
-      v-model:show="showQuickUpload"
-      :title="uploadTarget.title"
-      :difficulty="uploadTarget.difficulty"
-      :level="uploadTarget.level"
-      :chart-id="uploadTarget.chartId"
-      @success="loadData"
-    />
   </div>
+
+  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+  <QuickUploadModal
+    v-model:show="showQuickUpload"
+    :title="uploadTarget.title"
+    :difficulty="uploadTarget.difficulty"
+    :level="uploadTarget.level"
+    :chart-id="uploadTarget.chartId"
+    :cover="uploadTarget.cover"
+    @success="loadData"
+  />
 </template>
 
 <script setup lang="ts">
@@ -133,7 +133,7 @@ const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const exporting = ref(false)
 const showQuickUpload = ref(false)
-const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
+const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0, cover: '' })
 
 const b35Records = computed(() =>
   allRecords.value.filter((r) => !r.chart.b15).map((r, i) => ({ ...r, _index: i + 1 }))
@@ -180,6 +180,7 @@ const onQuickUpload = (record: PlayRecordInfo) => {
     difficulty: record.chart.difficulty,
     level: record.chart.level,
     chartId: record.chart.id,
+    cover: record.chart.cover,
   }
   showQuickUpload.value = true
 }

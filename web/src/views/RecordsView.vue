@@ -76,19 +76,20 @@
         @update:page="loadRecords"
       />
     </div>
-
-    <!-- Modals -->
-    <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
-    <CsvImportModal v-model:show="showCsvImport" @success="loadRecords" />
-    <QuickUploadModal
-      v-model:show="showQuickUpload"
-      :title="uploadTarget.title"
-      :difficulty="uploadTarget.difficulty"
-      :level="uploadTarget.level"
-      :chart-id="uploadTarget.chartId"
-      @success="loadRecords"
-    />
   </div>
+
+  <!-- Modals -->
+  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+  <CsvImportModal v-model:show="showCsvImport" @success="loadRecords" />
+  <QuickUploadModal
+    v-model:show="showQuickUpload"
+    :title="uploadTarget.title"
+    :difficulty="uploadTarget.difficulty"
+    :level="uploadTarget.level"
+    :chart-id="uploadTarget.chartId"
+    :cover="uploadTarget.cover"
+    @success="loadRecords"
+  />
 </template>
 
 <script setup lang="ts">
@@ -204,7 +205,7 @@ const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const showQuickUpload = ref(false)
 const showCsvImport = ref(false)
-const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
+const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0, cover: '' })
 
 const scopeTabs = [
   { key: 'best', label: t('term.best_only') },
@@ -260,6 +261,7 @@ const onQuickUpload = (record: PlayRecordInfo) => {
     difficulty: record.chart.difficulty,
     level: record.chart.level,
     chartId: record.chart.id,
+    cover: record.chart.cover,
   }
   showQuickUpload.value = true
 }

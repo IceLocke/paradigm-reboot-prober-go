@@ -6,6 +6,7 @@
     style="width: 400px; max-width: 90vw; max-height: 90vh;"
     :bordered="false"
     :auto-focus="false"
+    content-scrollable
     @update:show="$emit('update:show', $event)"
   >
     <form class="auth-form" @submit.prevent="onSubmit">

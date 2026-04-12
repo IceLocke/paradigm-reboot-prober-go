@@ -104,17 +104,18 @@
       @quick-upload="onQuickUpload"
       @update:sorter="handleSorterUpdate"
     />
-
-    <!-- Modals -->
-    <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
-    <QuickUploadModal
-      v-model:show="showQuickUpload"
-      :title="uploadTarget.title"
-      :difficulty="uploadTarget.difficulty"
-      :level="uploadTarget.level"
-      :chart-id="uploadTarget.chartId"
-    />
   </div>
+
+  <!-- Modals -->
+  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+  <QuickUploadModal
+    v-model:show="showQuickUpload"
+    :title="uploadTarget.title"
+    :difficulty="uploadTarget.difficulty"
+    :level="uploadTarget.level"
+    :chart-id="uploadTarget.chartId"
+    :cover="uploadTarget.cover"
+  />
 </template>
 
 <script setup lang="ts">
@@ -178,7 +179,7 @@ const { groupedData, collapsedLevels, toggleLevel } = useChartGroups(filteredDat
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
 const showQuickUpload = ref(false)
-const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
+const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0, cover: '' })
 
 // --- Actions ---
 const onClickTitle = async (songId: number) => {
@@ -228,6 +229,7 @@ const onQuickUpload = (chart: ChartInfo) => {
     difficulty: chart.difficulty,
     level: chart.level,
     chartId: chart.id,
+    cover: chart.cover,
   }
   showQuickUpload.value = true
 }

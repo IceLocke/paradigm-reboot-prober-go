@@ -53,6 +53,6 @@ export const themeOverrides: GlobalThemeOverrides = {
     itemBorderRadius: '6px',
   },
   Radio: {
-    textColor: 'e4e4e7',
+    textColor: '#e4e4e7',
   },
 }
