@@ -1,11 +1,11 @@
 <template>
   <n-modal
-    content-scrollable
     :show="show"
     preset="card"
     :title="song?.title ?? ''"
     :style="modalStyle"
     :bordered="false"
+    content-scrollable
     @update:show="$emit('update:show', $event)"
   >
     <div v-if="song" class="song-detail">

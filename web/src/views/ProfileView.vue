@@ -93,7 +93,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { useMessage, NSpace, NRadioGroup, NRadio } from 'naive-ui'
+import { useMessage, NRadioGroup, NRadio } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { Copy, RefreshCw } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'

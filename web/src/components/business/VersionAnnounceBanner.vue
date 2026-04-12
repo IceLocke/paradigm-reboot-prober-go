@@ -36,6 +36,7 @@
     :difficulty="uploadTarget.difficulty"
     :level="uploadTarget.level"
     :chart-id="uploadTarget.chartId"
+    :cover="uploadTarget.cover"
   />
 
   <ConfirmModal
@@ -126,7 +127,7 @@ const visible = computed(() => {
 
 const showUpload = ref(false)
 const showConfirm = ref(false)
-const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0 })
+const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0, cover: '' })
 
 const openUpload = (chart: ChartInfo) => {
   uploadTarget.value = {
@@ -134,6 +135,7 @@ const openUpload = (chart: ChartInfo) => {
     difficulty: chart.difficulty,
     level: chart.level,
     chartId: chart.id,
+    cover: chart.cover,
   }
   showUpload.value = true
 }

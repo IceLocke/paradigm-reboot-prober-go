@@ -3,19 +3,30 @@
     :show="show"
     preset="card"
     :title="t('common.upload_record')"
-    style="width: 400px; max-width: 9Ovw; max-height: 90vh;"
+    style="width: 400px; max-width: 90vw; max-height: 90vh;"
     :bordered="false"
+    content-scrollable
     @update:show="$emit('update:show', $event)"
   >
     <form class="upload-form" @submit.prevent="onSubmit">
       <div class="form-info">
-        <div class="info-row">
-          <span class="info-label">{{ t('term.title') }}</span>
-          <span class="info-value">{{ title }}</span>
+        <div class="chart-cover">
+          <img
+            :src="coverUrl"
+            :alt="title"
+            class="cover-img"
+            loading="lazy"
+          />
         </div>
-        <div class="info-row">
-          <span class="info-label">{{ t('term.difficulty') }}</span>
-          <DifficultyBadge :difficulty="difficulty" :level="level" />
+        <div class="chart-info">
+          <div class="info-row">
+            <span class="info-label">{{ t('term.title') }}</span>
+            <span class="info-value">{{ title }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ t('term.difficulty') }}</span>
+            <span><DifficultyBadge :difficulty="difficulty" :level="level" /></span>
+          </div>
         </div>
       </div>
 
@@ -28,16 +39,14 @@
 
       <div class="form-field">
         <label class="field-label">{{ t('term.replace') }}</label>
-        <div class="radio-group">
-          <label class="radio-item">
-            <input type="radio" :value="false" v-model="isReplace" />
-            <span>{{ t('common.no') }}</span>
-          </label>
-          <label class="radio-item">
-            <input type="radio" :value="true" v-model="isReplace" />
-            <span>{{ t('common.yes') }}</span>
-          </label>
-        </div>
+        <n-radio-group
+          v-model:value="isReplace"
+        >
+          <span class="radio-group">
+            <n-radio :value="true">{{ t('common.yes') }}</n-radio>
+            <n-radio :value="false">{{ t('common.no') }}</n-radio>
+          </span>
+        </n-radio-group>
       </div>
 
       <div class="form-actions">
@@ -49,8 +58,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { NModal, useMessage } from 'naive-ui'
+import { ref, computed } from 'vue'
+import { NModal, NRadioGroup, NRadio, useMessage } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { uploadRecords } from '@/api/record'
@@ -71,11 +80,18 @@ const props = defineProps<{
   difficulty: Difficulty
   level: number
   chartId: number
+  cover: string
 }>()
 
 const emit = defineEmits<{
   'success': []
 }>()
+
+const coverUrl = computed(() => {
+  if (!props.cover) return ''
+  if (props.cover.startsWith('http')) return props.cover
+  return `/cover/${props.cover}`
+})
 
 const scoreStr = ref('')
 const isReplace = ref(false)
@@ -116,17 +132,32 @@ const onSubmit = async () => {
 }
 .form-info {
   display: flex;
-  flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
   background: var(--bg-secondary);
   border-radius: 8px;
 }
+.chart-cover {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 96px;
+  max-width: 25%;
+}
+.cover-img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+.chart-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
 .info-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  flex-direction: column;
+  gap: 4px;
 }
 .info-label {
   font-size: var(--text-sm);
@@ -139,7 +170,7 @@ const onSubmit = async () => {
 }
 .form-field {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   gap: var(--space-2);
 }
 .field-label {
@@ -150,20 +181,6 @@ const onSubmit = async () => {
 .radio-group {
   display: flex;
   gap: var(--space-4);
-}
-.radio-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  cursor: pointer;
-  color: var(--text-primary);
-  font-size: var(--text-base);
-  min-height: 44px;
-}
-.radio-item input[type="radio"] {
-  accent-color: var(--accent);
-  width: 18px;
-  height: 18px;
 }
 .form-actions {
   display: flex;

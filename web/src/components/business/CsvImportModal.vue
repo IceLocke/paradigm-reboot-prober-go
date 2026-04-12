@@ -6,6 +6,7 @@
     style="width: 480px; max-width: 90vw; max-height: 90vh;"
     :bordered="false"
     :auto-focus="false"
+    content-scrollable
     @update:show="$emit('update:show', $event)"
   >
     <div class="import-form">
