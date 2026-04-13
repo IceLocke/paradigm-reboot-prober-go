@@ -448,8 +448,15 @@ function gridBlockHeight(recordCount: number): number {
 // ─── Main Render Function ──────────────────────────────────────
 
 export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
-  // Ensure web fonts are loaded before rendering
-  await document.fonts.ready
+  // Eagerly load all fonts used on the canvas.
+  // document.fonts.ready alone is insufficient — the browser won't download a
+  // font that isn't referenced by any DOM element, so Anta (used only on the
+  // canvas for scores) would be missing on the first render.
+  await Promise.all([
+    document.fonts.load(`bold 28px ${FONT_SCORE}`),
+    document.fonts.load(`16px ${FONT_SANS}`),
+    document.fonts.load(`16px ${FONT_MONO}`),
+  ])
 
   const { b15Records, b35Records } = options
 
