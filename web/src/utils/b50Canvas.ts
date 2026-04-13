@@ -382,7 +382,7 @@ function drawRecordCard(
   ctx.fillStyle = DIFF_COLORS[record.chart.difficulty] || '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText(diffLabel, contentX, y + pad + 22)
+  ctx.fillText(diffLabel, contentX, y + pad + 24)
 
   // Bottom left: level > rating
   ctx.shadowBlur = 2
@@ -403,7 +403,7 @@ function drawRecordCard(
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
   const scoreStr = String(record.score).padStart(7, '0')
-  ctx.fillText(scoreStr, contentX, y + h - pad - 14)
+  ctx.fillText(scoreStr, contentX, y + h - pad - 17)
 
   // Reset shadow
   ctx.shadowColor = 'transparent'
