@@ -2,39 +2,35 @@
   <Analytics/>
   <SpeedInsights />
   <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
-    <n-message-provider>
-      <n-notification-provider>
-        <div :class="['app-layout', { 'app-layout--desktop': isDesktop }]">
-          <AppHeader
-            @toggle-sidebar="appStore.sidebarOpen = !appStore.sidebarOpen"
-            @show-login="showLogin = true"
-            @show-register="showRegister = true"
-          />
-          <Sidebar v-model="appStore.sidebarOpen" />
-          <main class="app-main">
-            <router-view />
-          </main>
-        </div>
+    <div :class="['app-layout', { 'app-layout--desktop': isDesktop }]">
+      <AppHeader
+        @toggle-sidebar="appStore.sidebarOpen = !appStore.sidebarOpen"
+        @show-login="showLogin = true"
+        @show-register="showRegister = true"
+      />
+      <Sidebar v-model="appStore.sidebarOpen" />
+      <main class="app-main">
+        <router-view />
+      </main>
+    </div>
 
-        <!-- Auth Modals -->
-        <LoginModal
-          v-model:show="showLogin"
-          @success="onLoginSuccess"
-          @go-register="showLogin = false; showRegister = true"
-        />
-        <RegisterModal
-          v-model:show="showRegister"
-          @success="showRegister = false; showLogin = true"
-          @go-login="showRegister = false; showLogin = true"
-        />
-      </n-notification-provider>
-    </n-message-provider>
+    <!-- Auth Modals -->
+    <LoginModal
+      v-model:show="showLogin"
+      @success="onLoginSuccess"
+      @go-register="showLogin = false; showRegister = true"
+    />
+    <RegisterModal
+      v-model:show="showRegister"
+      @success="showRegister = false; showLogin = true"
+      @go-login="showRegister = false; showLogin = true"
+    />
   </n-config-provider>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { darkTheme, NConfigProvider, NMessageProvider, NNotificationProvider } from 'naive-ui'
+import { darkTheme, NConfigProvider } from 'naive-ui'
 
 import { themeOverrides } from '@/config/naive-theme'
 import { useUserStore } from '@/stores/user'

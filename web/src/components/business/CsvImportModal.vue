@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { NModal, useMessage } from 'naive-ui'
+import { NModal } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { File } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'
@@ -74,10 +74,10 @@ import { uploadRecords, getAllChartsWithScores } from '@/api/record'
 import { USE_MOCK, getMockAllCharts } from '@/api/mock'
 import { decodeFileBuffer, parseCsvToRecords, filterUnchangedRecords } from '@/utils/csv'
 import type { CsvRecord } from '@/utils/csv'
+import { toastSuccess, formatApiError } from '@/utils/toast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 const userStore = useUserStore()
 
 const show = defineModel<boolean>('show', { required: true })
@@ -184,13 +184,12 @@ const onUpload = async () => {
       uploaded += batch.length
     }
 
-    message.success(t('message.csv_import_success', { count: uploaded }))
+    toastSuccess('message.csv_import_success', { count: uploaded })
     show.value = false
     resetState()
     emit('success')
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    errorMsg.value = t('message.csv_import_failed') + (e.response?.data?.error ?? '')
+    errorMsg.value = formatApiError('message.csv_import_failed', err)
   } finally {
     loading.value = false
   }

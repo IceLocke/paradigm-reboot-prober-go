@@ -55,7 +55,7 @@ web/
 │
 ├── src/
 │   ├── main.ts                   # App entry: Pinia, Router, I18n, CSS imports
-│   ├── App.vue                   # Root: NConfigProvider, layout, auth modals
+│   ├── App.vue                   # Root: NConfigProvider, layout, auth modals (NO provider wrappers)
 │   │
 │   ├── assets/styles/
 │   │   ├── variables.css         # Design tokens (colors, spacing, fonts, etc.)
@@ -69,7 +69,7 @@ web/
 │   │   ├── generated.d.ts        # Auto-generated types (DO NOT EDIT)
 │   │   ├── openapi3.json         # Converted OpenAPI 3.0 spec (gitignored)
 │   │   ├── types.ts              # Re-exports from generated.d.ts + DeepRequired
-│   │   ├── client.ts             # Axios instance (base URL, JWT interceptor, gzip request compression)
+│   │   ├── client.ts             # Axios instance (base URL, JWT interceptor, gzip request, global 401 toast)
 │   │   ├── user.ts               # User API (login, register, profile, token)
 │   │   ├── song.ts               # Song API (list charts, song detail, CRUD)
 │   │   ├── record.ts             # Record API (query, upload)
@@ -80,6 +80,8 @@ web/
 │   │   └── app.ts                # App state (charts cache, upload cart, sidebar)
 │   │
 │   ├── utils/
+│   │   ├── discrete.ts          # Naive UI createDiscreteApi singleton (message, notification, loadingBar)
+│   │   ├── toast.ts             # Centralized toast helpers (toastSuccess, toastError, toastWarning, etc.)
 │   │   ├── b50Canvas.ts          # B50 image Canvas renderer (export as JPEG)
 │   │   └── csv.ts                # CSV export generation, import parsing, GBK/UTF-8 detection
 │   │
@@ -152,7 +154,7 @@ User Interaction → View → (API / Mock) → Store → View re-renders
 | **Layout Components** | `src/components/layout/` | App shell (header, sidebar/drawer) |
 | **API Layer** | `src/api/` | Axios client, typed API functions, mock data |
 | **Stores** | `src/stores/` | Pinia reactive state (user session, app cache) |
-| **Utilities** | `src/utils/` | Pure helper modules (B50 canvas renderer) |
+| **Utilities** | `src/utils/` | Pure helper modules (B50 canvas, CSV, **toast/discrete API**) |
 | **Composables** | `src/composables/` | Reusable reactive logic (breakpoint detection) |
 | **Design System** | `src/assets/styles/` + `src/config/` | CSS variables + Naive UI theme overrides |
 
@@ -332,7 +334,7 @@ All view components are **lazy-loaded** via `() => import(...)`.
 
 - Base URL: `import.meta.env.VITE_API_ENDPOINT || '/api/v2'` (exported as `API_BASE`)
 - Request interceptor: reads `userStore` from `localStorage` and attaches `Authorization` header
-- Response interceptor: catches `401` errors (token expired) — components handle the actual logout flow
+- Response interceptor: catches `401` errors and shows a token-expired toast (via `toastWarning`)
 - The token format is `"Bearer <jwt>"`, stored as-is in `userStore.access_token`
 
 ### Type Definitions (`src/api/types.ts`)
@@ -382,6 +384,48 @@ term.*       — domain terms (b50, records, difficulty, level, rating)
 message.*    — notifications and validation messages
 about.*      — about page content
 ```
+
+---
+
+## Toast / Notification Pattern (Discrete API)
+
+The project uses Naive UI's **`createDiscreteApi`** as the sole toast/message mechanism. This allows toast calls from **anywhere** — Vue components, Axios interceptors, Pinia actions, and plain utility functions — without relying on `<n-message-provider>` or `useMessage()`.
+
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/utils/discrete.ts` | Singleton `createDiscreteApi` instance (theme-synced) |
+| `src/utils/toast.ts` | i18n-aware helpers: `toastSuccess`, `toastError`, `toastWarning`, `toastInfo`, `formatApiError`, `extractApiError` |
+
+### Usage
+
+```ts
+// In any .ts or .vue file:
+import { toastSuccess, toastError, toastWarning, formatApiError } from '@/utils/toast'
+
+// Success toast with i18n key
+toastSuccess('message.post_record_success')
+
+// Error toast with automatic API error detail extraction
+try { await someApi() }
+catch (err) { toastError('message.post_record_failed', err) }
+// Renders: "Failed to upload record: <API error detail>"
+
+// Generic fallback (no key needed)
+toastSuccess()  // → "Operation successful" (i18n: message.request_success)
+toastError()    // → "Operation failed"     (i18n: message.request_failed)
+
+// For inline error display (not a toast):
+errorMsg.value = formatApiError('message.login_failed', err)
+```
+
+### Rules
+
+- **NEVER** use `useMessage()` from Naive UI directly — always use `toastSuccess`/`toastError`/etc.
+- **NEVER** add `<n-message-provider>` or `<n-notification-provider>` to `App.vue` — the discrete API handles this
+- Error i18n keys should NOT include trailing `: ` — the `formatApiError` function adds the separator automatically
+- When adding new toast messages, add the i18n key to ALL locale files (`en.ts`, `zh.ts`, `ja.ts`)
 
 ---
 
@@ -469,6 +513,8 @@ color: white;
 
 ### Naive UI
 - **NEVER** use `n-button`, `n-card`, `n-input`, `n-tabs` — use `Base*` components
+- **NEVER** use `useMessage()` / `useNotification()` — use `toastSuccess` / `toastError` / etc. from `@/utils/toast`
+- **NEVER** add `<n-message-provider>` or `<n-notification-provider>` to templates
 - Theme config lives ONLY in `src/config/naive-theme.ts`
 - Color changes must sync `variables.css` ↔ `naive-theme.ts`
 
@@ -509,5 +555,6 @@ color: white;
 | Color palette | `src/assets/styles/variables.css` + `src/config/naive-theme.ts` |
 | API schema | Run `pnpm generate:api` → update `src/api/types.ts` re-exports → fix affected views |
 | New route | `src/router/index.ts` + sidebar nav items in `Sidebar.vue` |
-| New translation key | `src/i18n/en.ts` + `src/i18n/zh.ts` |
+| New translation key | `src/i18n/en.ts` + `src/i18n/zh.ts` + `src/i18n/ja.ts` |
 | New difficulty type | `src/api/types.ts` (Difficulty union) + `DifficultyBadge.vue` + `variables.css` |
+| Theme overrides | `src/config/naive-theme.ts` + `src/utils/discrete.ts` (synced via `configProviderProps`) |

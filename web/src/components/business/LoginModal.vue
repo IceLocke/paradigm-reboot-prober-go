@@ -33,16 +33,16 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { NModal, useMessage } from 'naive-ui'
+import { NModal } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { login } from '@/api/user'
 import { USE_MOCK } from '@/api/mock'
+import { toastSuccess, formatApiError } from '@/utils/toast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 const userStore = useUserStore()
 
 const show = defineModel<boolean>('show', { required: true })
@@ -81,15 +81,14 @@ const onSubmit = async () => {
     }
     form.username = ''
     form.password = ''
-    message.success(t('message.login_success'))
+    toastSuccess('message.login_success')
     emit('success')
   } catch (err: unknown) {
-    const error = err as { status: number, response?: { data?: { error?: string } } }
+    const error = err as { status: number }
     if (error.status === 401) {
       errorMsg.value = t('message.password_incorrect')
     } else {
-      const msg = t('message.login_failed') + (error.response?.data?.error ?? '')
-      errorMsg.value = msg
+      errorMsg.value = formatApiError('message.login_failed', err)
     }
   } finally {
     loading.value = false

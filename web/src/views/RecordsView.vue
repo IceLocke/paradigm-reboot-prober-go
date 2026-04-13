@@ -95,10 +95,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, NInputNumber, NPagination, NSelect, useMessage } from 'naive-ui'
+import { NDataTable, NInputNumber, NPagination, NSelect } from 'naive-ui'
 import type { DataTableColumns, DataTableSortState, SelectOption } from 'naive-ui'
 import { FileUp, FileDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import dayjs from 'dayjs'
+
+import { toastSuccess, toastError } from '@/utils/toast'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
@@ -118,7 +120,6 @@ import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
 import CsvImportModal from '@/components/business/CsvImportModal.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 const userStore = useUserStore()
 const appStore = useAppStore()
 
@@ -250,8 +251,7 @@ const onClickTitle = async (songId: number) => {
       selectedSong.value = res.data
     }
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_song_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    toastError('message.get_song_failed', err)
   }
 }
 
@@ -269,7 +269,7 @@ const onQuickUpload = (record: PlayRecordInfo) => {
 const onAddToCart = (record: PlayRecordInfo) => {
   const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.id)
   if (exists) {
-    message.error(t('message.add_to_upload_list_failed'))
+    toastError('message.add_to_upload_list_failed')
     return
   }
   appStore.uploadList.push({
@@ -279,7 +279,7 @@ const onAddToCart = (record: PlayRecordInfo) => {
     chart_id: record.chart.id,
     score: record.score,
   })
-  message.success(t('message.add_to_upload_list_success'))
+  toastSuccess('message.add_to_upload_list_success')
 }
 
 const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
@@ -386,7 +386,7 @@ const loadRecords = async () => {
       records.value = mock.records
       total.value = mock.total
     } else {
-      if (!userStore.logged_in) return
+      if (!userStore.logged_in) return false
       const { columnKey, order } = sortState.value ?? {}
       const hasActiveSort = (order === 'ascend' || order === 'descend') && columnKey != null
       const sortBy = hasActiveSort ? String(columnKey) : 'rating'
@@ -396,17 +396,18 @@ const loadRecords = async () => {
       records.value = res.data.records
       total.value = res.data.total
     }
+    return true
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_record_failed') + (e.response?.data?.error ?? ''))
+    toastError('message.get_record_failed', err)
+    return false
   } finally {
     loading.value = false
   }
 }
 
 const refreshRecords = async () => {
-  await loadRecords()
-  message.success(t('message.refresh_record_success'))
+  const ok = await loadRecords()
+  if (ok) toastSuccess('message.refresh_record_success')
 }
 
 const onExportCsv = async () => {
@@ -421,9 +422,9 @@ const onExportCsv = async () => {
     const csvStr = exportCsv(csvData.charts)
     const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8' })
     saveAs(blob, `${userStore.username}_records.csv`)
-    message.success(t('message.csv_export_success'))
-  } catch {
-    message.error(t('message.csv_export_failed'))
+    toastSuccess('message.csv_export_success')
+  } catch (err: unknown) {
+    toastError('message.csv_export_failed', err)
   }
 }
 

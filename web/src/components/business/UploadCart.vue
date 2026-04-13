@@ -41,9 +41,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NPopover, useMessage } from 'naive-ui'
+import { NPopover } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { ShoppingCart, X } from '@lucide/vue';
+import { toastSuccess, toastError } from '@/utils/toast'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { uploadRecords } from '@/api/record'
@@ -54,7 +55,6 @@ import IconButton from '@/components/ui/IconButton.vue'
 import DifficultyBadge from './DifficultyBadge.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 const appStore = useAppStore()
 const userStore = useUserStore()
 const loading = ref(false)
@@ -75,10 +75,9 @@ const onSubmit = async () => {
       await uploadRecords(userStore.username, { play_records: records })
     }
     appStore.uploadList = []
-    message.success(t('message.post_record_success'))
+    toastSuccess('message.post_record_success')
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.post_record_failed') + (e.response?.data?.error ?? ''))
+    toastError('message.post_record_failed', err)
   } finally {
     loading.value = false
   }

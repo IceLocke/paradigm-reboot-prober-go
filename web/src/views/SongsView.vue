@@ -121,8 +121,10 @@
 <script setup lang="ts">
 import { ref, defineAsyncComponent, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useMessage, NDivider } from 'naive-ui'
+import { NDivider } from 'naive-ui'
 import { Search, RefreshCw, LayoutGrid, List } from '@lucide/vue'
+
+import { toastSuccess, toastError } from '@/utils/toast'
 
 import { useAppStore } from '@/stores/app'
 import { getAllCharts, getSingleSongInfo } from '@/api/song'
@@ -142,7 +144,6 @@ const SongGridView = defineAsyncComponent(() => import('@/components/business/So
 const SongTableView = defineAsyncComponent(() => import('@/components/business/SongTableView.vue'))
 
 const { t } = useI18n()
-const message = useMessage()
 const appStore = useAppStore()
 
 // --- Composables ---
@@ -218,8 +219,7 @@ const onClickTitle = async (songId: number) => {
       selectedSong.value = res.data
     }
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_song_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    toastError('message.get_song_failed', err)
   }
 }
 
@@ -237,7 +237,7 @@ const onQuickUpload = (chart: ChartInfo) => {
 const onAddToCart = (chart: ChartInfo) => {
   const exists = appStore.uploadList.some((item) => item.chart_id === chart.id)
   if (exists) {
-    message.error(t('message.add_to_upload_list_failed'))
+    toastError('message.add_to_upload_list_failed')
     return
   }
   appStore.uploadList.push({
@@ -246,7 +246,7 @@ const onAddToCart = (chart: ChartInfo) => {
     level: chart.level,
     chart_id: chart.id,
   })
-  message.success(t('message.add_to_upload_list_success'))
+  toastSuccess('message.add_to_upload_list_success')
 }
 
 // --- Load data ---
@@ -258,10 +258,9 @@ const loadCharts = async () => {
   try {
     const res = await getAllCharts()
     appStore.charts = res.data
-    message.success(t('message.get_charts_success'))
+    toastSuccess('message.get_charts_success')
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_charts_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    toastError('message.get_charts_failed', err)
   }
 }
 

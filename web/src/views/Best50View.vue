@@ -96,7 +96,7 @@
 import { ref, computed, onMounted, watch, h } from 'vue'
 import { saveAs } from 'file-saver'
 import { useI18n } from 'vue-i18n'
-import { NDataTable, useMessage } from 'naive-ui'
+import { NDataTable } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { ImageDown, Loader, RefreshCw, Plus, Upload } from '@lucide/vue';
 import VChart from 'vue-echarts'
@@ -104,6 +104,8 @@ import { use } from 'echarts/core'
 import { ScatterChart } from 'echarts/charts'
 import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
+
+import { toastSuccess, toastError } from '@/utils/toast'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
@@ -123,7 +125,6 @@ import VersionAnnounceBanner from '@/components/business/VersionAnnounceBanner.v
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
 
 const { t } = useI18n()
-const message = useMessage()
 const userStore = useUserStore()
 const appStore = useAppStore()
 
@@ -161,7 +162,7 @@ const b15Rating = computed(() => {
 const onAddToCart = (record: PlayRecordInfo) => {
   const exists = appStore.uploadList.some((item) => item.chart_id === record.chart.id)
   if (exists) {
-    message.error(t('message.add_to_upload_list_failed'))
+    toastError('message.add_to_upload_list_failed')
     return
   }
   appStore.uploadList.push({
@@ -171,7 +172,7 @@ const onAddToCart = (record: PlayRecordInfo) => {
     chart_id: record.chart.id,
     score: record.score,
   })
-  message.success(t('message.add_to_upload_list_success'))
+  toastSuccess('message.add_to_upload_list_success')
 }
 
 const onQuickUpload = (record: PlayRecordInfo) => {
@@ -201,8 +202,7 @@ const onClickTitle = async (songId: number) => {
       selectedSong.value = res.data
     }
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_song_failed') + (e.response?.data?.error ? ': ' + e.response.data.error : ''))
+    toastError('message.get_song_failed', err)
   }
 }
 
@@ -335,23 +335,24 @@ const loadData = async () => {
     const mock = getMockB50()
     allRecords.value = mock.records
     nickname.value = mock.nickname
-    return
+    return true
   }
 
-  if (!userStore.logged_in) return
+  if (!userStore.logged_in) return false
   try {
     const res = await getRecords(userStore.username, 'b50')
     allRecords.value = res.data.records
     nickname.value = res.data.nickname
+    return true
   } catch (err: unknown) {
-    const e = err as { response?: { data?: { error?: string } } }
-    message.error(t('message.get_record_failed') + (e.response?.data?.error ?? ''))
+    toastError('message.get_record_failed', err)
+    return false
   }
 }
 
 const refreshData = async () => {
-  await loadData()
-  message.success(t('message.refresh_record_success'))
+  const ok = await loadData()
+  if (ok) toastSuccess('message.refresh_record_success')
 }
 
 const exportImage = async () => {
@@ -368,9 +369,9 @@ const exportImage = async () => {
       b35Avg: b35Rating.value,
     })
     saveAs(blob, `b50_${Date.now()}.jpg`)
-    message.success(t('message.export_image_success'))
-  } catch {
-    message.error(t('message.export_image_failed'))
+    toastSuccess('message.export_image_success')
+  } catch (err: unknown) {
+    toastError('message.export_image_failed', err)
   } finally {
     exporting.value = false
   }
