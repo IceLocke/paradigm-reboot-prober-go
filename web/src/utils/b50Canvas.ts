@@ -56,6 +56,7 @@ const DIFF_NAMES: Record<string, string> = {
 
 const FONT_SANS = "'Inter', 'Noto Sans SC', sans-serif"
 const FONT_MONO = "'JetBrains Mono', monospace"
+const FONT_SCORE = "'Anta', sans-serif"
 
 // ─── Helpers ───────────────────────────────────────────────────
 
@@ -266,8 +267,8 @@ function drawHeader(
   ctx.fillText(options.nickname || options.username, rightX, y)
 
   // Right: rating
-  ctx.font = `16px ${FONT_MONO}`
-  ctx.fillStyle = '#a1a1aa'
+  ctx.font = `20px ${FONT_MONO}`
+  ctx.fillStyle = '#ffffff'
   ctx.fillText(`Rating: ${options.rating.toFixed(4)}`, rightX, y + 38)
 }
 
@@ -280,8 +281,8 @@ function drawSectionTitle(
   const text = `${label} / Avg. ${avg.toFixed(4)}`
   const centerX = CANVAS_WIDTH / 2
 
-  ctx.font = `bold 18px ${FONT_SANS}`
-  ctx.fillStyle = '#e4e4e7'
+  ctx.font = `18px ${FONT_SANS}`
+  ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
 
@@ -362,7 +363,7 @@ function drawRecordCard(
   const rankStr = `#${rank}`
   ctx.font = `bold 13px ${FONT_MONO}`
   const rankWidth = ctx.measureText(rankStr).width
-  ctx.font = `bold 18px ${FONT_SANS}`
+  ctx.font = `bold 20px ${FONT_SANS}`
   const title = truncateText(ctx, record.chart.title, contentW - rankWidth - 8)
   ctx.fillText(title, contentX, y + pad)
 
@@ -381,15 +382,15 @@ function drawRecordCard(
   ctx.fillStyle = DIFF_COLORS[record.chart.difficulty] || '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText(diffLabel, contentX, y + pad + 22)
+  ctx.fillText(diffLabel, contentX, y + pad + 24)
 
   // Bottom left: level > rating
   ctx.shadowBlur = 2
   ctx.shadowOffsetY = 1
   const ratingVal = (record.rating / 100).toFixed(2)
   const levelVal = record.chart.level.toFixed(1)
-  ctx.font = `13px ${FONT_MONO}`
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)'
+  ctx.font = `bold 14px ${FONT_MONO}`
+  ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
   ctx.fillText(`${levelVal} → ${ratingVal}`, contentX, y + h - pad)
@@ -397,12 +398,12 @@ function drawRecordCard(
   // Score (left-aligned, vertically centered)
   ctx.shadowBlur = 5
   ctx.shadowOffsetY = 2
-  ctx.font = `bold 28px ${FONT_MONO}`
+  ctx.font = `bold 28px ${FONT_SCORE}`
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'bottom'
   const scoreStr = String(record.score).padStart(7, '0')
-  ctx.fillText(scoreStr, contentX, y + h - pad - 14)
+  ctx.fillText(scoreStr, contentX, y + h - pad - 17)
 
   // Reset shadow
   ctx.shadowColor = 'transparent'
@@ -447,8 +448,15 @@ function gridBlockHeight(recordCount: number): number {
 // ─── Main Render Function ──────────────────────────────────────
 
 export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
-  // Ensure web fonts are loaded before rendering
-  await document.fonts.ready
+  // Eagerly load all fonts used on the canvas.
+  // document.fonts.ready alone is insufficient — the browser won't download a
+  // font that isn't referenced by any DOM element, so Anta (used only on the
+  // canvas for scores) would be missing on the first render.
+  await Promise.all([
+    document.fonts.load(`bold 28px ${FONT_SCORE}`),
+    document.fonts.load(`16px ${FONT_SANS}`),
+    document.fonts.load(`16px ${FONT_MONO}`),
+  ])
 
   const { b15Records, b35Records } = options
 
