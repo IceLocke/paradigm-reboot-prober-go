@@ -60,21 +60,29 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 })
 
 // Response interceptor: handle global errors (401 token expiry)
+//
+// Some endpoints use 401 to mean "wrong credentials" rather than
+// "token expired".  We skip the global toast for those so the
+// component-level error handling can show the correct message.
+const AUTH_401_PATHS = ['/user/login', '/user/me/password']
+
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Only show token-expired toast when a stored token exists
-      // (i.e. the user was previously logged in).
-      // Login / register 401s are handled by their own components.
-      const raw = localStorage.getItem('userStore')
-      if (raw) {
-        try {
-          const store = JSON.parse(raw)
-          if (store.access_token) {
-            toastWarning('message.token_expired')
-          }
-        } catch { /* ignore parse errors */ }
+      const reqUrl: string = error.config?.url ?? ''
+      const isCredentialCheck = AUTH_401_PATHS.some((p) => reqUrl.endsWith(p))
+
+      if (!isCredentialCheck) {
+        const raw = localStorage.getItem('userStore')
+        if (raw) {
+          try {
+            const store = JSON.parse(raw)
+            if (store.access_token) {
+              toastWarning('message.token_expired')
+            }
+          } catch { /* ignore parse errors */ }
+        }
       }
     }
     return Promise.reject(error)
