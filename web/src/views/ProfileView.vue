@@ -93,9 +93,10 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { useMessage, NRadioGroup, NRadio } from 'naive-ui'
+import { NRadioGroup, NRadio } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { Copy, RefreshCw } from '@lucide/vue';
+import { toastSuccess, toastError } from '@/utils/toast'
 import { useUserStore } from '@/stores/user'
 import { updateMyInfo, refreshUploadToken } from '@/api/user'
 import { USE_MOCK } from '@/api/mock'
@@ -107,7 +108,6 @@ import IconButton from '@/components/ui/IconButton.vue'
 import ChangePasswordModal from '@/components/business/ChangePasswordModal.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 const userStore = useUserStore()
 
 const form = reactive({
@@ -148,9 +148,9 @@ const onSave = async () => {
       userStore.profile.nickname = form.nickname
       userStore.profile.qq_account = form.qq_account
     }
-    message.success(t('message.update_profile_success'))
+    toastSuccess('message.update_profile_success')
   } catch {
-    message.error(t('message.update_profile_failed'))
+    toastError('message.update_profile_failed')
   } finally {
     loading.value = false
   }
@@ -159,9 +159,9 @@ const onSave = async () => {
 const onCopyToken = async () => {
   try {
     await navigator.clipboard.writeText(tokenDisplay.value)
-    message.success(t('message.copy_success'))
+    toastSuccess('message.copy_success')
   } catch {
-    message.error(t('message.copy_failed'))
+    toastError('message.copy_failed')
   }
 }
 
@@ -182,9 +182,9 @@ const refreshToken = async () => {
         userStore.profile.upload_token = res.data.upload_token
       }
     }
-    message.success(t('message.refresh_upload_token_success'))
+    toastSuccess('message.refresh_upload_token_success')
   } catch {
-    message.error(t('message.refresh_upload_token_failed'))
+    toastError('message.refresh_upload_token_failed')
   }
 }
 
@@ -199,10 +199,10 @@ const updateAnonymousProbe = async () => {
     if (userStore.profile) {
       userStore.profile.anonymous_probe = allowAnonymousProbe
     }
-    message.success(t('message.update_profile_success'))
+    toastSuccess('message.update_profile_success')
   } catch {
     anonymousProbe.value = !allowAnonymousProbe
-    message.error(t('message.update_profile_failed'))
+    toastError('message.update_profile_failed')
   }
 }
 </script>

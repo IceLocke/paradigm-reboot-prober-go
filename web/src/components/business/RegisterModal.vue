@@ -44,15 +44,15 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { NModal, useMessage } from 'naive-ui'
+import { NModal } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
 import { register } from '@/api/user'
 import { USE_MOCK } from '@/api/mock'
+import { toastSuccess, toastError, formatApiError } from '@/utils/toast'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 
 const show = defineModel<boolean>('show', { required: true })
 const emit = defineEmits<{
@@ -94,13 +94,12 @@ const onSubmit = async () => {
     form.email = ''
     form.password = ''
     form.confirmPassword = ''
-    message.success(t('message.register_success'))
+    toastSuccess('message.register_success')
     emit('success')
   } catch (err: unknown) {
-    const error = err as { response?: { data?: { error?: string } } }
-    const msg = t('message.register_failed') + (error.response?.data?.error ?? '')
+    const msg = formatApiError('message.register_failed', err)
     errorMsg.value = msg
-    message.error(msg)
+    toastError('message.register_failed', err)
   } finally {
     loading.value = false
   }

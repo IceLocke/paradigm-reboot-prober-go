@@ -1,6 +1,7 @@
 import type {AxiosInstance, InternalAxiosRequestConfig} from 'axios'
 import axios from 'axios'
 import pako from 'pako'
+import { toastWarning } from '@/utils/toast'
 
 const API_BASE = import.meta.env.VITE_API_ENDPOINT || '/api/v2'
 
@@ -58,12 +59,23 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
-// Response interceptor: handle 401
+// Response interceptor: handle global errors (401 token expiry)
 client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired - the component should handle this
+      // Only show token-expired toast when a stored token exists
+      // (i.e. the user was previously logged in).
+      // Login / register 401s are handled by their own components.
+      const raw = localStorage.getItem('userStore')
+      if (raw) {
+        try {
+          const store = JSON.parse(raw)
+          if (store.access_token) {
+            toastWarning('message.token_expired')
+          }
+        } catch { /* ignore parse errors */ }
+      }
     }
     return Promise.reject(error)
   }

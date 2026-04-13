@@ -1,8 +1,9 @@
 import { ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { refDebounced } from '@vueuse/core'
-import { useMessage } from 'naive-ui'
 import type { DataTableSortState } from 'naive-ui'
+
+import { toastWarning, toastError } from '@/utils/toast'
 
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
@@ -42,7 +43,6 @@ const matchesSearch = (chart: ChartInfo, query: string): boolean => {
 
 export function useChartFilters() {
   const { t } = useI18n()
-  const message = useMessage()
   const appStore = useAppStore()
   const userStore = useUserStore()
 
@@ -215,7 +215,7 @@ export function useChartFilters() {
 
     if (!appStore.b50ChartIds) {
       if (!userStore.logged_in && !USE_MOCK) {
-        message.warning(t('message.login_required_b50'))
+        toastWarning('message.login_required_b50')
         return
       }
 
@@ -229,7 +229,7 @@ export function useChartFilters() {
           appStore.b50ChartIds = res.data.records.map((r) => r.chart.id)
         }
       } catch {
-        message.error(t('message.get_record_failed'))
+        toastError('message.get_record_failed')
         b50Loading.value = false
         return
       }

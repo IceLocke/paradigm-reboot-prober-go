@@ -8,12 +8,11 @@
 
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { useMessage } from 'naive-ui'
 import { useUserStore } from '@/stores/user'
+import { toastSuccess } from '@/utils/toast'
 import ConfirmModal from '@/components/ui/ConfirmModal.vue'
 
 const { t } = useI18n()
-const message = useMessage()
 const userStore = useUserStore()
 
 const show = defineModel<boolean>('show', { required: true })
@@ -23,7 +22,7 @@ const emit = defineEmits<{
 
 const onLogout = () => {
   userStore.$reset()
-  message.success(t('message.logout_success'))
+  toastSuccess('message.logout_success')
   emit('success')
 }
 </script>
