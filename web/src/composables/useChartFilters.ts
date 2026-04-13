@@ -228,8 +228,8 @@ export function useChartFilters() {
           const res = await getRecords(userStore.username, 'b50')
           appStore.b50ChartIds = res.data.records.map((r) => r.chart.id)
         }
-      } catch {
-        toastError('message.get_record_failed')
+      } catch (err: unknown) {
+        toastError('message.get_record_failed', err)
         b50Loading.value = false
         return
       }

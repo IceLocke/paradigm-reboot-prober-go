@@ -386,7 +386,7 @@ const loadRecords = async () => {
       records.value = mock.records
       total.value = mock.total
     } else {
-      if (!userStore.logged_in) return
+      if (!userStore.logged_in) return false
       const { columnKey, order } = sortState.value ?? {}
       const hasActiveSort = (order === 'ascend' || order === 'descend') && columnKey != null
       const sortBy = hasActiveSort ? String(columnKey) : 'rating'
@@ -396,16 +396,18 @@ const loadRecords = async () => {
       records.value = res.data.records
       total.value = res.data.total
     }
+    return true
   } catch (err: unknown) {
     toastError('message.get_record_failed', err)
+    return false
   } finally {
     loading.value = false
   }
 }
 
 const refreshRecords = async () => {
-  await loadRecords()
-  toastSuccess('message.refresh_record_success')
+  const ok = await loadRecords()
+  if (ok) toastSuccess('message.refresh_record_success')
 }
 
 const onExportCsv = async () => {
@@ -421,8 +423,8 @@ const onExportCsv = async () => {
     const blob = new Blob([csvStr], { type: 'text/csv;charset=utf-8' })
     saveAs(blob, `${userStore.username}_records.csv`)
     toastSuccess('message.csv_export_success')
-  } catch {
-    toastError('message.csv_export_failed')
+  } catch (err: unknown) {
+    toastError('message.csv_export_failed', err)
   }
 }
 

@@ -335,22 +335,24 @@ const loadData = async () => {
     const mock = getMockB50()
     allRecords.value = mock.records
     nickname.value = mock.nickname
-    return
+    return true
   }
 
-  if (!userStore.logged_in) return
+  if (!userStore.logged_in) return false
   try {
     const res = await getRecords(userStore.username, 'b50')
     allRecords.value = res.data.records
     nickname.value = res.data.nickname
+    return true
   } catch (err: unknown) {
     toastError('message.get_record_failed', err)
+    return false
   }
 }
 
 const refreshData = async () => {
-  await loadData()
-  toastSuccess('message.refresh_record_success')
+  const ok = await loadData()
+  if (ok) toastSuccess('message.refresh_record_success')
 }
 
 const exportImage = async () => {
@@ -368,8 +370,8 @@ const exportImage = async () => {
     })
     saveAs(blob, `b50_${Date.now()}.jpg`)
     toastSuccess('message.export_image_success')
-  } catch {
-    toastError('message.export_image_failed')
+  } catch (err: unknown) {
+    toastError('message.export_image_failed', err)
   } finally {
     exporting.value = false
   }

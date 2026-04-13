@@ -2,8 +2,19 @@ import { message } from './discrete'
 import i18n from '@/i18n'
 
 // ---------------------------------------------------------------------------
-// Error extraction
+// Error detection & extraction
 // ---------------------------------------------------------------------------
+
+/**
+ * Check whether an error represents a network failure (server unreachable,
+ * DNS failure, timeout, CORS block, etc.).
+ * In Axios these errors have a `request` but no `response`.
+ */
+export function isNetworkError(error: unknown): boolean {
+  const e = error as { response?: unknown; request?: unknown; code?: string }
+  // Has a request that was sent, but no response came back
+  return !!e?.request && !e?.response
+}
 
 /** Extract the `error` string from an AxiosError-shaped object. */
 export function extractApiError(error: unknown): string {
@@ -14,10 +25,14 @@ export function extractApiError(error: unknown): string {
 /**
  * Build a human-readable error string:
  *   "<i18n base text>: <API error detail>"
+ * If the error is a network failure, returns the service-offline message instead.
  * If no detail exists, returns just the base text.
  */
 export function formatApiError(key: string, error?: unknown): string {
   const { t } = i18n.global
+  if (error && isNetworkError(error)) {
+    return t('message.service_offline')
+  }
   const base = t(key)
   const detail = error ? extractApiError(error) : ''
   return detail ? `${base}: ${detail}` : base
@@ -40,6 +55,8 @@ export function toastSuccess(key = 'message.request_success', params?: Record<st
 
 /**
  * Show an **error** toast, with optional API error detail appended.
+ * If the error is a network failure (server unreachable), a dedicated
+ * "service offline" message is shown instead of the component-specific key.
  *
  * @param key   - i18n key (defaults to generic `message.request_failed`)
  * @param error - the caught error; API error detail is extracted automatically

@@ -146,6 +146,7 @@ const en = {
     csv_records_preview: 'Found {total} with scores, {count} to upload after filtering',
     request_success: 'Operation successful',
     request_failed: 'Operation failed',
+    service_offline: 'API service is offline, please try again later',
   },
   announce: {
     new_version: 'Ver. {version} New Songs',

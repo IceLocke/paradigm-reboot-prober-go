@@ -149,8 +149,8 @@ const onSave = async () => {
       userStore.profile.qq_account = form.qq_account
     }
     toastSuccess('message.update_profile_success')
-  } catch {
-    toastError('message.update_profile_failed')
+  } catch (err: unknown) {
+    toastError('message.update_profile_failed', err)
   } finally {
     loading.value = false
   }
@@ -183,8 +183,8 @@ const refreshToken = async () => {
       }
     }
     toastSuccess('message.refresh_upload_token_success')
-  } catch {
-    toastError('message.refresh_upload_token_failed')
+  } catch (err: unknown) {
+    toastError('message.refresh_upload_token_failed', err)
   }
 }
 
@@ -200,9 +200,9 @@ const updateAnonymousProbe = async () => {
       userStore.profile.anonymous_probe = allowAnonymousProbe
     }
     toastSuccess('message.update_profile_success')
-  } catch {
+  } catch (err: unknown) {
     anonymousProbe.value = !allowAnonymousProbe
-    toastError('message.update_profile_failed')
+    toastError('message.update_profile_failed', err)
   }
 }
 </script>
