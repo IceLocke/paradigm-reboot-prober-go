@@ -144,6 +144,7 @@ const ja = {
     csv_records_preview: '{total} 件にスコアあり、フィルター後 {count} 件アップロード予定',
     request_success: '操作が完了しました',
     request_failed: '操作に失敗しました',
+    service_offline: 'API サービスがオフラインです。後でもう一度お試しください',
   },
   announce: {
     new_version: 'Ver. {version} 新曲追加',

@@ -146,6 +146,7 @@ const zh = {
     csv_records_preview: '发现 {total} 条成绩，过滤后共 {count} 条待上传',
     request_success: '操作成功',
     request_failed: '操作失败',
+    service_offline: 'API 服务不在线，请稍后再试',
   },
   announce: {
     new_version: '{version} 版本新曲更新',
