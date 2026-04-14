@@ -4,25 +4,47 @@ import (
 	"errors"
 	"paradigm-reboot-prober-go/internal/model"
 
+	gocache "github.com/patrickmn/go-cache"
 	"gorm.io/gorm"
 )
 
 type UserRepository struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache *gocache.Cache
 }
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+	return &UserRepository{
+		db:    db,
+		cache: gocache.New(UserCacheTTL, UserCacheCleanup),
+	}
 }
 
 // GetUserByUsername retrieves a user by their username
 func (r *UserRepository) GetUserByUsername(username string) (*model.User, error) {
+	key := userCacheKey(username)
+	if r.cache != nil {
+		if cached, found := r.cache.Get(key); found {
+			// Return a shallow copy to prevent callers from mutating cached data
+			original := cached.(*model.User)
+			cp := *original
+			return &cp, nil
+		}
+	}
+
 	var user model.User
 	if err := r.db.Where("username = ?", username).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	if r.cache != nil {
+		r.cache.Set(key, &user, gocache.DefaultExpiration)
+		// Return a copy so the caller cannot mutate the cached object
+		cp := user
+		return &cp, nil
 	}
 	return &user, nil
 }
@@ -57,13 +79,19 @@ func (r *UserRepository) UpdateUser(user *model.User) (*model.User, error) {
 	if err := r.db.Save(user).Error; err != nil {
 		return nil, err
 	}
+	// Invalidate cache for this user after successful DB write
+	if r.cache != nil {
+		r.cache.Delete(userCacheKey(user.Username))
+	}
 	return user, nil
 }
 
 // WithTransaction executes fn within a database transaction, passing a transactional
 // copy of UserRepository. If fn returns an error the transaction is rolled back.
+// The transactional repo shares the same cache so writes inside the TX trigger
+// invalidation on the shared cache.
 func (r *UserRepository) WithTransaction(fn func(txRepo *UserRepository) error) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		return fn(&UserRepository{db: tx})
+		return fn(&UserRepository{db: tx, cache: r.cache})
 	})
 }

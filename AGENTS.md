@@ -27,6 +27,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | Authentication | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt                   |
 | API Docs       | Swagger via `swaggo/swag` + `swaggo/gin-swagger`              |
 | Testing        | `testing` stdlib + `stretchr/testify`                         |
+| Caching        | `patrickmn/go-cache` (in-process, per-repository)              |
 | Linting        | golangci-lint v2.6                                            |
 | CI/CD          | GitHub Actions                                                |
 | Container      | Docker (multi-stage Alpine build)                             |
@@ -73,7 +74,8 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │       ├── user.go          # CreateUserRequest, UpdateUserRequest, ChangePasswordRequest, ResetPasswordRequest
 │   │       ├── song.go          # CreateSongRequest, UpdateSongRequest
 │   │       └── play_record.go   # BatchCreatePlayRecordRequest
-│   ├── repository/              # Database access layer (GORM queries)
+│   ├── repository/              # Database access layer (GORM queries) + in-process cache
+│   │   ├── cache.go             # Cache helpers: prefix invalidation, filter key, TTL constants
 │   │   ├── user_repo.go
 │   │   ├── song_repo.go
 │   │   └── record_repo.go       # Includes rating calculation on record creation
@@ -138,9 +140,42 @@ Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit
 - **Auth** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`). Injects `username` into slog context on successful authentication.
 - **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services. Injects business-specific fields (e.g. `target_user`, `scope`, `song_id`) into context via `logging.AppendCtx` before calling services.
 - **Service** (`internal/service/`): Business logic. All public methods accept `context.Context` as their first parameter. Uses `slog.InfoContext`/`WarnContext`/`ErrorContext` for automatic inclusion of upstream context fields (request ID, HTTP metadata, username, business fields). Orchestrates repository calls.
-- **Repository** (`internal/repository/`): Direct database operations via GORM. Rating calculation happens here when creating records.
+- **Repository** (`internal/repository/`): Direct database operations via GORM. Rating calculation happens here when creating records. Each repository embeds an in-process `go-cache` instance for cache-aside (read-through, invalidate-on-write).
 - **Model** (`internal/model/`): GORM entities (with table name overrides) and DTOs. Request-specific DTOs live in `internal/model/request/`.
 - **Pkg** (`pkg/`): Reusable, domain-specific packages — `auth` (password hashing, JWT) and `rating` (score-to-rating calculation).
+
+### In-Process Caching
+
+The repository layer implements a **cache-aside** pattern using [`patrickmn/go-cache`](https://github.com/patrickmn/go-cache), an in-process key-value cache with expiration. Each repository struct owns its own `*cache.Cache` instance — no shared state between repositories, no external dependencies like Redis.
+
+**Cache configuration** (defined in `internal/repository/cache.go`):
+
+| Repository | Default TTL | Cleanup Interval | Rationale |
+|------------|-------------|-------------------|-----------|
+| `SongRepository` | 10 min | 15 min | Song data changes extremely rarely (admin-only mutations) |
+| `UserRepository` | 5 min | 10 min | User data changes on profile update, password change |
+| `RecordRepository` | 5 min | 10 min | Record data changes on score upload |
+
+**Cached operations**:
+
+| Repository | Cached Methods | Cache Key Pattern |
+|------------|---------------|------------------|
+| `UserRepository` | `GetUserByUsername` | `user:{username}` |
+| `SongRepository` | `GetAllSongs`, `GetSongByID`, `GetSongByWikiID`, `GetChartByID`, `GetChartByWikiIDAndDifficulty` | `all_songs`, `song:id:{id}`, `song:wiki:{wikiID}`, `chart:id:{id}`, `chart:wiki_diff:{wikiID}:{diff}` |
+| `RecordRepository` | `GetBest50Records`, `GetBestRecordsBySong`, `GetBestRecordByChart`, `GetAllChartsWithBestScores` | `{username}:b50:{underflow}:{filterKey}`, `{username}:best_song:{songID}`, `{username}:best_chart:{chartID}`, `{username}:all_charts:{filterKey}` |
+
+**Invalidation rules**:
+- Song writes (`CreateSong`, `UpdateSong`) → `cache.Flush()` (flush all song/chart entries).
+- User writes (`UpdateUser`) → `cache.Delete("user:" + username)` (targeted).
+- Record writes (`CreateRecord`, `BatchCreateRecords`) → `invalidateByPrefix(cache, username + ":")` (per-user prefix scan).
+- Returns shallow copies from cache to prevent callers from mutating cached data.
+- `nil` results (not found) are never cached.
+
+**Design notes**:
+- Constructor signatures are unchanged (`NewUserRepository(db)`, etc.) — cache is created internally. The service layer is completely unaware of caching.
+- `UserRepository.WithTransaction` shares the cache reference with the transactional repo so writes inside the TX trigger invalidation.
+- Paginated/sorted record queries are NOT cached (low hit rate due to parameter variation).
+- When `UpdateSong` triggers `RecalculateRatingsByChart`, the record cache is not directly invalidated (cross-repo). Stale entries expire via TTL. This is acceptable because song updates are extremely rare.
 
 ### Key Domain Concepts
 
@@ -278,7 +313,7 @@ go test -v ./pkg/rating/...
 |--------------------------|-------------------------------------------------------|
 | `pkg/auth`               | Password hashing, JWT generation/extraction/expiry     |
 | `pkg/rating`             | Rating formula with various score ranges               |
-| `internal/repository`    | CRUD for users, songs, records; best record logic      |
+| `internal/repository`    | CRUD for users, songs, records; best record logic; cache consistency (hit/miss/invalidation, cross-user isolation, shallow copy safety, TX rollback) |
 | `internal/service`       | User creation/login, song CRUD, record management      |
 | `internal/controller`    | HTTP handler integration (register, login, songs, records) |
 | `internal/middleware`     | Auth middleware (valid/invalid/expired/missing tokens)  |
