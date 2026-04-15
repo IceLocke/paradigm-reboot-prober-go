@@ -153,6 +153,120 @@ func TestUserService_ResetPassword(t *testing.T) {
 	})
 }
 
+func TestUserService_GetUserByUploadToken(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	userService := NewUserService(userRepo)
+	ctx := context.Background()
+
+	// Create a user to get an upload token
+	createdUser, err := userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "tokenuser",
+		Email:    "token@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+	assert.NotEmpty(t, createdUser.UploadToken)
+
+	t.Run("Found", func(t *testing.T) {
+		user, err := userService.GetUserByUploadToken(createdUser.UploadToken)
+		assert.NoError(t, err)
+		assert.NotNil(t, user)
+		assert.Equal(t, "tokenuser", user.Username)
+	})
+
+	t.Run("Not found", func(t *testing.T) {
+		user, err := userService.GetUserByUploadToken("nonexistent_token")
+		assert.NoError(t, err)
+		assert.Nil(t, user)
+	})
+}
+
+func TestUserService_CheckProbeAuthority(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	userService := NewUserService(userRepo)
+	ctx := context.Background()
+
+	// Create target user with anonymous probe enabled
+	targetUser, err := userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "target_user",
+		Email:    "target@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Enable anonymous probe on target user
+	anonProbe := true
+	_, err = userService.UpdateUser(ctx, "target_user", &request.UpdateUserRequest{
+		AnonymousProbe: &anonProbe,
+	})
+	assert.NoError(t, err)
+
+	// Create a private user (anonymous probe disabled)
+	_, err = userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "private_user",
+		Email:    "private@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Create a different non-admin user
+	otherUser, err := userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "other_user_a",
+		Email:    "other@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Create an admin user (manually set IsAdmin since CreateUser doesn't)
+	adminUser, err := userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "admin_user_a",
+		Email:    "admin@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+	adminUser.IsAdmin = true
+
+	t.Run("Anonymous probe enabled", func(t *testing.T) {
+		err := userService.CheckProbeAuthority(ctx, "target_user", nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Same user", func(t *testing.T) {
+		// Even if anonymous probe is disabled, the same user can access their own records
+		privateUserObj, _ := userService.GetUser("private_user")
+		err := userService.CheckProbeAuthority(ctx, "private_user", privateUserObj)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Admin user", func(t *testing.T) {
+		// Admin can access any user's records even if anonymous probe is disabled
+		err := userService.CheckProbeAuthority(ctx, "private_user", adminUser)
+		assert.NoError(t, err)
+	})
+
+	t.Run("Forbidden - different non-admin user", func(t *testing.T) {
+		err := userService.CheckProbeAuthority(ctx, "private_user", otherUser)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrForbidden)
+		assert.Contains(t, err.Error(), "authentication info not matched")
+	})
+
+	t.Run("Forbidden - no current user", func(t *testing.T) {
+		err := userService.CheckProbeAuthority(ctx, "private_user", nil)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrForbidden)
+		assert.Contains(t, err.Error(), "anonymous probes are not allowed")
+	})
+
+	t.Run("Target user not found", func(t *testing.T) {
+		err := userService.CheckProbeAuthority(ctx, "nonexistent", targetUser)
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrNotFound)
+	})
+}
+
 func TestUserService_UpdateUser(t *testing.T) {
 	db := setupTestDB(t)
 	userRepo := repository.NewUserRepository(db)
