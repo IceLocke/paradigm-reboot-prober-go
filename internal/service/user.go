@@ -23,25 +23,79 @@ func NewUserService(userRepo *repository.UserRepository) *UserService {
 	return &UserService{userRepo: userRepo}
 }
 
-func (s *UserService) Login(ctx context.Context, username, plainPassword string) (string, error) {
+func (s *UserService) Login(ctx context.Context, username, plainPassword string) (string, string, error) {
 	username = strings.ToLower(username)
 
 	user, err := s.userRepo.GetUserByUsername(username)
 	if err != nil || user == nil {
-		return "", errors.New("incorrect username or password")
+		return "", "", errors.New("incorrect username or password")
 	}
 
 	if !user.IsActive {
-		return "", errors.New("inactivated user")
+		return "", "", errors.New("inactivated user")
 	}
 
 	if !auth.VerifyPassword(plainPassword, user.EncodedPassword) {
 		slog.WarnContext(ctx, "login failed", "username", username, "reason", "incorrect password")
-		return "", errors.New("incorrect username or password")
+		return "", "", errors.New("incorrect username or password")
 	}
 
 	duration := config.JWTExpirationDuration
-	return auth.GenerateAccessJWT(username, &duration)
+	accessToken, err := auth.GenerateAccessJWT(username, &duration)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshDuration := config.RefreshTokenExpirationDuration
+	refreshToken, err := auth.GenerateRefreshJWT(username, &refreshDuration)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+// RefreshToken validates a refresh token and returns a new access/refresh token pair.
+func (s *UserService) RefreshToken(ctx context.Context, refreshTokenString string) (string, string, error) {
+	// Validate the refresh token
+	tokenType, err := auth.ExtractTokenType(refreshTokenString)
+	if err != nil {
+		slog.WarnContext(ctx, "refresh token validation failed", "error", err)
+		return "", "", errors.New("invalid or expired refresh token")
+	}
+	if tokenType != "refresh" {
+		return "", "", errors.New("invalid token type")
+	}
+
+	username, err := auth.ExtractUsername(refreshTokenString)
+	if err != nil {
+		return "", "", errors.New("invalid or expired refresh token")
+	}
+
+	// Verify user still exists and is active
+	user, err := s.userRepo.GetUserByUsername(username)
+	if err != nil || user == nil {
+		return "", "", errors.New("user not found")
+	}
+	if !user.IsActive {
+		return "", "", errors.New("user account is deactivated")
+	}
+
+	// Generate new token pair (token rotation)
+	duration := config.JWTExpirationDuration
+	newAccessToken, err := auth.GenerateAccessJWT(username, &duration)
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshDuration := config.RefreshTokenExpirationDuration
+	newRefreshToken, err := auth.GenerateRefreshJWT(username, &refreshDuration)
+	if err != nil {
+		return "", "", err
+	}
+
+	slog.InfoContext(ctx, "token refreshed", "username", username)
+	return newAccessToken, newRefreshToken, nil
 }
 
 func (s *UserService) GetUser(username string) (*model.User, error) {

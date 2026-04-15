@@ -111,6 +111,7 @@ const ja = {
     get_charts_failed: '定数表の読み込みに失敗しました',
     get_song_failed: '楽曲情報の取得に失敗しました',
     token_expired: 'セッションが切れました。再度ログインしてください',
+    session_refresh_failed: 'セッション更新に失敗しました。再度ログインしてください',
     refresh_record_success: '記録を更新しました',
     get_record_failed: '記録の読み込みに失敗しました',
     post_record_success: 'リザルトをアップロードしました',

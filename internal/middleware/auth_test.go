@@ -126,6 +126,15 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 			expectedStatus: http.StatusOK,
 			expectUsername: false,
 		},
+		{
+			name: "Refresh Token - Rejected",
+			setupAuth: func() string {
+				token, _ := auth.GenerateRefreshJWT("testuser", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusOK,
+			expectUsername: false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -293,6 +302,15 @@ func TestAuthMiddleware(t *testing.T) {
 			},
 			expectedStatus: http.StatusUnauthorized,
 			expectedBody:   `{"error":"user account is deactivated"}`,
+		},
+		{
+			name: "Refresh Token - Rejected",
+			setupAuth: func() string {
+				token, _ := auth.GenerateRefreshJWT("testuser", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Invalid token type"}`,
 		},
 	}
 

@@ -315,6 +315,8 @@ definitions:
     properties:
       access_token:
         type: string
+      refresh_token:
+        type: string
       token_type:
         example: Bearer
         type: string
@@ -488,6 +490,13 @@ definitions:
     - email
     - password
     - username
+    type: object
+  request.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
     type: object
   request.ResetPasswordRequest:
     properties:
@@ -903,7 +912,7 @@ paths:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: Authenticate user and return JWT token
+      description: Authenticate user and return access and refresh JWT tokens
       parameters:
       - description: Username
         in: formData
@@ -1024,6 +1033,32 @@ paths:
       security:
       - BearerAuth: []
       summary: Refresh upload token
+      tags:
+      - user
+  /user/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchange a valid refresh token for a new access/refresh token pair
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.Token'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Refresh access token
       tags:
       - user
   /user/register:

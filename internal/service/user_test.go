@@ -6,6 +6,7 @@ import (
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/pkg/auth"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -43,15 +44,26 @@ func TestUserService(t *testing.T) {
 	})
 
 	t.Run("LoginSuccess", func(t *testing.T) {
-		token, err := userService.Login(ctx, "testuser", "password123")
+		accessToken, refreshToken, err := userService.Login(ctx, "testuser", "password123")
 		assert.NoError(t, err)
-		assert.NotEmpty(t, token)
+		assert.NotEmpty(t, accessToken)
+		assert.NotEmpty(t, refreshToken)
+
+		// Verify token types
+		accessType, err := auth.ExtractTokenType(accessToken)
+		assert.NoError(t, err)
+		assert.Equal(t, "access", accessType)
+
+		refreshType, err := auth.ExtractTokenType(refreshToken)
+		assert.NoError(t, err)
+		assert.Equal(t, "refresh", refreshType)
 	})
 
 	t.Run("LoginFailure", func(t *testing.T) {
-		token, err := userService.Login(ctx, "testuser", "wrongpassword")
+		accessToken, refreshToken, err := userService.Login(ctx, "testuser", "wrongpassword")
 		assert.Error(t, err)
-		assert.Empty(t, token)
+		assert.Empty(t, accessToken)
+		assert.Empty(t, refreshToken)
 		assert.Equal(t, "incorrect username or password", err.Error())
 	})
 
@@ -89,12 +101,13 @@ func TestUserService_ChangePassword(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify login with new password works
-		token, err := userService.Login(ctx, "chgpwd_user", "newpassword")
+		accessToken, refreshToken, err := userService.Login(ctx, "chgpwd_user", "newpassword")
 		assert.NoError(t, err)
-		assert.NotEmpty(t, token)
+		assert.NotEmpty(t, accessToken)
+		assert.NotEmpty(t, refreshToken)
 
 		// Verify login with old password fails
-		_, err = userService.Login(ctx, "chgpwd_user", "oldpassword")
+		_, _, err = userService.Login(ctx, "chgpwd_user", "oldpassword")
 		assert.Error(t, err)
 	})
 
@@ -138,9 +151,10 @@ func TestUserService_ResetPassword(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify login with new password
-		token, err := userService.Login(ctx, "rstpwd_user", "resetpwd123")
+		accessToken, refreshToken, err := userService.Login(ctx, "rstpwd_user", "resetpwd123")
 		assert.NoError(t, err)
-		assert.NotEmpty(t, token)
+		assert.NotEmpty(t, accessToken)
+		assert.NotEmpty(t, refreshToken)
 	})
 
 	t.Run("User not found", func(t *testing.T) {
@@ -264,6 +278,67 @@ func TestUserService_CheckProbeAuthority(t *testing.T) {
 		err := userService.CheckProbeAuthority(ctx, "nonexistent", targetUser)
 		assert.Error(t, err)
 		assert.ErrorIs(t, err, ErrNotFound)
+	})
+}
+
+func TestUserService_RefreshToken(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	userService := NewUserService(userRepo)
+	ctx := context.Background()
+
+	_, err := userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "refresh_user",
+		Email:    "refresh@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	// Login to get a refresh token
+	_, refreshToken, err := userService.Login(ctx, "refresh_user", "password123")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, refreshToken)
+
+	t.Run("Success", func(t *testing.T) {
+		newAccess, newRefresh, err := userService.RefreshToken(ctx, refreshToken)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, newAccess)
+		assert.NotEmpty(t, newRefresh)
+
+		// Verify new tokens have correct types
+		accessType, _ := auth.ExtractTokenType(newAccess)
+		assert.Equal(t, "access", accessType)
+		refreshType, _ := auth.ExtractTokenType(newRefresh)
+		assert.Equal(t, "refresh", refreshType)
+	})
+
+	t.Run("Invalid token", func(t *testing.T) {
+		_, _, err := userService.RefreshToken(ctx, "invalid.token.string")
+		assert.Error(t, err)
+		assert.Equal(t, "invalid or expired refresh token", err.Error())
+	})
+
+	t.Run("Access token rejected", func(t *testing.T) {
+		accessToken, _, _ := userService.Login(ctx, "refresh_user", "password123")
+		_, _, err := userService.RefreshToken(ctx, accessToken)
+		assert.Error(t, err)
+		assert.Equal(t, "invalid token type", err.Error())
+	})
+
+	t.Run("User not found", func(t *testing.T) {
+		// Generate a refresh token for a non-existent user
+		fakeToken, _ := auth.GenerateRefreshJWT("nonexistent", nil)
+		_, _, err := userService.RefreshToken(ctx, fakeToken)
+		assert.Error(t, err)
+		assert.Equal(t, "user not found", err.Error())
+	})
+
+	t.Run("Expired refresh token", func(t *testing.T) {
+		expiredDuration := -time.Minute
+		expiredToken, _ := auth.GenerateRefreshJWT("refresh_user", &expiredDuration)
+		_, _, err := userService.RefreshToken(ctx, expiredToken)
+		assert.Error(t, err)
+		assert.Equal(t, "invalid or expired refresh token", err.Error())
 	})
 }
 

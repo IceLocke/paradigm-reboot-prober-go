@@ -52,7 +52,7 @@ func (ctrl *UserController) Register(c *gin.Context) {
 
 // Login godoc
 // @Summary Login user
-// @Description Authenticate user and return JWT token
+// @Description Authenticate user and return access and refresh JWT tokens
 // @Tags user
 // @Accept x-www-form-urlencoded
 // @Produce json
@@ -72,15 +72,47 @@ func (ctrl *UserController) Login(c *gin.Context) {
 	}
 
 	ctx := logging.AppendCtx(c.Request.Context(), slog.String("login_user", username))
-	token, err := ctrl.userService.Login(ctx, username, password)
+	accessToken, refreshToken, err := ctrl.userService.Login(ctx, username, password)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Token{
-		AccessToken: token,
-		TokenType:   "Bearer",
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+	})
+}
+
+// RefreshToken godoc
+// @Summary Refresh access token
+// @Description Exchange a valid refresh token for a new access/refresh token pair
+// @Tags user
+// @Accept json
+// @Produce json
+// @Param request body request.RefreshTokenRequest true "Refresh token"
+// @Success 200 {object} model.Token
+// @Failure 401 {object} model.Response
+// @Router /user/refresh [post]
+func (ctrl *UserController) RefreshToken(c *gin.Context) {
+	var req request.RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{Error: err.Error()})
+		return
+	}
+
+	ctx := c.Request.Context()
+	accessToken, refreshToken, err := ctrl.userService.RefreshToken(ctx, req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, model.Response{Error: err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Token{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
 	})
 }
 

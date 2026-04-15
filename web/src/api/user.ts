@@ -14,6 +14,10 @@ export const login = (username: string, password: string) => {
   })
 }
 
+export const refreshToken = (refresh_token: string) => {
+  return client.post<Token>('/user/refresh', { refresh_token })
+}
+
 export const register = (data: CreateUserRequest) => {
   return client.post<User>('/user/register', data)
 }

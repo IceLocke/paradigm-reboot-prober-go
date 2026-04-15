@@ -32,7 +32,7 @@ export type Difficulty = Schemas['model.Difficulty']
 
 // ─── Generic API Response ─────────────────────────────────────────
 export type Response = Schemas['model.Response']
-export type Token = DeepRequired<Schemas['model.Token']>
+export type Token = DeepRequired<Schemas['model.Token']> & { refresh_token: string }
 export type UploadToken = DeepRequired<Schemas['model.UploadToken']>
 // ─── Domain Models (response — always complete) ───────────────────
 export type User = DeepRequired<Schemas['model.User']>

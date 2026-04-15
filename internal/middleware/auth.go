@@ -31,6 +31,20 @@ func AuthMiddleware(userService *service.UserService) gin.HandlerFunc {
 		}
 
 		tokenString := parts[1]
+
+		// Reject refresh tokens — only access tokens (or legacy tokens without type) are allowed
+		tokenType, err := auth.ExtractTokenType(tokenString)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, model.Response{Error: "Invalid or expired token"})
+			c.Abort()
+			return
+		}
+		if tokenType == "refresh" {
+			c.JSON(http.StatusUnauthorized, model.Response{Error: "Invalid token type"})
+			c.Abort()
+			return
+		}
+
 		username, err := auth.ExtractUsername(tokenString)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, model.Response{Error: "Invalid or expired token"})
@@ -77,6 +91,14 @@ func OptionalAuthMiddleware(userService *service.UserService) gin.HandlerFunc {
 		}
 
 		tokenString := parts[1]
+
+		// Skip refresh tokens — only access tokens (or legacy tokens without type) are allowed
+		tokenType, typeErr := auth.ExtractTokenType(tokenString)
+		if typeErr != nil || tokenType == "refresh" {
+			c.Next()
+			return
+		}
+
 		username, err := auth.ExtractUsername(tokenString)
 		if err == nil {
 			user, err := userService.GetUser(username)

@@ -52,9 +52,26 @@ func GenerateJWT(claims jwt.MapClaims, expiresDelta *time.Duration) (string, err
 // GenerateAccessJWT generates an access token for the given username.
 func GenerateAccessJWT(username string, expiresDelta *time.Duration) (string, error) {
 	claims := jwt.MapClaims{
-		"sub": username,
+		"sub":  username,
+		"type": "access",
 	}
 	return GenerateJWT(claims, expiresDelta)
+}
+
+// GenerateRefreshJWT generates a refresh token for the given username.
+func GenerateRefreshJWT(username string, expiresDelta *time.Duration) (string, error) {
+	var expire *time.Duration
+	if expiresDelta != nil {
+		expire = expiresDelta
+	} else {
+		d := config.RefreshTokenExpirationDuration
+		expire = &d
+	}
+	claims := jwt.MapClaims{
+		"sub":  username,
+		"type": "refresh",
+	}
+	return GenerateJWT(claims, expire)
 }
 
 // ExtractPayloads parses the token and returns the claims.
@@ -74,6 +91,21 @@ func ExtractPayloads(tokenString string) (jwt.MapClaims, error) {
 	}
 
 	return nil, errors.New("invalid token")
+}
+
+// ExtractTokenType extracts the token type claim from the JWT token.
+// Returns "" for legacy tokens without a type claim.
+func ExtractTokenType(tokenString string) (string, error) {
+	claims, err := ExtractPayloads(tokenString)
+	if err != nil {
+		return "", err
+	}
+
+	if tokenType, ok := claims["type"].(string); ok {
+		return tokenType, nil
+	}
+
+	return "", nil
 }
 
 // ExtractUsername extracts the username from the JWT token.

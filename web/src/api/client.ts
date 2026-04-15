@@ -59,35 +59,134 @@ client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
-// Response interceptor: handle global errors (401 token expiry)
-//
-// Some endpoints use 401 to mean "wrong credentials" rather than
-// "token expired".  We skip the global toast for those so the
-// component-level error handling can show the correct message.
-const AUTH_401_PATHS = ['/user/login', '/user/me/password']
+// ─── Token refresh logic ───────────────────────────────────────────
+// Prevents multiple concurrent refresh calls: when a 401 triggers a
+// refresh, subsequent 401s queue behind the same promise.
 
+let isRefreshing = false
+let refreshSubscribers: Array<(token: string) => void> = []
+
+function subscribeTokenRefresh(cb: (token: string) => void) {
+  refreshSubscribers.push(cb)
+}
+
+function onTokenRefreshed(token: string) {
+  refreshSubscribers.forEach((cb) => cb(token))
+  refreshSubscribers = []
+}
+
+// Endpoints where 401 means "wrong credentials", not "token expired"
+const AUTH_401_SKIP_PATHS = ['/user/login', '/user/me/password', '/user/refresh']
+
+// Response interceptor: handle 401 with automatic token refresh
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      const reqUrl: string = error.config?.url ?? ''
-      const isCredentialCheck = AUTH_401_PATHS.some((p) => reqUrl.endsWith(p))
+  async (error) => {
+    const originalRequest = error.config
+    if (!error.response || error.response.status !== 401) {
+      return Promise.reject(error)
+    }
 
-      if (!isCredentialCheck) {
+    const reqUrl: string = originalRequest?.url ?? ''
+    const isCredentialCheck = AUTH_401_SKIP_PATHS.some((p) => reqUrl.endsWith(p))
+
+    // For credential-check endpoints, just reject without refresh attempt
+    if (isCredentialCheck) {
+      return Promise.reject(error)
+    }
+
+    // Check if we have a refresh token
+    let storedRefreshToken = ''
+    try {
+      const raw = localStorage.getItem('userStore')
+      if (raw) {
+        const store = JSON.parse(raw)
+        storedRefreshToken = store.refresh_token || ''
+      }
+    } catch { /* ignore */ }
+
+    if (!storedRefreshToken) {
+      // No refresh token — show expiry toast and clear session
+      showExpiredToastAndClear()
+      return Promise.reject(error)
+    }
+
+    // If already refreshing, queue this request
+    if (isRefreshing) {
+      return new Promise((resolve) => {
+        subscribeTokenRefresh((newAccessToken: string) => {
+          originalRequest.headers.Authorization = newAccessToken
+          resolve(client(originalRequest))
+        })
+      })
+    }
+
+    isRefreshing = true
+
+    try {
+      // Call refresh endpoint directly with axios to avoid interceptor loops
+      const res = await axios.post(`${API_BASE}/user/refresh`, {
+        refresh_token: storedRefreshToken,
+      }, {
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const newAccessToken = `Bearer ${res.data.access_token}`
+      const newRefreshToken = res.data.refresh_token
+
+      // Update localStorage
+      try {
         const raw = localStorage.getItem('userStore')
         if (raw) {
-          try {
-            const store = JSON.parse(raw)
-            if (store.access_token) {
-              toastWarning('message.token_expired')
-            }
-          } catch { /* ignore parse errors */ }
+          const store = JSON.parse(raw)
+          store.access_token = newAccessToken
+          store.refresh_token = newRefreshToken
+          localStorage.setItem('userStore', JSON.stringify(store))
         }
-      }
+      } catch { /* ignore */ }
+
+      isRefreshing = false
+      onTokenRefreshed(newAccessToken)
+
+      // Retry the original request with new token
+      originalRequest.headers.Authorization = newAccessToken
+      return client(originalRequest)
+    } catch {
+      // Refresh failed — clear session and notify
+      isRefreshing = false
+      refreshSubscribers = []
+      showExpiredToastAndClear()
+      return Promise.reject(error)
     }
-    return Promise.reject(error)
   }
 )
+
+function showExpiredToastAndClear() {
+  try {
+    const raw = localStorage.getItem('userStore')
+    if (raw) {
+      const store = JSON.parse(raw)
+      if (store.access_token) {
+        toastWarning('message.token_expired')
+      }
+    }
+  } catch { /* ignore */ }
+
+  // Clear auth state in localStorage
+  try {
+    const raw = localStorage.getItem('userStore')
+    if (raw) {
+      const store = JSON.parse(raw)
+      store.access_token = ''
+      store.refresh_token = ''
+      store.logged_in = false
+      store.username = ''
+      store.is_admin = false
+      store.profile = null
+      localStorage.setItem('userStore', JSON.stringify(store))
+    }
+  } catch { /* ignore */ }
+}
 
 export default client
 export { API_BASE }

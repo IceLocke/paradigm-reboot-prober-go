@@ -113,6 +113,7 @@ const zh = {
     get_charts_failed: '定数表加载失败',
     get_song_failed: '单曲信息获取失败',
     token_expired: '登录已过期，请重新登录',
+    session_refresh_failed: '会话刷新失败，请重新登录',
     refresh_record_success: '成绩刷新成功',
     get_record_failed: '成绩加载失败',
     post_record_success: '成绩上传成功',
