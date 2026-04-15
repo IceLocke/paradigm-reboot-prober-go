@@ -149,23 +149,25 @@ jobs:
             type=ref,event=tag
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/') }}
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: ${{ github.event_name == 'push' }}
+          load: ${{ github.event_name != 'push' }}
           tags: ${{ steps.meta.outputs.tags || 'prp-local:ci' }}
           labels: ${{ steps.meta.outputs.labels || '' }}
 
       - name: Start Services with Docker Compose (Integration Test)
-        if: github.event_name == 'push'
         run: |
-          # Use the newly built image for integration test
-          export APP_IMAGE=ghcr.io/${{ env.REPO_LOWER }}:sha-${GITHUB_SHA::7}
+          if [ "${{ github.event_name }}" == "push" ]; then
+            export APP_IMAGE=ghcr.io/${{ env.REPO_LOWER }}:sha-${GITHUB_SHA::7}
+          else
+            export APP_IMAGE=prp-local:ci
+          fi
           docker compose up -d
 
       - name: Wait for Services to be Ready
-        if: github.event_name == 'push'
         run: |
           for i in {1..30}; do
             if curl -s http://localhost:8080/healthz; then
@@ -181,7 +183,6 @@ jobs:
           exit 1
 
       - name: Check Health Status
-        if: github.event_name == 'push'
         run: |
           STATUS=$(curl -s http://localhost:8080/healthz | jq -r '.status')
           if [ "$STATUS" != "up" ]; then
@@ -191,5 +192,5 @@ jobs:
           fi
 
       - name: Stop Services
-        if: always() && github.event_name == 'push'
+        if: always()
         run: docker compose down -v
