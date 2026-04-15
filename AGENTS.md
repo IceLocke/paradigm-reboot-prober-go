@@ -27,7 +27,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | Authentication | JWT (HS256) via `golang-jwt/jwt/v5`, bcrypt                   |
 | API Docs       | Swagger via `swaggo/swag` + `swaggo/gin-swagger`              |
 | Testing        | `testing` stdlib + `stretchr/testify`                         |
-| Caching        | `patrickmn/go-cache` (in-process, per-repository)              |
+| Caching        | `jellydator/ttlcache/v3` (in-process, per-repository)          |
 | Linting        | golangci-lint v2.6                                            |
 | CI/CD          | GitHub Actions                                                |
 | Container      | Docker (multi-stage Alpine build)                             |
@@ -146,7 +146,7 @@ Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit
 
 ### In-Process Caching
 
-The repository layer implements a **cache-aside** pattern using [`patrickmn/go-cache`](https://github.com/patrickmn/go-cache), an in-process key-value cache with expiration. Each repository struct owns its own `*cache.Cache` instance — no shared state between repositories, no external dependencies like Redis.
+The repository layer implements a **cache-aside** pattern using [`jellydator/ttlcache/v3`](https://github.com/jellydator/ttlcache), a generic in-process key-value cache with TTL-based expiration and automatic cleanup. Each repository struct owns its own `*ttlcache.Cache[string, any]` instance — no shared state between repositories, no external dependencies like Redis.
 
 **Cache configuration** (defined in `internal/repository/cache.go`):
 

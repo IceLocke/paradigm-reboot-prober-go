@@ -7,33 +7,47 @@ import (
 	"strings"
 	"time"
 
-	gocache "github.com/patrickmn/go-cache"
+	"github.com/jellydator/ttlcache/v3"
 )
 
-// Default cache TTLs and cleanup intervals for each repository domain.
+// Default cache TTLs for each repository domain.
 const (
-	SongCacheTTL       = 10 * time.Minute
-	SongCacheCleanup   = 15 * time.Minute
-	UserCacheTTL       = 5 * time.Minute
-	UserCacheCleanup   = 10 * time.Minute
-	RecordCacheTTL     = 5 * time.Minute
-	RecordCacheCleanup = 10 * time.Minute
+	SongCacheTTL   = 10 * time.Minute
+	UserCacheTTL   = 5 * time.Minute
+	RecordCacheTTL = 5 * time.Minute
 )
+
+// repoCache is a type alias for the concrete cache type used across all repositories.
+type repoCache = ttlcache.Cache[string, any]
+
+// newRepoCache creates a new cache instance with the given default TTL
+// and starts the automatic expired-item cleanup goroutine.
+func newRepoCache(defaultTTL time.Duration) *repoCache {
+	c := ttlcache.New[string, any](
+		ttlcache.WithTTL[string, any](defaultTTL),
+	)
+	go c.Start() // non-blocking; runs until Stop() is called
+	return c
+}
 
 // b50CacheEntry wraps the two-slice return value of GetBest50Records
-// so it can be stored as a single interface{} in go-cache.
+// so it can be stored as a single value in the cache.
 type b50CacheEntry struct {
 	B35 []model.PlayRecord
 	B15 []model.PlayRecord
 }
 
-// invalidateByPrefix iterates all cache items and deletes those whose key
-// starts with the given prefix. Used for per-user record cache invalidation.
-func invalidateByPrefix(c *gocache.Cache, prefix string) {
-	for key := range c.Items() {
-		if strings.HasPrefix(key, prefix) {
-			c.Delete(key)
+// invalidateByPrefix collects all keys that start with prefix and deletes them.
+func invalidateByPrefix(c *repoCache, prefix string) {
+	var keys []string
+	c.Range(func(item *ttlcache.Item[string, any]) bool {
+		if strings.HasPrefix(item.Key(), prefix) {
+			keys = append(keys, item.Key())
 		}
+		return true
+	})
+	for _, k := range keys {
+		c.Delete(k)
 	}
 }
 
@@ -45,10 +59,14 @@ func invalidateByPrefix(c *gocache.Cache, prefix string) {
 func userCacheKey(username string) string { return "user:" + username }
 
 // Song / chart keys
-func allSongsCacheKey() string              { return "all_songs" }
-func songIDCacheKey(songID int) string      { return fmt.Sprintf("song:id:%d", songID) }
+func allSongsCacheKey() string { return "all_songs" }
+func songIDCacheKey(songID int) string {
+	return fmt.Sprintf("song:id:%d", songID)
+}
 func songWikiCacheKey(wikiID string) string { return "song:wiki:" + wikiID }
-func chartIDCacheKey(chartID int) string    { return fmt.Sprintf("chart:id:%d", chartID) }
+func chartIDCacheKey(chartID int) string {
+	return fmt.Sprintf("chart:id:%d", chartID)
+}
 func chartWikiDiffCacheKey(wikiID string, diff model.Difficulty) string {
 	return fmt.Sprintf("chart:wiki_diff:%s:%s", wikiID, diff)
 }

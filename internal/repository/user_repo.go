@@ -4,19 +4,19 @@ import (
 	"errors"
 	"paradigm-reboot-prober-go/internal/model"
 
-	gocache "github.com/patrickmn/go-cache"
+	"github.com/jellydator/ttlcache/v3"
 	"gorm.io/gorm"
 )
 
 type UserRepository struct {
 	db    *gorm.DB
-	cache *gocache.Cache
+	cache *repoCache
 }
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
 		db:    db,
-		cache: gocache.New(UserCacheTTL, UserCacheCleanup),
+		cache: newRepoCache(UserCacheTTL),
 	}
 }
 
@@ -24,9 +24,9 @@ func NewUserRepository(db *gorm.DB) *UserRepository {
 func (r *UserRepository) GetUserByUsername(username string) (*model.User, error) {
 	key := userCacheKey(username)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
+		if item := r.cache.Get(key); item != nil {
 			// Return a shallow copy to prevent callers from mutating cached data
-			original := cached.(*model.User)
+			original := item.Value().(*model.User)
 			cp := *original
 			return &cp, nil
 		}
@@ -41,7 +41,7 @@ func (r *UserRepository) GetUserByUsername(username string) (*model.User, error)
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &user, gocache.DefaultExpiration)
+		r.cache.Set(key, &user, ttlcache.DefaultTTL)
 		// Return a copy so the caller cannot mutate the cached object
 		cp := user
 		return &cp, nil

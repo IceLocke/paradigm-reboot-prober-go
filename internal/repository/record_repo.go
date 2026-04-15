@@ -8,7 +8,7 @@ import (
 	"paradigm-reboot-prober-go/pkg/rating"
 	"time"
 
-	gocache "github.com/patrickmn/go-cache"
+	"github.com/jellydator/ttlcache/v3"
 	"gorm.io/gorm"
 )
 
@@ -29,13 +29,13 @@ func validateSortBy(sortBy string) string {
 
 type RecordRepository struct {
 	db    *gorm.DB
-	cache *gocache.Cache
+	cache *repoCache
 }
 
 func NewRecordRepository(db *gorm.DB) *RecordRepository {
 	return &RecordRepository{
 		db:    db,
-		cache: gocache.New(RecordCacheTTL, RecordCacheCleanup),
+		cache: newRepoCache(RecordCacheTTL),
 	}
 }
 
@@ -159,8 +159,8 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 func (r *RecordRepository) GetBest50Records(username string, underflow int, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
 	key := b50CacheKey(username, underflow, filter)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			entry := cached.(*b50CacheEntry)
+		if item := r.cache.Get(key); item != nil {
+			entry := item.Value().(*b50CacheEntry)
 			b35 := make([]model.PlayRecord, len(entry.B35))
 			copy(b35, entry.B35)
 			b15 := make([]model.PlayRecord, len(entry.B15))
@@ -199,7 +199,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int, filt
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &b50CacheEntry{B35: b35, B15: b15}, gocache.DefaultExpiration)
+		r.cache.Set(key, &b50CacheEntry{B35: b35, B15: b15}, ttlcache.DefaultTTL)
 	}
 	return b35, b15, nil
 }
@@ -254,8 +254,8 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter model.RecordFilter) ([]model.ChartWithScore, error) {
 	key := allChartsCacheKey(username, filter)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.([]model.ChartWithScore)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().([]model.ChartWithScore)
 			cp := make([]model.ChartWithScore, len(original))
 			copy(cp, original)
 			return cp, nil
@@ -288,7 +288,7 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter mo
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, results, gocache.DefaultExpiration)
+		r.cache.Set(key, results, ttlcache.DefaultTTL)
 	}
 	return results, nil
 }
@@ -317,8 +317,8 @@ func (r *RecordRepository) CountAllRecords(username string, filter model.RecordF
 func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]model.PlayRecord, error) {
 	key := bestSongCacheKey(username, songID)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.([]model.PlayRecord)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().([]model.PlayRecord)
 			cp := make([]model.PlayRecord, len(original))
 			copy(cp, original)
 			return cp, nil
@@ -338,7 +338,7 @@ func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, records, gocache.DefaultExpiration)
+		r.cache.Set(key, records, ttlcache.DefaultTTL)
 	}
 	return records, err
 }
@@ -377,8 +377,8 @@ func (r *RecordRepository) CountAllRecordsBySong(username string, songID int) (i
 func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*model.PlayRecord, error) {
 	key := bestChartCacheKey(username, chartID)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.(*model.PlayRecord)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().(*model.PlayRecord)
 			cp := *original
 			return &cp, nil
 		}
@@ -399,7 +399,7 @@ func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &record, gocache.DefaultExpiration)
+		r.cache.Set(key, &record, ttlcache.DefaultTTL)
 		cp := record
 		return &cp, nil
 	}

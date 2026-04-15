@@ -32,8 +32,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		assert.Len(t, songs, 1)
 
 		// Verify entry is in cache
-		_, found := repo.cache.Get(allSongsCacheKey())
-		assert.True(t, found, "all_songs should be cached after first read")
+		assert.True(t, repo.cache.Has(allSongsCacheKey()), "all_songs should be cached after first read")
 
 		// Second read → cache hit → same data
 		songs2, err := repo.GetAllSongs()
@@ -50,8 +49,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify cache was flushed
-		_, found = repo.cache.Get(allSongsCacheKey())
-		assert.False(t, found, "all_songs cache should be flushed after CreateSong")
+		assert.False(t, repo.cache.Has(allSongsCacheKey()), "all_songs cache should be flushed after CreateSong")
 
 		// Re-read → should return 2 songs from DB
 		songs3, err := repo.GetAllSongs()
@@ -74,8 +72,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		got, err := repo.GetSongByID(created.ID)
 		assert.NoError(t, err)
 		assert.Equal(t, "Original", got.Title)
-		_, found := repo.cache.Get(songIDCacheKey(1))
-		assert.True(t, found)
+		assert.True(t, repo.cache.Has(songIDCacheKey(1)))
 
 		// Update song title
 		updatedSong := &model.Song{
@@ -86,8 +83,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Cache should be flushed
-		_, found = repo.cache.Get(songIDCacheKey(1))
-		assert.False(t, found, "song cache should be flushed after UpdateSong")
+		assert.False(t, repo.cache.Has(songIDCacheKey(1)), "song cache should be flushed after UpdateSong")
 
 		// Re-read → should return updated data
 		got2, err := repo.GetSongByID(created.ID)
@@ -110,8 +106,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		got, err := repo.GetSongByWikiID("mywiki")
 		assert.NoError(t, err)
 		assert.NotNil(t, got)
-		_, found := repo.cache.Get(songWikiCacheKey("mywiki"))
-		assert.True(t, found)
+		assert.True(t, repo.cache.Has(songWikiCacheKey("mywiki")))
 
 		// Create another song → cache flushed
 		song2 := &model.Song{
@@ -121,8 +116,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		_, err = repo.CreateSong(song2)
 		assert.NoError(t, err)
 
-		_, found = repo.cache.Get(songWikiCacheKey("mywiki"))
-		assert.False(t, found, "wiki cache should be flushed after CreateSong")
+		assert.False(t, repo.cache.Has(songWikiCacheKey("mywiki")), "wiki cache should be flushed after CreateSong")
 	})
 
 	t.Run("GetChartByID cached and flushed on UpdateSong", func(t *testing.T) {
@@ -175,8 +169,7 @@ func TestSongCacheConsistency(t *testing.T) {
 		assert.NotNil(t, chart)
 
 		key := chartWikiDiffCacheKey("wd", model.DifficultyMassive)
-		_, found := repo.cache.Get(key)
-		assert.True(t, found, "chart wiki_diff lookup should be cached")
+		assert.True(t, repo.cache.Has(key), "chart wiki_diff lookup should be cached")
 
 		// Read again → cache hit
 		chart2, err := repo.GetChartByWikiIDAndDifficulty("wd", model.DifficultyMassive)
@@ -205,8 +198,7 @@ func TestUserCacheConsistency(t *testing.T) {
 		got, err := repo.GetUserByUsername("cacheuser")
 		assert.NoError(t, err)
 		assert.Equal(t, "OldNick", got.Nickname)
-		_, found := repo.cache.Get(userCacheKey("cacheuser"))
-		assert.True(t, found, "user should be cached after GetUserByUsername")
+		assert.True(t, repo.cache.Has(userCacheKey("cacheuser")), "user should be cached after GetUserByUsername")
 
 		// Read again → cache hit
 		got2, err := repo.GetUserByUsername("cacheuser")
@@ -219,8 +211,7 @@ func TestUserCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Cache should be invalidated
-		_, found = repo.cache.Get(userCacheKey("cacheuser"))
-		assert.False(t, found, "user cache should be invalidated after UpdateUser")
+		assert.False(t, repo.cache.Has(userCacheKey("cacheuser")), "user cache should be invalidated after UpdateUser")
 
 		// Re-read → fresh from DB
 		got3, err := repo.GetUserByUsername("cacheuser")
@@ -242,8 +233,7 @@ func TestUserCacheConsistency(t *testing.T) {
 
 		_, err = repo.GetUserByUsername("useronexx")
 		assert.NoError(t, err)
-		_, found := repo.cache.Get(userCacheKey("useronexx"))
-		assert.True(t, found)
+		assert.True(t, repo.cache.Has(userCacheKey("useronexx")))
 
 		// Create user2 → user1's cache entry should still exist
 		user2 := &model.User{
@@ -253,8 +243,7 @@ func TestUserCacheConsistency(t *testing.T) {
 		_, err = repo.CreateUser(user2)
 		assert.NoError(t, err)
 
-		_, found = repo.cache.Get(userCacheKey("useronexx"))
-		assert.True(t, found, "user1 cache should not be affected by user2 creation")
+		assert.True(t, repo.cache.Has(userCacheKey("useronexx")), "user1 cache should not be affected by user2 creation")
 	})
 
 	t.Run("WithTransaction shares cache for invalidation", func(t *testing.T) {
@@ -271,8 +260,7 @@ func TestUserCacheConsistency(t *testing.T) {
 		// Cache the user
 		_, err = repo.GetUserByUsername("txuserxx")
 		assert.NoError(t, err)
-		_, found := repo.cache.Get(userCacheKey("txuserxx"))
-		assert.True(t, found)
+		assert.True(t, repo.cache.Has(userCacheKey("txuserxx")))
 
 		// Update within transaction
 		err = repo.WithTransaction(func(txRepo *UserRepository) error {
@@ -287,8 +275,7 @@ func TestUserCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Cache should be invalidated by the TX
-		_, found = repo.cache.Get(userCacheKey("txuserxx"))
-		assert.False(t, found, "cache should be invalidated after TX commit with UpdateUser")
+		assert.False(t, repo.cache.Has(userCacheKey("txuserxx")), "cache should be invalidated after TX commit with UpdateUser")
 
 		// Read fresh data
 		got, err := repo.GetUserByUsername("txuserxx")
@@ -409,8 +396,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.Len(t, b15, 0)
 
 		key := b50CacheKey("recuser1", 0, model.RecordFilter{})
-		_, found := recordRepo.cache.Get(key)
-		assert.True(t, found, "B50 should be cached")
+		assert.True(t, recordRepo.cache.Has(key), "B50 should be cached")
 
 		// Upload another record → cache invalidated
 		score2 := 1000000
@@ -420,8 +406,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		}, false)
 		assert.NoError(t, err)
 
-		_, found = recordRepo.cache.Get(key)
-		assert.False(t, found, "B50 cache should be invalidated after CreateRecord")
+		assert.False(t, recordRepo.cache.Has(key), "B50 cache should be invalidated after CreateRecord")
 
 		// Re-query → should have 2 records
 		b35v2, _, err := recordRepo.GetBest50Records("recuser1", 0, model.RecordFilter{})
@@ -447,9 +432,8 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NotNil(t, best)
 		assert.Equal(t, 900000, *best.Score)
 
-		key := bestChartCacheKey("recuser1", 1)
-		_, found := recordRepo.cache.Get(key)
-		assert.True(t, found)
+		key := bestChartCacheKey("recuser1", chartID)
+		assert.True(t, recordRepo.cache.Has(key))
 
 		// Upload higher score
 		score2 := 980000
@@ -459,8 +443,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		}, false)
 		assert.NoError(t, err)
 
-		_, found = recordRepo.cache.Get(key)
-		assert.False(t, found, "best_chart cache should be invalidated after new record")
+		assert.False(t, recordRepo.cache.Has(key), "best_chart cache should be invalidated after new record")
 
 		// Re-query → should have higher score
 		best2, err := recordRepo.GetBestRecordByChart("recuser1", chartID)
@@ -541,10 +524,8 @@ func TestRecordCacheConsistency(t *testing.T) {
 
 		keyA := b50CacheKey("xusraaaa", 0, model.RecordFilter{})
 		keyB := b50CacheKey("xusrbbbb", 0, model.RecordFilter{})
-		_, foundA := recordRepo.cache.Get(keyA)
-		_, foundB := recordRepo.cache.Get(keyB)
-		assert.True(t, foundA)
-		assert.True(t, foundB)
+		assert.True(t, recordRepo.cache.Has(keyA))
+		assert.True(t, recordRepo.cache.Has(keyB))
 
 		// Upload a new record for user A only
 		scoreNew := 1000000
@@ -555,10 +536,8 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// User A's cache invalidated, user B's intact
-		_, foundA = recordRepo.cache.Get(keyA)
-		_, foundB = recordRepo.cache.Get(keyB)
-		assert.False(t, foundA, "user A's B50 cache should be invalidated")
-		assert.True(t, foundB, "user B's B50 cache should remain intact")
+		assert.False(t, recordRepo.cache.Has(keyA), "user A's B50 cache should be invalidated")
+		assert.True(t, recordRepo.cache.Has(keyB), "user B's B50 cache should remain intact")
 	})
 
 	t.Run("BatchCreateRecords invalidates all affected users", func(t *testing.T) {
@@ -607,12 +586,12 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// batchusr1 cache invalidated
-		_, found := recordRepo.cache.Get(b50CacheKey("batchusr1", 0, model.RecordFilter{}))
-		assert.False(t, found, "batchusr1 B50 cache should be invalidated after batch create")
+		assert.False(t, recordRepo.cache.Has(b50CacheKey("batchusr1", 0, model.RecordFilter{})),
+			"batchusr1 B50 cache should be invalidated after batch create")
 
 		// batchusr2 cache intact
-		_, found = recordRepo.cache.Get(b50CacheKey("batchusr2", 0, model.RecordFilter{}))
-		assert.True(t, found, "batchusr2 B50 cache should remain intact")
+		assert.True(t, recordRepo.cache.Has(b50CacheKey("batchusr2", 0, model.RecordFilter{})),
+			"batchusr2 B50 cache should remain intact")
 	})
 
 	t.Run("AllChartsWithBestScores cached and invalidated", func(t *testing.T) {
@@ -633,8 +612,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NotEmpty(t, results)
 
 		key := allChartsCacheKey("recuser1", model.RecordFilter{})
-		_, found := recordRepo.cache.Get(key)
-		assert.True(t, found, "all_charts should be cached")
+		assert.True(t, recordRepo.cache.Has(key), "all_charts should be cached")
 
 		// Upload new record → cache invalidated
 		score2 := 1000000
@@ -644,8 +622,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		}, false)
 		assert.NoError(t, err)
 
-		_, found = recordRepo.cache.Get(key)
-		assert.False(t, found, "all_charts cache should be invalidated after CreateRecord")
+		assert.False(t, recordRepo.cache.Has(key), "all_charts cache should be invalidated after CreateRecord")
 	})
 }
 
@@ -663,8 +640,7 @@ func TestCacheMissAndHit(t *testing.T) {
 		assert.Nil(t, got)
 
 		// nil results should NOT be stored in cache
-		_, found := repo.cache.Get(userCacheKey("ghost"))
-		assert.False(t, found, "nil result should not be cached")
+		assert.False(t, repo.cache.Has(userCacheKey("ghost")), "nil result should not be cached")
 	})
 
 	t.Run("Nil result for non-existent song is not cached", func(t *testing.T) {
@@ -675,8 +651,7 @@ func TestCacheMissAndHit(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, got)
 
-		_, found := repo.cache.Get(songIDCacheKey(9999))
-		assert.False(t, found, "nil song result should not be cached")
+		assert.False(t, repo.cache.Has(songIDCacheKey(9999)), "nil song result should not be cached")
 	})
 
 	t.Run("Nil result for non-existent chart is not cached", func(t *testing.T) {
@@ -687,8 +662,7 @@ func TestCacheMissAndHit(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, got)
 
-		_, found := repo.cache.Get(chartIDCacheKey(9999))
-		assert.False(t, found, "nil chart result should not be cached")
+		assert.False(t, repo.cache.Has(chartIDCacheKey(9999)), "nil chart result should not be cached")
 	})
 
 	t.Run("Nil result for non-existent chart by wiki_diff is not cached", func(t *testing.T) {
@@ -699,8 +673,8 @@ func TestCacheMissAndHit(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, got)
 
-		_, found := repo.cache.Get(chartWikiDiffCacheKey("nope", model.DifficultyMassive))
-		assert.False(t, found, "nil chart wiki_diff result should not be cached")
+		assert.False(t, repo.cache.Has(chartWikiDiffCacheKey("nope", model.DifficultyMassive)),
+			"nil chart wiki_diff result should not be cached")
 	})
 
 	t.Run("Nil result for non-existent best record by chart is not cached", func(t *testing.T) {
@@ -711,8 +685,8 @@ func TestCacheMissAndHit(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, got)
 
-		_, found := repo.cache.Get(bestChartCacheKey("nobody", 9999))
-		assert.False(t, found, "nil best record should not be cached")
+		assert.False(t, repo.cache.Has(bestChartCacheKey("nobody", 9999)),
+			"nil best record should not be cached")
 	})
 }
 

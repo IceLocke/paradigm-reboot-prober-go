@@ -4,19 +4,19 @@ import (
 	"errors"
 	"paradigm-reboot-prober-go/internal/model"
 
-	gocache "github.com/patrickmn/go-cache"
+	"github.com/jellydator/ttlcache/v3"
 	"gorm.io/gorm"
 )
 
 type SongRepository struct {
 	db    *gorm.DB
-	cache *gocache.Cache
+	cache *repoCache
 }
 
 func NewSongRepository(db *gorm.DB) *SongRepository {
 	return &SongRepository{
 		db:    db,
-		cache: gocache.New(SongCacheTTL, SongCacheCleanup),
+		cache: newRepoCache(SongCacheTTL),
 	}
 }
 
@@ -24,8 +24,8 @@ func NewSongRepository(db *gorm.DB) *SongRepository {
 func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 	key := allSongsCacheKey()
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.([]model.Song)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().([]model.Song)
 			cp := make([]model.Song, len(original))
 			copy(cp, original)
 			return cp, nil
@@ -38,7 +38,7 @@ func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, songs, gocache.DefaultExpiration)
+		r.cache.Set(key, songs, ttlcache.DefaultTTL)
 	}
 	return songs, nil
 }
@@ -47,8 +47,8 @@ func (r *SongRepository) GetAllSongs() ([]model.Song, error) {
 func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 	key := songIDCacheKey(songID)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.(*model.Song)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().(*model.Song)
 			cp := *original
 			return &cp, nil
 		}
@@ -63,7 +63,7 @@ func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &song, gocache.DefaultExpiration)
+		r.cache.Set(key, &song, ttlcache.DefaultTTL)
 		cp := song
 		return &cp, nil
 	}
@@ -74,8 +74,8 @@ func (r *SongRepository) GetSongByID(songID int) (*model.Song, error) {
 func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 	key := songWikiCacheKey(wikiID)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.(*model.Song)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().(*model.Song)
 			cp := *original
 			return &cp, nil
 		}
@@ -90,7 +90,7 @@ func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &song, gocache.DefaultExpiration)
+		r.cache.Set(key, &song, ttlcache.DefaultTTL)
 		cp := song
 		return &cp, nil
 	}
@@ -101,8 +101,8 @@ func (r *SongRepository) GetSongByWikiID(wikiID string) (*model.Song, error) {
 func (r *SongRepository) GetChartByID(chartID int) (*model.Chart, error) {
 	key := chartIDCacheKey(chartID)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.(*model.Chart)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().(*model.Chart)
 			cp := *original
 			return &cp, nil
 		}
@@ -117,7 +117,7 @@ func (r *SongRepository) GetChartByID(chartID int) (*model.Chart, error) {
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &chart, gocache.DefaultExpiration)
+		r.cache.Set(key, &chart, ttlcache.DefaultTTL)
 		cp := chart
 		return &cp, nil
 	}
@@ -128,8 +128,8 @@ func (r *SongRepository) GetChartByID(chartID int) (*model.Chart, error) {
 func (r *SongRepository) GetChartByWikiIDAndDifficulty(wikiID string, difficulty model.Difficulty) (*model.Chart, error) {
 	key := chartWikiDiffCacheKey(wikiID, difficulty)
 	if r.cache != nil {
-		if cached, found := r.cache.Get(key); found {
-			original := cached.(*model.Chart)
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().(*model.Chart)
 			cp := *original
 			return &cp, nil
 		}
@@ -147,7 +147,7 @@ func (r *SongRepository) GetChartByWikiIDAndDifficulty(wikiID string, difficulty
 	}
 
 	if r.cache != nil {
-		r.cache.Set(key, &chart, gocache.DefaultExpiration)
+		r.cache.Set(key, &chart, ttlcache.DefaultTTL)
 		cp := chart
 		return &cp, nil
 	}
@@ -162,7 +162,7 @@ func (r *SongRepository) CreateSong(song *model.Song) (*model.Song, error) {
 	}
 	// Flush all song/chart caches — song creation affects GetAllSongs
 	if r.cache != nil {
-		r.cache.Flush()
+		r.cache.DeleteAll()
 	}
 	return song, nil
 }
@@ -250,7 +250,7 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 
 	// Flush all song/chart caches after successful TX
 	if err == nil && r.cache != nil {
-		r.cache.Flush()
+		r.cache.DeleteAll()
 	}
 
 	return result, err
