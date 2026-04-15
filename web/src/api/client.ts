@@ -2,6 +2,7 @@ import type {AxiosInstance, InternalAxiosRequestConfig} from 'axios'
 import axios from 'axios'
 import pako from 'pako'
 import { toastWarning } from '@/utils/toast'
+import type { Token, RefreshTokenRequest } from './types'
 
 const API_BASE = import.meta.env.VITE_API_ENDPOINT || '/api/v2'
 
@@ -125,9 +126,9 @@ client.interceptors.response.use(
 
     try {
       // Call refresh endpoint directly with axios to avoid interceptor loops
-      const res = await axios.post(`${API_BASE}/user/refresh`, {
+      const res = await axios.post<Token>(`${API_BASE}/user/refresh`, {
         refresh_token: storedRefreshToken,
-      }, {
+      } satisfies RefreshTokenRequest, {
         headers: { 'Content-Type': 'application/json' },
       })
 
