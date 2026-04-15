@@ -76,3 +76,132 @@ func TestRecordService(t *testing.T) {
 		assert.Equal(t, int64(1), allCount)
 	})
 }
+
+func TestRecordService_PerSongAndChartMethods(t *testing.T) {
+	db := setupTestDB(t)
+	recordRepo := repository.NewRecordRepository(db)
+	songRepo := repository.NewSongRepository(db)
+	recordService := NewRecordService(recordRepo, songRepo)
+	ctx := context.Background()
+
+	// Setup Song with 2 Charts
+	song := &model.Song{
+		SongBase: model.SongBase{WikiID: "persong_1", Title: "PerSong Test Song"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 15.0},
+			{Difficulty: model.DifficultyInvaded, Level: 12.0},
+		},
+	}
+	createdSong, err := songRepo.CreateSong(song)
+	assert.NoError(t, err)
+	chart1ID := createdSong.Charts[0].ID // massive
+	chart2ID := createdSong.Charts[1].ID // invaded
+	songID := createdSong.ID
+
+	// Seed records for chart1 (massive): 3 records with different scores
+	_, err = recordService.CreateRecords(ctx, "testuser", []model.PlayRecordBase{
+		{ChartID: chart1ID, Score: intPtr(900000)},
+		{ChartID: chart1ID, Score: intPtr(950000)},
+		{ChartID: chart1ID, Score: intPtr(1000000)},
+	}, false)
+	assert.NoError(t, err)
+
+	// Seed records for chart2 (invaded): 2 records with different scores
+	_, err = recordService.CreateRecords(ctx, "testuser", []model.PlayRecordBase{
+		{ChartID: chart2ID, Score: intPtr(800000)},
+		{ChartID: chart2ID, Score: intPtr(850000)},
+	}, false)
+	assert.NoError(t, err)
+
+	t.Run("GetBestRecordsBySong", func(t *testing.T) {
+		records, err := recordService.GetBestRecordsBySong(ctx, "testuser", songID)
+		assert.NoError(t, err)
+		assert.Len(t, records, 2)
+		// Records are ordered by rating desc; check that each chart has its best score
+		scores := map[int]int{}
+		for _, r := range records {
+			scores[r.ChartID] = *r.Score
+		}
+		assert.Equal(t, 1000000, scores[chart1ID])
+		assert.Equal(t, 850000, scores[chart2ID])
+	})
+
+	t.Run("GetAllRecordsBySong", func(t *testing.T) {
+		records, err := recordService.GetAllRecordsBySong(ctx, "testuser", songID, 10, 0, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records, 5)
+		// First record should have the highest score
+		assert.Equal(t, 1000000, *records[0].Score)
+	})
+
+	t.Run("GetAllRecordsBySong_Pagination", func(t *testing.T) {
+		records, err := recordService.GetAllRecordsBySong(ctx, "testuser", songID, 2, 0, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records, 2)
+
+		records2, err := recordService.GetAllRecordsBySong(ctx, "testuser", songID, 2, 1, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records2, 2)
+
+		// Pages should not overlap
+		assert.NotEqual(t, records[0].ID, records2[0].ID)
+	})
+
+	t.Run("CountAllRecordsBySong", func(t *testing.T) {
+		count, err := recordService.CountAllRecordsBySong(ctx, "testuser", songID)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(5), count)
+	})
+
+	t.Run("GetBestRecordByChart", func(t *testing.T) {
+		record, err := recordService.GetBestRecordByChart(ctx, "testuser", chart1ID)
+		assert.NoError(t, err)
+		assert.NotNil(t, record)
+		assert.Equal(t, 1000000, *record.Score)
+		assert.Equal(t, chart1ID, record.ChartID)
+
+		record2, err := recordService.GetBestRecordByChart(ctx, "testuser", chart2ID)
+		assert.NoError(t, err)
+		assert.NotNil(t, record2)
+		assert.Equal(t, 850000, *record2.Score)
+		assert.Equal(t, chart2ID, record2.ChartID)
+	})
+
+	t.Run("GetBestRecordByChart_NotFound", func(t *testing.T) {
+		record, err := recordService.GetBestRecordByChart(ctx, "testuser", 99999)
+		assert.NoError(t, err)
+		assert.Nil(t, record)
+	})
+
+	t.Run("GetAllRecordsByChart", func(t *testing.T) {
+		records, err := recordService.GetAllRecordsByChart(ctx, "testuser", chart1ID, 10, 0, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records, 3)
+		assert.Equal(t, 1000000, *records[0].Score)
+
+		records2, err := recordService.GetAllRecordsByChart(ctx, "testuser", chart2ID, 10, 0, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records2, 2)
+		assert.Equal(t, 850000, *records2[0].Score)
+	})
+
+	t.Run("GetAllRecordsByChart_Pagination", func(t *testing.T) {
+		records, err := recordService.GetAllRecordsByChart(ctx, "testuser", chart1ID, 2, 0, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records, 2)
+
+		records2, err := recordService.GetAllRecordsByChart(ctx, "testuser", chart1ID, 2, 1, "score", "desc")
+		assert.NoError(t, err)
+		assert.Len(t, records2, 1)
+	})
+
+	t.Run("CountAllRecordsByChart", func(t *testing.T) {
+		count, err := recordService.CountAllRecordsByChart(ctx, "testuser", chart1ID)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(3), count)
+
+		count2, err := recordService.CountAllRecordsByChart(ctx, "testuser", chart2ID)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), count2)
+	})
+}

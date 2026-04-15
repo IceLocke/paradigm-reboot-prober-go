@@ -8,6 +8,7 @@ import (
 	"paradigm-reboot-prober-go/pkg/rating"
 	"time"
 
+	"github.com/jellydator/ttlcache/v3"
 	"gorm.io/gorm"
 )
 
@@ -27,11 +28,15 @@ func validateSortBy(sortBy string) string {
 }
 
 type RecordRepository struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache *repoCache
 }
 
 func NewRecordRepository(db *gorm.DB) *RecordRepository {
-	return &RecordRepository{db: db}
+	return &RecordRepository{
+		db:    db,
+		cache: newRepoCache(RecordCacheTTL),
+	}
 }
 
 // applyRecordFilter applies optional level range and difficulty filters to a GORM query
@@ -68,6 +73,13 @@ func applyCountFilter(query *gorm.DB, filter model.RecordFilter, chartIDColumn s
 	return query
 }
 
+// invalidateUserRecords removes all cached record entries for a given username.
+func (r *RecordRepository) invalidateUserRecords(username string) {
+	if r.cache != nil {
+		invalidateByPrefix(r.cache, username+":")
+	}
+}
+
 // CreateRecord creates a new play record and updates the best record if necessary
 func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced bool) (*model.PlayRecord, error) {
 	var result *model.PlayRecord
@@ -76,6 +88,10 @@ func (r *RecordRepository) CreateRecord(record *model.PlayRecord, isReplaced boo
 		result, txErr = r.createRecordInTx(tx, record, isReplaced)
 		return txErr
 	})
+	// Invalidate all cached records for this user after successful TX
+	if err == nil {
+		r.invalidateUserRecords(record.Username)
+	}
 	return result, err
 }
 
@@ -94,6 +110,14 @@ func (r *RecordRepository) BatchCreateRecords(records []*model.PlayRecord, isRep
 	})
 	if err != nil {
 		return nil, err
+	}
+	// Invalidate cached records for all affected users
+	invalidated := make(map[string]bool)
+	for _, record := range records {
+		if !invalidated[record.Username] {
+			r.invalidateUserRecords(record.Username)
+			invalidated[record.Username] = true
+		}
 	}
 	return results, nil
 }
@@ -133,6 +157,18 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 
 // GetBest50Records retrieves the best 35 (old) and 15 (new) records for B50 calculation
 func (r *RecordRepository) GetBest50Records(username string, underflow int, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
+	key := b50CacheKey(username, underflow, filter)
+	if r.cache != nil {
+		if item := r.cache.Get(key); item != nil {
+			entry := item.Value().(*b50CacheEntry)
+			b35 := make([]model.PlayRecord, len(entry.B35))
+			copy(b35, entry.B35)
+			b15 := make([]model.PlayRecord, len(entry.B15))
+			copy(b15, entry.B15)
+			return b35, b15, nil
+		}
+	}
+
 	var b35 []model.PlayRecord
 	var b15 []model.PlayRecord
 
@@ -162,6 +198,9 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int, filt
 		return nil, nil, err
 	}
 
+	if r.cache != nil {
+		r.cache.Set(key, &b50CacheEntry{B35: b35, B15: b15}, ttlcache.DefaultTTL)
+	}
 	return b35, b15, nil
 }
 
@@ -213,6 +252,16 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 
 // GetAllChartsWithBestScores retrieves all charts with the user's best score (if any)
 func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter model.RecordFilter) ([]model.ChartWithScore, error) {
+	key := allChartsCacheKey(username, filter)
+	if r.cache != nil {
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().([]model.ChartWithScore)
+			cp := make([]model.ChartWithScore, len(original))
+			copy(cp, original)
+			return cp, nil
+		}
+	}
+
 	var results []model.ChartWithScore
 
 	query := r.db.Table("charts").
@@ -234,8 +283,14 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter mo
 	}
 
 	err := query.Scan(&results).Error
+	if err != nil {
+		return results, err
+	}
 
-	return results, err
+	if r.cache != nil {
+		r.cache.Set(key, results, ttlcache.DefaultTTL)
+	}
+	return results, nil
 }
 
 // CountBestRecords counts the number of best records for a user
@@ -260,6 +315,16 @@ func (r *RecordRepository) CountAllRecords(username string, filter model.RecordF
 
 // GetBestRecordsBySong retrieves the best record per difficulty for a specific song
 func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]model.PlayRecord, error) {
+	key := bestSongCacheKey(username, songID)
+	if r.cache != nil {
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().([]model.PlayRecord)
+			cp := make([]model.PlayRecord, len(original))
+			copy(cp, original)
+			return cp, nil
+		}
+	}
+
 	var records []model.PlayRecord
 	err := r.db.Model(&model.PlayRecord{}).
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
@@ -268,6 +333,13 @@ func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]
 		Where(`play_records.username = ? AND "Chart".song_id = ?`, username, songID).
 		Order("rating desc").
 		Find(&records).Error
+	if err != nil {
+		return records, err
+	}
+
+	if r.cache != nil {
+		r.cache.Set(key, records, ttlcache.DefaultTTL)
+	}
 	return records, err
 }
 
@@ -303,6 +375,15 @@ func (r *RecordRepository) CountAllRecordsBySong(username string, songID int) (i
 
 // GetBestRecordByChart retrieves the best record for a specific chart
 func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*model.PlayRecord, error) {
+	key := bestChartCacheKey(username, chartID)
+	if r.cache != nil {
+		if item := r.cache.Get(key); item != nil {
+			original := item.Value().(*model.PlayRecord)
+			cp := *original
+			return &cp, nil
+		}
+	}
+
 	var record model.PlayRecord
 	err := r.db.Model(&model.PlayRecord{}).
 		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
@@ -315,6 +396,12 @@ func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*
 			return nil, nil
 		}
 		return nil, err
+	}
+
+	if r.cache != nil {
+		r.cache.Set(key, &record, ttlcache.DefaultTTL)
+		cp := record
+		return &cp, nil
 	}
 	return &record, nil
 }

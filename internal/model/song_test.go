@@ -65,6 +65,32 @@ func TestWithOverride(t *testing.T) {
 	})
 }
 
+func TestDifficulty_Order(t *testing.T) {
+	t.Run("Detected", func(t *testing.T) {
+		assert.Equal(t, 1, DifficultyDetected.Order())
+	})
+
+	t.Run("Invaded", func(t *testing.T) {
+		assert.Equal(t, 2, DifficultyInvaded.Order())
+	})
+
+	t.Run("Massive", func(t *testing.T) {
+		assert.Equal(t, 3, DifficultyMassive.Order())
+	})
+
+	t.Run("Reboot", func(t *testing.T) {
+		assert.Equal(t, 4, DifficultyReboot.Order())
+	})
+
+	t.Run("Unknown difficulty", func(t *testing.T) {
+		assert.Equal(t, 0, Difficulty("unknown").Order())
+	})
+
+	t.Run("Empty string", func(t *testing.T) {
+		assert.Equal(t, 0, Difficulty("").Order())
+	})
+}
+
 func TestValidDifficulty(t *testing.T) {
 	t.Run("Valid difficulties", func(t *testing.T) {
 		assert.True(t, ValidDifficulty("detected"))

@@ -1,0 +1,13 @@
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+    patch:
+      default:
+        target: 80%
+
+ignore:
+  - "cmd/**"              # main() entry points — not unit-testable
+  - "docs/**"             # auto-generated Swagger docs

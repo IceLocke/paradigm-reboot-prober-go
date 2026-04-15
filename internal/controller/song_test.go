@@ -1,9 +1,11 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"paradigm-reboot-prober-go/internal/model"
+	"paradigm-reboot-prober-go/internal/model/request"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -50,4 +52,90 @@ func TestSongController(t *testing.T) {
 		w := performRequest(r, "GET", "/songs/999", nil, nil)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
+}
+
+func TestSongController_CreateSong(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := setupEnv(t)
+
+	r := gin.Default()
+	r.POST("/songs", env.songCtrl.CreateSong)
+
+	reqBody := request.CreateSongRequest{
+		SongBase: model.SongBase{
+			WikiID:  "test_song",
+			Title:   "Test Song",
+			Artist:  "Test Artist",
+			Genre:   "Pop",
+			Version: "1.0.0",
+		},
+		Charts: []model.ChartInput{
+			{
+				Difficulty: model.DifficultyMassive,
+				Level:      13.5,
+				Notes:      1000,
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	w := performRequest(r, "POST", "/songs", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
+
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var charts []model.ChartInfo
+	err := json.Unmarshal(w.Body.Bytes(), &charts)
+	assert.NoError(t, err)
+	assert.Len(t, charts, 1)
+	assert.Equal(t, "Test Song", charts[0].Title)
+	assert.Equal(t, model.DifficultyMassive, charts[0].Difficulty)
+}
+
+func TestSongController_UpdateSong(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := setupEnv(t)
+
+	// Seed a song
+	song := model.Song{
+		SongBase: model.SongBase{
+			WikiID:  "update_test",
+			Title:   "Original Song",
+			Artist:  "Original Artist",
+			Genre:   "Rock",
+			Version: "1.0.0",
+		},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 10, Notes: 500},
+		},
+	}
+	env.db.Create(&song)
+
+	r := gin.Default()
+	r.PUT("/songs", env.songCtrl.UpdateSong)
+
+	reqBody := request.UpdateSongRequest{
+		ID: song.ID,
+		SongBase: model.SongBase{
+			WikiID:  "update_test",
+			Title:   "Updated Song",
+			Artist:  "Updated Artist",
+			Genre:   "Rock",
+			Version: "2.0.0",
+		},
+		Charts: []model.ChartInput{
+			{
+				Difficulty: model.DifficultyMassive,
+				Level:      14.0,
+				Notes:      800,
+			},
+		},
+	}
+	body, _ := json.Marshal(reqBody)
+	w := performRequest(r, "PUT", "/songs", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
+
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var charts []model.ChartInfo
+	err := json.Unmarshal(w.Body.Bytes(), &charts)
+	assert.NoError(t, err)
+	assert.Len(t, charts, 1)
+	assert.Equal(t, "Updated Song", charts[0].Title)
+	assert.Equal(t, 14.0, charts[0].Level)
 }

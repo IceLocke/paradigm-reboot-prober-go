@@ -57,8 +57,160 @@ func setupAuthTest(t *testing.T) *service.UserService {
 	db.Create(inactiveUser)
 	db.Model(inactiveUser).Update("is_active", false)
 
+	// Admin user
+	db.Create(&model.User{
+		UserBase: model.UserBase{
+			Username:    "adminuser",
+			Email:       "admin@test.com",
+			IsActive:    true,
+			IsAdmin:     true,
+			UploadToken: "tok3",
+		},
+		EncodedPassword: encoded,
+	})
+
 	userRepo := repository.NewUserRepository(db)
 	return service.NewUserService(userRepo)
+}
+
+func TestOptionalAuthMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	userService := setupAuthTest(t)
+
+	tests := []struct {
+		name           string
+		setupAuth      func() string
+		expectedStatus int
+		expectUsername bool
+	}{
+		{
+			name: "No Authorization Header",
+			setupAuth: func() string {
+				return ""
+			},
+			expectedStatus: http.StatusOK,
+			expectUsername: false,
+		},
+		{
+			name: "Invalid Token",
+			setupAuth: func() string {
+				return "Bearer invalid.token.string"
+			},
+			expectedStatus: http.StatusOK,
+			expectUsername: false,
+		},
+		{
+			name: "Valid Token - Active User",
+			setupAuth: func() string {
+				token, _ := auth.GenerateAccessJWT("testuser", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusOK,
+			expectUsername: true,
+		},
+		{
+			name: "Valid Token - Inactive User",
+			setupAuth: func() string {
+				token, _ := auth.GenerateAccessJWT("inactiveuser", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusOK,
+			expectUsername: false,
+		},
+		{
+			name: "Valid Token - Non-existent User",
+			setupAuth: func() string {
+				token, _ := auth.GenerateAccessJWT("nonexistent", nil)
+				return "Bearer " + token
+			},
+			expectedStatus: http.StatusOK,
+			expectUsername: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			r.Use(OptionalAuthMiddleware(userService))
+			r.GET("/", func(c *gin.Context) {
+				_, exists := c.Get("username")
+				assert.Equal(t, tt.expectUsername, exists)
+				c.String(http.StatusOK, "OK")
+			})
+
+			req, _ := http.NewRequest("GET", "/", nil)
+			authHeader := tt.setupAuth()
+			if authHeader != "" {
+				req.Header.Set("Authorization", authHeader)
+			}
+
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+		})
+	}
+}
+
+func TestAdminMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	userService := setupAuthTest(t)
+
+	tests := []struct {
+		name           string
+		setUsername    string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{
+			name:           "No username in context",
+			setUsername:    "",
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"Authentication required"}`,
+		},
+		{
+			name:           "Valid admin user",
+			setUsername:    "adminuser",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "Valid non-admin user",
+			setUsername:    "testuser",
+			expectedStatus: http.StatusForbidden,
+			expectedBody:   `{"error":"Admin access required"}`,
+		},
+		{
+			name:           "Non-existent user",
+			setUsername:    "nonexistent",
+			expectedStatus: http.StatusUnauthorized,
+			expectedBody:   `{"error":"User not found"}`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := gin.New()
+			if tt.setUsername != "" {
+				r.Use(func(c *gin.Context) {
+					c.Set("username", tt.setUsername)
+					c.Next()
+				})
+			}
+			r.Use(AdminMiddleware(userService))
+			r.GET("/", func(c *gin.Context) {
+				c.String(http.StatusOK, "OK")
+			})
+
+			req, _ := http.NewRequest("GET", "/", nil)
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+			if tt.expectedBody != "" {
+				assert.JSONEq(t, tt.expectedBody, w.Body.String())
+			}
+		})
+	}
 }
 
 func TestAuthMiddleware(t *testing.T) {

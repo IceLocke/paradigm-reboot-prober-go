@@ -1,6 +1,7 @@
 # Paradigm: Reboot Prober (Go)
 
 [![CI/CD Pipeline](https://github.com/IceLocke/paradigm-reboot-prober-go/actions/workflows/ci.yml/badge.svg)](https://github.com/IceLocke/paradigm-reboot-prober-go/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/IceLocke/paradigm-reboot-prober-go/branch/master/graph/badge.svg)](https://codecov.io/gh/IceLocke/paradigm-reboot-prober-go)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/IceLocke/paradigm-reboot-prober-go)](https://go.dev/)
 [![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue.svg)](https://github.com/IceLocke/paradigm-reboot-prober-go/pkgs/container/paradigm-reboot-prober-go)
 [![License](https://img.shields.io/github/license/IceLocke/paradigm-reboot-prober-go)](LICENSE)
