@@ -113,6 +113,7 @@ const en = {
     get_charts_failed: 'Failed to load charts',
     get_song_failed: 'Failed to get song info',
     token_expired: 'Session expired, please login again',
+    session_refresh_failed: 'Session refresh failed, please login again',
     refresh_record_success: 'Records refresh successful',
     get_record_failed: 'Failed to load records',
     post_record_success: 'Record uploaded',

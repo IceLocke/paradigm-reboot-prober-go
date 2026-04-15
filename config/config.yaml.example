@@ -15,7 +15,8 @@ database:
 auth:
   secret_key: "your_secret_key_here"
   jwt_algorithm: "HS256"
-  jwt_expiration: "24h"             # access token lifetime, e.g. "24h", "30m"
+  jwt_expiration: "30m"             # access token lifetime, e.g. "30m", "2h"
+  refresh_token_expiration: "168h"  # refresh token lifetime (default 7 days)
   bcrypt_cost: 10                   # bcrypt hashing cost (4-31)
   upload_token_length: 16           # bytes; hex output is 2x this value
   username_pattern: "^[a-z][a-z0-9_]{5,15}$"

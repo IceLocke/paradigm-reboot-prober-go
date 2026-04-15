@@ -49,6 +49,8 @@ func TestUserController(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &token)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, token.AccessToken)
+		assert.NotEmpty(t, token.RefreshToken)
+		assert.Equal(t, "Bearer", token.TokenType)
 	})
 
 	t.Run("GetMe", func(t *testing.T) {
@@ -186,4 +188,67 @@ func TestUserController_ResetPassword(t *testing.T) {
 	err = json.Unmarshal(w.Body.Bytes(), &resp)
 	assert.NoError(t, err)
 	assert.Equal(t, "password reset successfully", resp.Message)
+}
+
+func TestUserController_RefreshToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	env := setupEnv(t)
+
+	// Seed a user via service
+	ctx := context.Background()
+	_, err := env.userService.CreateUser(ctx, &request.CreateUserRequest{
+		Username: "refresh_user",
+		Email:    "refresh@example.com",
+		Password: "password123",
+	})
+	assert.NoError(t, err)
+
+	r := gin.Default()
+	r.POST("/user/refresh", env.userCtrl.RefreshToken)
+
+	// Login to get a refresh token
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/login", bytes.NewBufferString("username=refresh_user&password=password123"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	loginRouter := gin.Default()
+	loginRouter.POST("/login", env.userCtrl.Login)
+	loginRouter.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var loginToken model.Token
+	err = json.Unmarshal(w.Body.Bytes(), &loginToken)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, loginToken.RefreshToken)
+
+	t.Run("Success", func(t *testing.T) {
+		reqBody := request.RefreshTokenRequest{
+			RefreshToken: loginToken.RefreshToken,
+		}
+		body, _ := json.Marshal(reqBody)
+		w := performRequest(r, "POST", "/user/refresh", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		var token model.Token
+		err := json.Unmarshal(w.Body.Bytes(), &token)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, token.AccessToken)
+		assert.NotEmpty(t, token.RefreshToken)
+		assert.Equal(t, "Bearer", token.TokenType)
+	})
+
+	t.Run("Invalid refresh token", func(t *testing.T) {
+		reqBody := request.RefreshTokenRequest{
+			RefreshToken: "invalid.token.string",
+		}
+		body, _ := json.Marshal(reqBody)
+		w := performRequest(r, "POST", "/user/refresh", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
+		assert.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("Missing refresh token", func(t *testing.T) {
+		reqBody := map[string]string{}
+		body, _ := json.Marshal(reqBody)
+		w := performRequest(r, "POST", "/user/refresh", bytes.NewBuffer(body), map[string]string{"Content-Type": "application/json"})
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+	})
 }

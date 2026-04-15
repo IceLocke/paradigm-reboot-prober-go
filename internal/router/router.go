@@ -74,6 +74,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		// Public routes
 		v2.POST("/user/register", middleware.RateLimitMiddleware(RegisterEndpointRequestPerMinute, time.Minute), userCtrl.Register)
 		v2.POST("/user/login", middleware.RateLimitMiddleware(LoginEndpointRequestPerMinute, time.Minute), userCtrl.Login)
+		v2.POST("/user/refresh", userCtrl.RefreshToken)
 		v2.GET("/songs", songCtrl.GetAllCharts)
 		v2.GET("/songs/:song_id", songCtrl.GetSingleSongInfo)
 

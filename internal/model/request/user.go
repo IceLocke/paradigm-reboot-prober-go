@@ -29,3 +29,8 @@ type ResetPasswordRequest struct {
 	Username    string `json:"username" binding:"required" example:"targetuser"`
 	NewPassword string `json:"new_password" binding:"required,min=6" example:"newpass456"`
 }
+
+// RefreshTokenRequest represents the request to refresh an access token
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}

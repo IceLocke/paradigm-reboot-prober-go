@@ -52,7 +52,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   └── config.yaml.example      # Example configuration (safe to commit)
 ├── internal/
 │   ├── controller/              # HTTP handlers (Gin handlers with Swagger annotations)
-│   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword
+│   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword, RefreshToken
 │   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
 │   │   └── record.go            # GetPlayRecords, GetSongRecords, GetChartRecords, UploadRecords
 │   ├── logging/                 # Structured logging infrastructure (slog + context)
@@ -68,10 +68,10 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
 │   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, AllChartsResponse, ToPlayRecordInfo()
-│   │   ├── auth.go              # Token, UploadToken
+│   │   ├── auth.go              # Token, UploadToken (access_token + refresh_token)
 │   │   ├── common.go            # Response (generic error/message response)
 │   │   └── request/             # Request DTOs
-│   │       ├── user.go          # CreateUserRequest, UpdateUserRequest, ChangePasswordRequest, ResetPasswordRequest
+│   │       ├── user.go          # CreateUserRequest, UpdateUserRequest, ChangePasswordRequest, ResetPasswordRequest, RefreshTokenRequest
 │   │       ├── song.go          # CreateSongRequest, UpdateSongRequest
 │   │       └── play_record.go   # BatchCreatePlayRecordRequest
 │   ├── repository/              # Database access layer (GORM queries) + in-process cache
@@ -137,12 +137,12 @@ Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit
 - **CORS**: Configured via `gin-contrib/cors` — allows all origins, standard methods and headers.
 - **Gzip** (`internal/middleware/`): `GzipRequestMiddleware` transparently decompresses `Content-Encoding: gzip` request bodies; `GzipResponseMiddleware` (via `gin-contrib/gzip`) compresses responses when the client sends `Accept-Encoding: gzip`.
 - **RateLimit** (`internal/middleware/ratelimit.go`): Per-IP token bucket rate limiter applied to login and registration endpoints.
-- **Auth** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`). Injects `username` into slog context on successful authentication.
+- **Auth** (`internal/middleware/`): JWT auth extraction (`AuthMiddleware`, `OptionalAuthMiddleware`), admin role check (`AdminMiddleware(userService)`). Both `AuthMiddleware` and `OptionalAuthMiddleware` reject refresh tokens (only access tokens or legacy tokens without a type claim are accepted). Injects `username` into slog context on successful authentication.
 - **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services. Injects business-specific fields (e.g. `target_user`, `scope`, `song_id`) into context via `logging.AppendCtx` before calling services.
 - **Service** (`internal/service/`): Business logic. All public methods accept `context.Context` as their first parameter. Uses `slog.InfoContext`/`WarnContext`/`ErrorContext` for automatic inclusion of upstream context fields (request ID, HTTP metadata, username, business fields). Orchestrates repository calls.
 - **Repository** (`internal/repository/`): Direct database operations via GORM. Rating calculation happens here when creating records. Each repository embeds an in-process `go-cache` instance for cache-aside (read-through, invalidate-on-write).
 - **Model** (`internal/model/`): GORM entities (with table name overrides) and DTOs. Request-specific DTOs live in `internal/model/request/`.
-- **Pkg** (`pkg/`): Reusable, domain-specific packages — `auth` (password hashing, JWT) and `rating` (score-to-rating calculation).
+- **Pkg** (`pkg/`): Reusable, domain-specific packages — `auth` (password hashing, JWT generation for access/refresh tokens, token type extraction) and `rating` (score-to-rating calculation).
 
 ### In-Process Caching
 
@@ -183,6 +183,9 @@ The repository layer implements a **cache-aside** pattern using [`jellydator/ttl
 - **Chart**: A specific difficulty chart (谱面) of a song. Difficulties: `detected`, `invaded`, `massive`, `reboot`. Each chart has a level, optional fitting_level, optional level_design, and notes count. Charts may also carry `SongBaseOverride` fields (`override_title`, `override_artist`, `override_version`, `override_cover`) to override the parent song's metadata — useful when a chart was added in a later version (e.g. Reboot difficulty). `SongBase.WithOverride()` applies non-nil overrides when building API responses.
 - **PlayRecord**: A single play attempt with a score, linked to a Chart and User.
 - **BestPlayRecord**: Points to the best PlayRecord per user per Chart (unique constraint on username+chart_id). Updated automatically when a higher score is submitted.
+- **Token** (`model.Token`): Contains `access_token`, `refresh_token`, and `token_type`.
+- **Access Token**: Short-lived JWT with `"type": "access"` claim, used for API authentication.
+- **Refresh Token**: Long-lived JWT with `"type": "refresh"` claim, used to obtain new token pairs via `POST /user/refresh`. Auth middleware rejects refresh tokens.
 - **Rating**: Calculated from chart level and score using a piecewise formula (see `pkg/rating/rating.go`). Stored as `int` (rating × 100).
 - **B50**: Best 50 = B35 (top 35 ratings from old songs where `b15=false`) + B15 (top 15 ratings from new songs where `b15=true`).
 
@@ -353,7 +356,8 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `database.sslmode`           | `DB_SSLMODE`   | —                                    | PostgreSQL SSL mode                      |
 | `auth.secret_key`            | `SECRET_KEY`   | `your_secret_key_here`               | JWT signing secret (**must change**)     |
 | `auth.jwt_algorithm`         | —              | `HS256`                              | JWT algorithm (hardcoded HS256)          |
-| `auth.jwt_expiration`        | —              | `24h`                                | Access token lifetime (Go duration)      |
+| `auth.jwt_expiration`        | —              | `30m`                                | Access token lifetime (Go duration)      |
+| `auth.refresh_token_expiration` | —           | `168h`                               | Refresh token lifetime (Go duration)     |
 | `auth.bcrypt_cost`           | —              | `10`                                 | bcrypt hashing cost (4–31)               |
 | `auth.upload_token_length`   | —              | `16`                                 | Upload token bytes (hex output is 2×)    |
 | `auth.username_pattern`      | —              | `^[a-z][a-z0-9_]{5,15}$`            | Regex for username validation            |
@@ -395,6 +399,7 @@ Base path: `/api/v2`
 |--------|-----------------------|--------------------------------|
 | POST   | `/user/register`      | `UserController.Register`      |
 | POST   | `/user/login`         | `UserController.Login`         |
+| POST   | `/user/refresh`       | `UserController.RefreshToken`  |
 | GET    | `/songs`              | `SongController.GetAllCharts`  |
 | GET    | `/songs/:song_id`     | `SongController.GetSingleSongInfo` |
 

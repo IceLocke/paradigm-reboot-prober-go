@@ -464,7 +464,7 @@ export interface paths {
         put?: never;
         /**
          * Login user
-         * @description Authenticate user and return JWT token
+         * @description Authenticate user and return access and refresh JWT tokens
          */
         post: {
             parameters: {
@@ -686,6 +686,59 @@ export interface paths {
                     };
                     content: {
                         "application/json": components["schemas"]["model.UploadToken"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Response"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/user/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh access token
+         * @description Exchange a valid refresh token for a new access/refresh token pair
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            /** @description Refresh token */
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["request.RefreshTokenRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["model.Token"];
                     };
                 };
                 /** @description Unauthorized */
@@ -991,6 +1044,7 @@ export interface components {
         };
         "model.Token": {
             access_token?: string;
+            refresh_token?: string;
             /** @example Bearer */
             token_type?: string;
         };
@@ -1087,6 +1141,9 @@ export interface components {
             password: string;
             /** @example user123 */
             username: string;
+        };
+        "request.RefreshTokenRequest": {
+            refresh_token: string;
         };
         "request.ResetPasswordRequest": {
             /** @example newpass456 */

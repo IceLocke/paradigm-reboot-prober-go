@@ -25,12 +25,13 @@ type Config struct {
 		SSLMode  string `yaml:"sslmode"`
 	} `yaml:"database"`
 	Auth struct {
-		SecretKey         string `yaml:"secret_key"`
-		JWTAlgorithm      string `yaml:"jwt_algorithm"`
-		JWTExpiration     string `yaml:"jwt_expiration"` // duration string, e.g. "24h", "30m"
-		BcryptCost        int    `yaml:"bcrypt_cost"`
-		UploadTokenLength int    `yaml:"upload_token_length"` // bytes (hex output is 2x)
-		UsernamePattern   string `yaml:"username_pattern"`
+		SecretKey              string `yaml:"secret_key"`
+		JWTAlgorithm           string `yaml:"jwt_algorithm"`
+		JWTExpiration          string `yaml:"jwt_expiration"`           // duration string, e.g. "24h", "30m"
+		RefreshTokenExpiration string `yaml:"refresh_token_expiration"` // duration string, e.g. "168h"
+		BcryptCost             int    `yaml:"bcrypt_cost"`
+		UploadTokenLength      int    `yaml:"upload_token_length"` // bytes (hex output is 2x)
+		UsernamePattern        string `yaml:"username_pattern"`
 	} `yaml:"auth"`
 	Pagination struct {
 		DefaultPageSize int `yaml:"default_page_size"`
@@ -46,8 +47,9 @@ var GlobalConfig Config
 
 // Parsed values derived from config strings
 var (
-	JWTExpirationDuration time.Duration
-	UsernameRegex         *regexp.Regexp
+	JWTExpirationDuration          time.Duration
+	RefreshTokenExpirationDuration time.Duration
+	UsernameRegex                  *regexp.Regexp
 )
 
 // InitDefaults sets all config fields to their default values and parses derived values.
@@ -58,7 +60,8 @@ func InitDefaults() {
 	GlobalConfig.Database.DSN = "prober.db"
 	GlobalConfig.Auth.SecretKey = "your_secret_key_here"
 	GlobalConfig.Auth.JWTAlgorithm = "HS256"
-	GlobalConfig.Auth.JWTExpiration = "24h"
+	GlobalConfig.Auth.JWTExpiration = "30m"
+	GlobalConfig.Auth.RefreshTokenExpiration = "168h"
 	GlobalConfig.Auth.BcryptCost = 10
 	GlobalConfig.Auth.UploadTokenLength = 16
 	GlobalConfig.Auth.UsernamePattern = `^[a-z][a-z0-9_]{5,15}$`
@@ -69,6 +72,7 @@ func InitDefaults() {
 
 	// Parse derived values (defaults are always valid, no error expected)
 	JWTExpirationDuration, _ = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
+	RefreshTokenExpirationDuration, _ = time.ParseDuration(GlobalConfig.Auth.RefreshTokenExpiration)
 	UsernameRegex = regexp.MustCompile(GlobalConfig.Auth.UsernamePattern)
 }
 
@@ -124,6 +128,11 @@ func LoadConfig(configPath string) {
 	JWTExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
 	if err != nil {
 		log.Fatalf("Invalid jwt_expiration value %q: %v", GlobalConfig.Auth.JWTExpiration, err)
+	}
+
+	RefreshTokenExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.RefreshTokenExpiration)
+	if err != nil {
+		log.Fatalf("Invalid refresh_token_expiration value %q: %v", GlobalConfig.Auth.RefreshTokenExpiration, err)
 	}
 
 	UsernameRegex, err = regexp.Compile(GlobalConfig.Auth.UsernamePattern)

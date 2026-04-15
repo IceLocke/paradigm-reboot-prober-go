@@ -3,6 +3,7 @@ import type {
   Token, User, UploadToken, Response,
   CreateUserRequest, UpdateUserRequest,
   ChangePasswordRequest, ResetPasswordRequest,
+  RefreshTokenRequest,
 } from './types'
 
 export const login = (username: string, password: string) => {
@@ -12,6 +13,10 @@ export const login = (username: string, password: string) => {
   return client.post<Token>('/user/login', params, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   })
+}
+
+export const refreshToken = (refresh_token: string) => {
+  return client.post<Token>('/user/refresh', { refresh_token } satisfies RefreshTokenRequest)
 }
 
 export const register = (data: CreateUserRequest) => {

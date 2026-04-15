@@ -314,6 +314,7 @@ All view components are **lazy-loaded** via `() => import(...)`.
 |----------------|----------------|---------------------------|
 | `username`     | `string`       | Current username          |
 | `access_token` | `string`       | Full JWT (`"Bearer xxx"`) |
+| `refresh_token`| `string`       | Refresh token JWT         |
 | `is_admin`     | `boolean`      | Admin flag                |
 | `logged_in`    | `boolean`      | Auth state                |
 | `profile`      | `User \| null` | Full user profile object  |
@@ -334,7 +335,8 @@ All view components are **lazy-loaded** via `() => import(...)`.
 
 - Base URL: `import.meta.env.VITE_API_ENDPOINT || '/api/v2'` (exported as `API_BASE`)
 - Request interceptor: reads `userStore` from `localStorage` and attaches `Authorization` header
-- Response interceptor: catches `401` errors and shows a token-expired toast (via `toastWarning`)
+- Request interceptor: reads `userStore` from `localStorage` and attaches `Authorization` header
+- Response interceptor: catches `401` errors and attempts automatic token refresh using the stored `refresh_token`. If refresh succeeds, the original request is retried with the new access token. If refresh fails (or no refresh token exists), the user session is cleared and a token-expired toast is shown. Concurrent 401s are queued behind a single refresh call.
 - The token format is `"Bearer <jwt>"`, stored as-is in `userStore.access_token`
 
 ### Type Definitions (`src/api/types.ts`)
@@ -352,7 +354,7 @@ Types are **auto-generated** from `docs/swagger.json` via `pnpm generate:api`, t
 
 | Module | Functions |
 |--------|-----------|
-| `user.ts` | `login`, `register`, `getMyInfo`, `updateMyInfo`, `changePassword`, `refreshUploadToken`, `resetPassword` |
+| `user.ts` | `login`, `register`, `getMyInfo`, `updateMyInfo`, `changePassword`, `refreshUploadToken`, `resetPassword`, `refreshToken` |
 | `song.ts` | `getAllCharts`, `getSingleSongInfo`, `createSong`, `updateSong` |
 | `record.ts` | `getRecords`, `uploadRecords`, `getAllChartsWithScores` |
 

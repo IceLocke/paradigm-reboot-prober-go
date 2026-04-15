@@ -77,6 +77,7 @@ const onSubmit = async () => {
         logged_in: true,
         username: form.username.toLowerCase(),
         access_token: `Bearer ${res.data.access_token}`,
+        refresh_token: res.data.refresh_token,
       })
     }
     form.username = ''
