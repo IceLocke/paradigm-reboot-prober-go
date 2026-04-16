@@ -6,6 +6,7 @@ import (
 
 // PlayRecord represents a play record entity
 type PlayRecord struct {
+	BaseModel
 	PlayRecordBase
 	ID         int       `gorm:"primaryKey" json:"id"`
 	RecordTime time.Time `gorm:"not null" json:"record_time"`
@@ -21,6 +22,7 @@ func (PlayRecord) TableName() string {
 
 // BestPlayRecord represents the best record for a specific chart
 type BestPlayRecord struct {
+	BaseModel
 	ID           int         `gorm:"primaryKey" json:"id"`
 	Username     string      `gorm:"not null;uniqueIndex:idx_best_user_chart" json:"username"`
 	ChartID      int         `gorm:"not null;uniqueIndex:idx_best_user_chart" json:"chart_id"`

@@ -19,6 +19,7 @@ type SongBase struct {
 type Song struct {
 	ID int `gorm:"primaryKey" json:"id"`
 	SongBase
+	BaseModel
 	Charts []Chart `gorm:"foreignKey:SongID;references:ID" json:"charts"`
 }
 
@@ -90,6 +91,7 @@ func (s SongBase) WithOverride(o SongBaseOverride) SongBase {
 
 // Chart represents a specific difficulty chart (谱面) of a song
 type Chart struct {
+	BaseModel
 	ID           int        `gorm:"primaryKey" json:"id"`
 	SongID       int        `gorm:"not null;uniqueIndex:idx_song_difficulty" json:"song_id"`
 	Difficulty   Difficulty `gorm:"type:varchar(20);not null;uniqueIndex:idx_song_difficulty" json:"difficulty" example:"massive"`
