@@ -13,6 +13,8 @@ definitions:
     type: object
   model.Chart:
     properties:
+      created_at:
+        type: string
       difficulty:
         allOf:
         - $ref: '#/definitions/model.Difficulty'
@@ -43,6 +45,8 @@ definitions:
         $ref: '#/definitions/model.Song'
       song_id:
         type: integer
+      updated_at:
+        type: string
     type: object
   model.ChartInfo:
     properties:
@@ -201,6 +205,8 @@ definitions:
       chart_id:
         example: 1
         type: integer
+      created_at:
+        type: string
       id:
         type: integer
       rating:
@@ -212,6 +218,8 @@ definitions:
         maximum: 1010000
         minimum: 0
         type: integer
+      updated_at:
+        type: string
       username:
         type: string
     required:
@@ -286,6 +294,8 @@ definitions:
       cover:
         example: Cover_d3d3d3.jpg
         type: string
+      created_at:
+        type: string
       genre:
         example: Pop
         type: string
@@ -299,6 +309,8 @@ definitions:
         type: string
       title:
         example: Song Title
+        type: string
+      updated_at:
         type: string
       version:
         example: 1.0.0
@@ -337,6 +349,8 @@ definitions:
       anonymous_probe:
         example: false
         type: boolean
+      created_at:
+        type: string
       email:
         example: user@example.com
         type: string
@@ -353,6 +367,8 @@ definitions:
         type: string
       qq_account:
         example: "12345678"
+        type: string
+      updated_at:
         type: string
       upload_token:
         example: token_xyz
