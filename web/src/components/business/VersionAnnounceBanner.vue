@@ -6,7 +6,7 @@
           <Sparkles :size="16" class="banner-icon" />
           <span class="banner-title">{{ t('announce.new_version', { version: latestVersion }) }}</span>
         </div>
-        <button class="banner-close" @click="confirmDismiss">
+        <button class="banner-close" @click="showConfirm = true">
           <span class="dismiss-hint">{{ t('announce.dismiss') }}</span>
           <X :size="14" />
         </button>
@@ -138,10 +138,6 @@ const openUpload = (chart: ChartInfo) => {
     cover: chart.cover,
   }
   showUpload.value = true
-}
-
-const confirmDismiss = () => {
-  showConfirm.value = true
 }
 
 const dismiss = () => {
