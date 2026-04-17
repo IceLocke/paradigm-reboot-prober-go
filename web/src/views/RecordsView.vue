@@ -298,6 +298,7 @@ const columns = computed<DataTableColumns<PlayRecordInfo>>(() => [
     ellipsis: {
       tooltip: {
         zIndex: 99,
+        'width': 'trigger',
       },
     },
     fixed: "left",
