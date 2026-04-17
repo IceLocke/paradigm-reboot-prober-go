@@ -4,16 +4,21 @@
     preset="card"
     :title="t('common.confirm')"
     style="width: 400px; max-width: 90vw; max-height: 90vh;"
+    content-style="display: flex; flex-direction: column; overflow: hidden;"
     :bordered="false"
     :auto-focus="false"
     content-scrollable
     @update:show="$emit('update:show', $event)"
   >
-    <p class="confirm-message">{{ message }}</p>
-    <div class="confirm-actions">
-      <BaseButton type="button" variant="secondary" @click="cancel" :text="t('common.cancel')" />
-      <BaseButton type="button" @click="confirm" :text="t('common.confirm')" />
+    <div class="confirm-message">
+      <slot><p>{{ message }}</p></slot>
     </div>
+    <template #footer>
+      <div class="confirm-actions">
+        <BaseButton type="button" variant="secondary" @click="cancel" :text="t('common.cancel')" />
+        <BaseButton type="button" @click="confirm" :text="t('common.confirm')" />
+      </div>
+    </template>
   </n-modal>
 </template>
 
@@ -48,6 +53,9 @@ const cancel = () => {
 
 <style scoped>
 .confirm-message {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   margin: var(--space-3) 0;
 }
 
@@ -55,6 +63,5 @@ const cancel = () => {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
-  margin-top: var(--space-4);
 }
 </style>

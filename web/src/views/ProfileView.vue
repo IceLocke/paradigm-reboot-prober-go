@@ -73,7 +73,7 @@
                 :readonly="true"
               />
               <IconButton type="button" :icon="Copy" :size="16" @click="onCopyToken" :title="t('common.copy')" />
-              <IconButton type="button" :icon="RefreshCw" :size="16" @click="onRefreshToken" :title="t('common.refresh')" />
+              <IconButton type="button" :icon="RefreshCw" :size="16" @click="showConfirm = true" :title="t('common.refresh')" />
             </div>
           </div>
         </BaseCard>
@@ -163,10 +163,6 @@ const onCopyToken = async () => {
   } catch {
     toastError('message.copy_failed')
   }
-}
-
-const onRefreshToken = () => {
-  showConfirm.value = true
 }
 
 const refreshToken = async () => {
