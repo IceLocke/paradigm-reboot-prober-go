@@ -58,6 +58,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     ellipsis: {
       tooltip: {
         zIndex: 99,
+        'width': 'trigger',
       },
     },
     sorter: true,
