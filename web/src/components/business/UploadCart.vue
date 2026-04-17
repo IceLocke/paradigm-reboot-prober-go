@@ -1,87 +1,26 @@
 <template>
-  <n-popover trigger="click" placement="bottom-end" :show-arrow="false" :style="{ maxWidth: '500px' }">
-    <template #trigger>
-      <IconButton :icon="ShoppingCart" :size="18" :title="t('term.upload_list')">
-        <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
-      </IconButton>
-    </template>
-    <div class="upload-cart">
-      <div v-if="appStore.uploadList.length === 0" class="empty-state">
-        <p>{{ t('common.no_data') }}</p>
-      </div>
-      <template v-else>
-        <form class="cart-form" @submit.prevent="onSubmit">
-          <div class="cart-list">
-            <div v-for="(item, index) in appStore.uploadList" :key="item.chart_id" class="cart-item">
-              <div class="cart-info">
-                <span class="cart-title">{{ item.title }}</span>
-                <span><DifficultyBadge :difficulty="item.difficulty as Difficulty" :level="item.level" :short="true" /></span>
-              </div>
-              <div class="cart-score">
-                <input
-                  type="number"
-                  class="score-input"
-                  v-model.number="appStore.uploadList[index].new_score"
-                  v-bind:placeholder="String(appStore.uploadList[index].score ?? t('term.score'))"
-                  min="0"
-                  max="1010000"
-                />
-              </div>
-              <IconButton type="button" class="remove-btn" :icon="X" :size="16" @click="removeItem(item.chart_id)" :title="t('common.cancel')" />
-            </div>
-          </div>
-          <div class="cart-actions">
-            <BaseButton type="submit" size="sm" :disabled="loading" :text="t('common.submit') + '(' + appStore.uploadList.length + ')'" />
-          </div>
-        </form>
-      </template>
-    </div>
-  </n-popover>
+  <IconButton
+    :icon="ShoppingCart"
+    :size="18"
+    :title="t('term.upload_list')"
+    @click="show = true"
+  >
+    <span v-if="appStore.uploadList.length > 0" class="badge">{{ appStore.uploadList.length }}</span>
+  </IconButton>
+  <UploadCartModal v-model:show="show" />
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { NPopover } from 'naive-ui'
 import { useI18n } from 'vue-i18n'
-import { ShoppingCart, X } from '@lucide/vue';
-import { toastSuccess, toastError } from '@/utils/toast'
+import { ShoppingCart } from '@lucide/vue';
 import { useAppStore } from '@/stores/app'
-import { useUserStore } from '@/stores/user'
-import { uploadRecords } from '@/api/record'
-import type { Difficulty } from '@/api/types'
-import { USE_MOCK } from '@/api/mock'
-import BaseButton from '@/components/ui/BaseButton.vue'
 import IconButton from '@/components/ui/IconButton.vue'
-import DifficultyBadge from './DifficultyBadge.vue'
+import UploadCartModal from '@/components/business/UploadCartModal.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
-const userStore = useUserStore()
-const loading = ref(false)
-
-const removeItem = (chartId: number) => {
-  appStore.uploadList = appStore.uploadList.filter((item) => item.chart_id !== chartId)
-}
-
-const onSubmit = async () => {
-  const records = appStore.uploadList.map((item) => ({
-    chart_id: item.chart_id,
-    score: item.new_score ?? 0,
-  }))
-
-  loading.value = true
-  try {
-    if (!USE_MOCK) {
-      await uploadRecords(userStore.username, { play_records: records })
-    }
-    appStore.uploadList = []
-    toastSuccess('message.post_record_success')
-  } catch (err: unknown) {
-    toastError('message.post_record_failed', err)
-  } finally {
-    loading.value = false
-  }
-}
+const show = ref(false)
 </script>
 
 <style scoped>
@@ -100,71 +39,5 @@ const onSubmit = async () => {
   align-items: center;
   justify-content: center;
   padding: 0 4px;
-}
-.upload-cart {
-  min-width: 300px;
-}
-.empty-state {
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--text-muted);
-}
-.cart-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-height: 400px;
-  overflow-y: auto;
-}
-.cart-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-secondary);
-  border-radius: 6px;
-}
-.cart-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.cart-title {
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.score-input {
-  width: 100px;
-  padding: 4px 8px;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-family: var(--font-mono);
-  outline: none;
-  min-height: 36px;
-}
-.score-input:focus { border-color: var(--accent); }
-.remove-btn {
-  width: 32px;
-  height: 32px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-@media (hover: hover) {
-  .remove-btn:hover { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
-}
-.cart-actions {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: var(--space-3);
-  margin-top: var(--space-2);
-  border-top: 1px solid var(--border);
 }
 </style>

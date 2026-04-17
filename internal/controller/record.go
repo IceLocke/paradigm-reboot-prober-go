@@ -270,11 +270,6 @@ func (ctrl *RecordController) UploadRecords(c *gin.Context) {
 		return
 	}
 
-	if len(req.PlayRecords) == 0 {
-		c.JSON(http.StatusBadRequest, model.Response{Error: "play_records is required"})
-		return
-	}
-
 	currentUser := c.GetString("username")
 	authorized := false
 

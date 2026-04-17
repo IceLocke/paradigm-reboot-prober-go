@@ -1426,7 +1426,6 @@ const docTemplate = `{
                 "play_records": {
                     "type": "array",
                     "maxItems": 500,
-                    "minItems": 1,
                     "items": {
                         "$ref": "#/definitions/model.PlayRecordBase"
                     }

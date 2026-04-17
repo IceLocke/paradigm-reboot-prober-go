@@ -4,8 +4,8 @@
     preset="card"
     :title="song?.title ?? ''"
     :style="modalStyle"
+    content-style="display: flex; flex-direction: column; overflow: hidden;"
     :bordered="false"
-    content-scrollable
     @update:show="$emit('update:show', $event)"
   >
     <div v-if="song" class="song-detail">
@@ -103,6 +103,9 @@ const coverUrl = computed(() => {
 
 <style scoped>
 .song-detail {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   color: var(--text-primary);
 }
 .detail-grid {

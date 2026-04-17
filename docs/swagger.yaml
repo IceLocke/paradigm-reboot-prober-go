@@ -421,7 +421,6 @@ definitions:
         items:
           $ref: '#/definitions/model.PlayRecordBase'
         maxItems: 500
-        minItems: 1
         type: array
       upload_token:
         type: string
