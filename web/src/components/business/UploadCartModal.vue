@@ -35,6 +35,7 @@
     </form>
     <template #footer>
       <div v-if="!isEmpty" class="cart-actions">
+        <BaseButton type="button" variant="danger" size="sm" :text="t('common.clear')" @click="onClear" />
         <BaseButton form="upload-form" type="submit" size="sm" :disabled="loading" :text="t('common.submit') + '(' + appStore.uploadList.length + ')'" />
       </div>
     </template>
@@ -88,6 +89,10 @@ const onSubmit = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const onClear = () => {
+  appStore.uploadList = []
 }
 </script>
 
@@ -154,5 +159,6 @@ const onSubmit = async () => {
 .cart-actions {
   display: flex;
   justify-content: flex-end;
+  gap: var(--space-2);
 }
 </style>
