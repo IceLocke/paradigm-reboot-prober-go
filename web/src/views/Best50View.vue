@@ -196,6 +196,7 @@ const onClickTitle = async (songId: number) => {
         bpm: '180', cover: '', illustrator: 'Artist', version: '1.0',
         album: 'Album', genre: 'Genre', length: '2:30', b15: false,
         wiki_id: '', charts: [],
+        created_at: '', updated_at: '',
       }
     } else {
       const res = await getSingleSongInfo(songId)
