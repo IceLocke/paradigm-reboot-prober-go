@@ -200,7 +200,7 @@ The repository layer implements a **cache-aside** pattern using [`jellydator/ttl
 | `play_records`      | `PlayRecord`     | `id`              |
 | `best_play_records` | `BestPlayRecord` | `id`              |
 
-All GORM entities embed `BaseModel` (`internal/model/base.go`), which provides `created_at`, `updated_at`, and `deleted_at` columns. GORM automatically manages `created_at`/`updated_at` timestamps and filters soft-deleted rows (`WHERE deleted_at IS NULL`) in all SELECT queries. The `UpdateSong` chart-removal path uses `Unscoped().Delete()` (hard delete) to avoid unique-index conflicts on `(song_id, difficulty)`.
+All GORM entities embed `BaseModel` (`internal/model/base.go`), which provides `created_at`, `updated_at`, and `deleted_at` columns. GORM automatically manages `created_at`/`updated_at` timestamps and filters soft-deleted rows (`WHERE deleted_at IS NULL`) in all SELECT queries. The `Chart` entity uses a **partial unique index** on `(song_id, difficulty) WHERE deleted_at IS NULL`, so soft-deleted charts do not block re-adding a chart with the same difficulty — this is required because PostgreSQL and SQLite treat `NULL` values in composite UNIQUE indexes as distinct, so naively adding `deleted_at` to the unique index would break uniqueness on live rows instead.
 
 GORM `AutoMigrate` handles schema creation/updates at startup. Foreign key constraints are disabled during migration (`DisableForeignKeyConstraintWhenMigrating: true`).
 

@@ -37,7 +37,7 @@ func (BestPlayRecord) TableName() string {
 
 // PlayRecordBase represents the basic information of a play record
 type PlayRecordBase struct {
-	ChartID int  `json:"chart_id" gorm:"index:idx_pr_user_chart,priority:2" binding:"required" example:"1"`
+	ChartID int  `json:"chart_id" gorm:"not null;index:idx_pr_user_chart,priority:2" binding:"required" example:"1"`
 	Score   *int `json:"score" gorm:"not null" binding:"required,min=0,max=1010000" example:"1000000"`
 }
 

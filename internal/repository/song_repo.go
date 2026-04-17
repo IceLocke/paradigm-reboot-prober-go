@@ -236,9 +236,7 @@ func (r *SongRepository) UpdateSong(songID int, updatedSong *model.Song) (*model
 		for i := range existingSong.Charts {
 			chart := &existingSong.Charts[i]
 			if !requestedDifficulties[chart.Difficulty] {
-				// Hard delete: soft-deleted charts would still occupy the
-				// unique index (song_id, difficulty), so we must use Unscoped.
-				if err := tx.Unscoped().Delete(chart).Error; err != nil {
+				if err := tx.Delete(chart).Error; err != nil {
 					return err
 				}
 			} else {

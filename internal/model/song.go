@@ -93,8 +93,8 @@ func (s SongBase) WithOverride(o SongBaseOverride) SongBase {
 type Chart struct {
 	BaseModel
 	ID           int        `gorm:"primaryKey" json:"id"`
-	SongID       int        `gorm:"not null;uniqueIndex:idx_song_difficulty" json:"song_id"`
-	Difficulty   Difficulty `gorm:"type:varchar(20);not null;uniqueIndex:idx_song_difficulty" json:"difficulty" example:"massive"`
+	SongID       int        `gorm:"not null;uniqueIndex:idx_song_difficulty,where:deleted_at IS NULL" json:"song_id"`
+	Difficulty   Difficulty `gorm:"type:varchar(20);not null;uniqueIndex:idx_song_difficulty,where:deleted_at IS NULL" json:"difficulty" example:"massive"`
 	Level        float64    `gorm:"not null" json:"level"`
 	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level"`
 	LevelDesign  *string    `gorm:"column:level_design" json:"level_design"`
