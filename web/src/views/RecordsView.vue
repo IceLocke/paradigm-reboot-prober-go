@@ -241,9 +241,11 @@ const onClickTitle = async (songId: number) => {
         bpm: chart?.bpm ?? '', cover: chart?.cover ?? '', illustrator: chart?.illustrator ?? '',
         version: chart?.version ?? '', album: chart?.album ?? '', genre: chart?.genre ?? '',
         length: chart?.length ?? '', b15: chart?.b15 ?? false, wiki_id: chart?.wiki_id ?? '',
+        created_at: '', updated_at: '',
         charts: charts.filter((c) => c.song_id === songId).map((c) => ({
           id: c.id, song_id: c.song_id, difficulty: c.difficulty,
           level: c.level, fitting_level: c.fitting_level, level_design: c.level_design, notes: c.notes,
+          created_at: '', updated_at: '',
         })),
       }
     } else {

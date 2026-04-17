@@ -883,6 +883,7 @@ export interface components {
             username?: string;
         };
         "model.Chart": {
+            created_at?: string;
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
             fitting_level?: number;
@@ -900,6 +901,7 @@ export interface components {
             override_version?: string;
             song?: components["schemas"]["model.Song"];
             song_id?: number;
+            updated_at?: string;
         };
         "model.ChartInfo": {
             /** @example First Album */
@@ -986,11 +988,13 @@ export interface components {
             chart?: components["schemas"]["model.Chart"];
             /** @example 1 */
             chart_id: number;
+            created_at?: string;
             id?: number;
             rating?: number;
             record_time?: string;
             /** @example 1000000 */
             score: number;
+            updated_at?: string;
             username?: string;
         };
         "model.PlayRecordBase": {
@@ -1028,6 +1032,7 @@ export interface components {
             charts?: components["schemas"]["model.Chart"][];
             /** @example Cover_d3d3d3.jpg */
             cover?: string;
+            created_at?: string;
             /** @example Pop */
             genre?: string;
             id?: number;
@@ -1037,6 +1042,7 @@ export interface components {
             length?: string;
             /** @example Song Title */
             title: string;
+            updated_at?: string;
             /** @example 1.0.0 */
             version?: string;
             /** @example w123 */
@@ -1058,6 +1064,7 @@ export interface components {
             account_number?: number;
             /** @example false */
             anonymous_probe?: boolean;
+            created_at?: string;
             /** @example user@example.com */
             email: string;
             id?: number;
@@ -1069,6 +1076,7 @@ export interface components {
             nickname?: string;
             /** @example 12345678 */
             qq_account?: string;
+            updated_at?: string;
             /** @example token_xyz */
             upload_token?: string;
             /** @example user123 */

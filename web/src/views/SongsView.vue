@@ -202,6 +202,8 @@ const onClickTitle = async (songId: number) => {
         length: chart?.length ?? '',
         b15: chart?.b15 ?? false,
         wiki_id: chart?.wiki_id ?? '',
+        created_at: '',
+        updated_at: '',
         charts: (appStore.charts ?? [])
           .filter((c) => c.song_id === songId)
           .map((c) => ({
@@ -212,6 +214,8 @@ const onClickTitle = async (songId: number) => {
             fitting_level: c.fitting_level,
             level_design: c.level_design,
             notes: c.notes,
+            created_at: '',
+            updated_at: '',
           })),
       }
     } else {

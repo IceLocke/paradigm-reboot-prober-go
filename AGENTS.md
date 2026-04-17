@@ -65,6 +65,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── logging.go           # RequestIDMiddleware, SlogRequestMiddleware
 │   │   └── ratelimit.go         # Per-IP token bucket rate limiter
 │   ├── model/                   # Data models (GORM entities + DTOs)
+│   │   ├── base.go              # BaseModel (CreatedAt, UpdatedAt, DeletedAt — embedded by all GORM entities)
 │   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
 │   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, AllChartsResponse, ToPlayRecordInfo()
@@ -141,7 +142,7 @@ Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit
 - **Controller** (`internal/controller/`): Handles HTTP request/response, input validation, delegates to services. Injects business-specific fields (e.g. `target_user`, `scope`, `song_id`) into context via `logging.AppendCtx` before calling services.
 - **Service** (`internal/service/`): Business logic. All public methods accept `context.Context` as their first parameter. Uses `slog.InfoContext`/`WarnContext`/`ErrorContext` for automatic inclusion of upstream context fields (request ID, HTTP metadata, username, business fields). Orchestrates repository calls.
 - **Repository** (`internal/repository/`): Direct database operations via GORM. Rating calculation happens here when creating records. Each repository embeds an in-process `go-cache` instance for cache-aside (read-through, invalidate-on-write).
-- **Model** (`internal/model/`): GORM entities (with table name overrides) and DTOs. Request-specific DTOs live in `internal/model/request/`.
+- **Model** (`internal/model/`): GORM entities (with table name overrides) and DTOs. All GORM entities embed `BaseModel` for audit timestamps and soft-delete support. Request-specific DTOs live in `internal/model/request/`.
 - **Pkg** (`pkg/`): Reusable, domain-specific packages — `auth` (password hashing, JWT generation for access/refresh tokens, token type extraction) and `rating` (score-to-rating calculation).
 
 ### In-Process Caching
@@ -198,6 +199,8 @@ The repository layer implements a **cache-aside** pattern using [`jellydator/ttl
 | `charts`            | `Chart`          | `id`              |
 | `play_records`      | `PlayRecord`     | `id`              |
 | `best_play_records` | `BestPlayRecord` | `id`              |
+
+All GORM entities embed `BaseModel` (`internal/model/base.go`), which provides `created_at`, `updated_at`, and `deleted_at` columns. GORM automatically manages `created_at`/`updated_at` timestamps and filters soft-deleted rows (`WHERE deleted_at IS NULL`) in all SELECT queries. The `Chart` entity uses a **partial unique index** on `(song_id, difficulty) WHERE deleted_at IS NULL`, so soft-deleted charts do not block re-adding a chart with the same difficulty — this is required because PostgreSQL and SQLite treat `NULL` values in composite UNIQUE indexes as distinct, so naively adding `deleted_at` to the unique index would break uniqueness on live rows instead.
 
 GORM `AutoMigrate` handles schema creation/updates at startup. Foreign key constraints are disabled during migration (`DisableForeignKeyConstraintWhenMigrating: true`).
 

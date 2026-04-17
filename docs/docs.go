@@ -844,6 +844,9 @@ const docTemplate = `{
         "model.Chart": {
             "type": "object",
             "properties": {
+                "created_at": {
+                    "type": "string"
+                },
                 "difficulty": {
                     "allOf": [
                         {
@@ -888,6 +891,9 @@ const docTemplate = `{
                 },
                 "song_id": {
                     "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -1117,6 +1123,9 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 1
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "integer"
                 },
@@ -1131,6 +1140,9 @@ const docTemplate = `{
                     "maximum": 1010000,
                     "minimum": 0,
                     "example": 1000000
+                },
+                "updated_at": {
+                    "type": "string"
                 },
                 "username": {
                     "type": "string"
@@ -1241,6 +1253,9 @@ const docTemplate = `{
                     "type": "string",
                     "example": "Cover_d3d3d3.jpg"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "genre": {
                     "type": "string",
                     "example": "Pop"
@@ -1259,6 +1274,9 @@ const docTemplate = `{
                 "title": {
                     "type": "string",
                     "example": "Song Title"
+                },
+                "updated_at": {
+                    "type": "string"
                 },
                 "version": {
                     "type": "string",
@@ -1312,6 +1330,9 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": false
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "email": {
                     "type": "string",
                     "example": "user@example.com"
@@ -1334,6 +1355,9 @@ const docTemplate = `{
                 "qq_account": {
                     "type": "string",
                     "example": "12345678"
+                },
+                "updated_at": {
+                    "type": "string"
                 },
                 "upload_token": {
                     "type": "string",

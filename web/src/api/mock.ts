@@ -272,6 +272,8 @@ export function getMockUser(): User {
     is_admin: false,
     is_active: true,
     upload_token: 'mock-upload-token-abc123',
+    created_at: '',
+    updated_at: '',
   }
 }
 

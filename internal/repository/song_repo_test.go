@@ -94,6 +94,56 @@ func TestSongRepository_UpdateSong(t *testing.T) {
 	})
 }
 
+// TestSongRepository_UpdateSong_ReAddSoftDeletedDifficulty verifies that after a
+// chart is removed (soft-deleted) via UpdateSong, a subsequent UpdateSong can
+// add back a chart with the same difficulty without hitting a UNIQUE constraint
+// violation. This relies on the partial unique index on (song_id, difficulty)
+// scoped to `WHERE deleted_at IS NULL`.
+func TestSongRepository_UpdateSong_ReAddSoftDeletedDifficulty(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewSongRepository(db)
+
+	song := &model.Song{
+		SongBase: model.SongBase{WikiID: "soft_delete_readd", Title: "T"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 10.0, Notes: 500},
+		},
+	}
+	_, err := repo.CreateSong(song)
+	assert.NoError(t, err)
+
+	// Step 1: remove the Massive chart via UpdateSong (soft delete).
+	_, err = repo.UpdateSong(song.ID, &model.Song{
+		SongBase: model.SongBase{WikiID: "soft_delete_readd", Title: "T"},
+		Charts:   []model.Chart{},
+	})
+	assert.NoError(t, err)
+
+	// The chart should still exist in the DB but be soft-deleted.
+	var softDeletedCount int64
+	db.Unscoped().Model(&model.Chart{}).
+		Where("song_id = ? AND difficulty = ? AND deleted_at IS NOT NULL", song.ID, model.DifficultyMassive).
+		Count(&softDeletedCount)
+	assert.Equal(t, int64(1), softDeletedCount, "old chart should be soft-deleted, not hard-deleted")
+
+	// Step 2: add the Massive difficulty back. This must not conflict with
+	// the soft-deleted row on the (song_id, difficulty) unique index.
+	_, err = repo.UpdateSong(song.ID, &model.Song{
+		SongBase: model.SongBase{WikiID: "soft_delete_readd", Title: "T"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyMassive, Level: 12.5, Notes: 600},
+		},
+	})
+	assert.NoError(t, err)
+
+	// Verify the fresh (non-deleted) chart has the new values.
+	var freshSong model.Song
+	db.Preload("Charts").First(&freshSong, song.ID)
+	assert.Len(t, freshSong.Charts, 1)
+	assert.Equal(t, model.DifficultyMassive, freshSong.Charts[0].Difficulty)
+	assert.Equal(t, 12.5, freshSong.Charts[0].Level)
+}
+
 func TestSongRepository_GetSong(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewSongRepository(db)

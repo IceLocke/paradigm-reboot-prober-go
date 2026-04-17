@@ -18,6 +18,7 @@ type UserBase struct {
 // User represents the user entity in the database
 type User struct {
 	ID int `gorm:"primaryKey" json:"id"`
+	BaseModel
 	UserBase
 	EncodedPassword string `gorm:"not null" json:"-"`
 }
