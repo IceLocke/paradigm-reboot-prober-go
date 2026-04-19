@@ -50,7 +50,7 @@ type Config struct {
 	} `yaml:"logging"`
 	Metrics struct {
 		Enabled      bool     `yaml:"enabled"`       // when true, HTTP metrics middleware is installed and a separate metrics server is started
-		Addr         string   `yaml:"addr"`          // listen address for the metrics HTTP server, e.g. ":2112" (must not overlap with Server.Port)
+		Addr         string   `yaml:"addr"`          // listen address for the metrics HTTP server, e.g. ":9090" (must not overlap with Server.Port)
 		Path         string   `yaml:"path"`          // URL path that serves Prometheus metrics, e.g. "/metrics"
 		ExcludePaths []string `yaml:"exclude_paths"` // Gin route templates starting with any of these prefixes are not counted in HTTP metrics
 	} `yaml:"metrics"`
@@ -87,7 +87,7 @@ func InitDefaults() {
 	GlobalConfig.Logging.Format = "text"
 	GlobalConfig.Logging.ExcludePaths = []string{"/healthz"}
 	GlobalConfig.Metrics.Enabled = true
-	GlobalConfig.Metrics.Addr = ":2112"
+	GlobalConfig.Metrics.Addr = ":9090"
 	GlobalConfig.Metrics.Path = "/metrics"
 	GlobalConfig.Metrics.ExcludePaths = []string{"/healthz"}
 
@@ -231,7 +231,7 @@ func LoadConfig(configPath string) {
 	// Validate metrics
 	if GlobalConfig.Metrics.Enabled {
 		if strings.TrimSpace(GlobalConfig.Metrics.Addr) == "" {
-			log.Fatalf("metrics.enabled=true requires metrics.addr to be set (e.g. \":2112\")")
+			log.Fatalf("metrics.enabled=true requires metrics.addr to be set (e.g. \":9090\")")
 		}
 		if !strings.HasPrefix(GlobalConfig.Metrics.Path, "/") {
 			log.Fatalf("Invalid metrics.path %q: must start with '/'", GlobalConfig.Metrics.Path)
