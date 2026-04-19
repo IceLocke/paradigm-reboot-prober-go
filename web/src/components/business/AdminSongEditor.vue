@@ -191,9 +191,10 @@ import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import { createSong, updateSong } from '@/api/song'
 import { USE_MOCK } from '@/api/mock'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { DIFFICULTY_ORDER, sortByDifficulty } from '@/utils/difficulty'
 import type {
   Song, Chart, ChartInfo, Difficulty,
-  CreateSongRequest, UpdateSongRequest,
+  CreateSongRequest, UpdateSongRequest, ChartInput,
 } from '@/api/types'
 
 export type EditorMode = 'edit' | 'create'
@@ -212,19 +213,15 @@ const emit = defineEmits<{
 }>()
 
 // ---- form state ----
-interface ChartForm {
-  id?: number
-  difficulty: Difficulty
-  level: number
-  notes: number
-  level_design: string
-  override_title?: string | null
-  override_artist?: string | null
-  override_version?: string | null
-  override_cover?: string | null
-}
+// Chart editor state mirrors `ChartInput` (the API request DTO) plus a local-only
+// `id` for tracking existing rows. Override fields follow the DTO's optional shape.
+type ChartForm = ChartInput & { id?: number }
 
-interface SongForm {
+// Song editor state mirrors `CreateSongRequest` (all form-editable fields) but
+// keeps every text field as a required string for easier v-model binding; empty
+// strings are treated as “unset” and filtered out (or kept as empty) when
+// building the outbound payload.
+type SongForm = {
   id?: number
   title: string
   artist: string
@@ -240,6 +237,13 @@ interface SongForm {
   charts: ChartForm[]
 }
 
+const emptyChart = (difficulty: Difficulty = 'detected'): ChartForm => ({
+  difficulty,
+  level: 1,
+  notes: 0,
+  level_design: '',
+})
+
 const emptyForm = (): SongForm => ({
   title: '',
   artist: '',
@@ -252,7 +256,7 @@ const emptyForm = (): SongForm => ({
   genre: '',
   length: '',
   b15: false,
-  charts: [{ difficulty: 'detected', level: 1, notes: 0, level_design: '' }],
+  charts: [emptyChart()],
 })
 
 const form = reactive<SongForm>(emptyForm())
@@ -281,10 +285,10 @@ const fromSong = (song: Song): SongForm => ({
     level: c.level ?? 0,
     notes: c.notes ?? 0,
     level_design: c.level_design ?? '',
-    override_title: c.override_title ?? null,
-    override_artist: c.override_artist ?? null,
-    override_version: c.override_version ?? null,
-    override_cover: c.override_cover ?? null,
+    override_title: c.override_title ?? undefined,
+    override_artist: c.override_artist ?? undefined,
+    override_version: c.override_version ?? undefined,
+    override_cover: c.override_cover ?? undefined,
   })),
 })
 
@@ -292,7 +296,9 @@ const resetFromSong = () => {
   if (props.mode === 'create') {
     Object.assign(form, emptyForm())
   } else if (props.song) {
-    Object.assign(form, fromSong(props.song))
+    const next = fromSong(props.song)
+    next.charts = sortByDifficulty(next.charts)
+    Object.assign(form, next)
   }
   original.value = JSON.stringify(form)
 }
@@ -315,34 +321,25 @@ const diffOptions: SelectOption[] = [
 
 const nextDifficulty = (): Difficulty => {
   const used = new Set(form.charts.map((c) => c.difficulty))
-  const order: Difficulty[] = ['detected', 'invaded', 'massive', 'reboot']
-  for (const d of order) if (!used.has(d)) return d
+  for (const d of DIFFICULTY_ORDER) if (!used.has(d)) return d
   return 'detected'
 }
 
 const addChart = () => {
-  form.charts.push({
-    difficulty: nextDifficulty(),
-    level: 1,
-    notes: 0,
-    level_design: '',
-  })
+  form.charts.push(emptyChart(nextDifficulty()))
 }
 
 const removeChart = (i: number) => {
   form.charts.splice(i, 1)
 }
 
+type OverrideKey = 'override_title' | 'override_artist' | 'override_version' | 'override_cover'
+
 const hasOverride = (c: ChartForm) =>
   !!(c.override_title || c.override_artist || c.override_version || c.override_cover)
 
-const setOverride = (
-  i: number,
-  key: 'override_title' | 'override_artist' | 'override_version' | 'override_cover',
-  v: string,
-) => {
-  const trimmed = v
-  form.charts[i][key] = trimmed === '' ? null : trimmed
+const setOverride = (i: number, key: OverrideKey, v: string) => {
+  form.charts[i][key] = v === '' ? undefined : v
 }
 
 // ---- validation ----
@@ -360,36 +357,40 @@ const validate = (): string | null => {
 }
 
 // ---- build payload ----
-const buildPayload = () => {
-  const charts = form.charts.map((c) => {
-    const out: Record<string, unknown> = {
+const buildCharts = (): ChartInput[] =>
+  form.charts.map<ChartInput>((c) => {
+    const base: ChartInput = {
       difficulty: c.difficulty,
       level: Number(c.level) || 0,
       notes: Number(c.notes) || 0,
+      level_design: c.level_design ?? '',
     }
-    if (c.level_design) out.level_design = c.level_design
-    if (c.override_title) out.override_title = c.override_title
-    if (c.override_artist) out.override_artist = c.override_artist
-    if (c.override_version) out.override_version = c.override_version
-    if (c.override_cover) out.override_cover = c.override_cover
-    return out
+    if (c.override_title) base.override_title = c.override_title
+    if (c.override_artist) base.override_artist = c.override_artist
+    if (c.override_version) base.override_version = c.override_version
+    if (c.override_cover) base.override_cover = c.override_cover
+    return base
   })
-  const base: Record<string, unknown> = {
-    title: form.title,
-    artist: form.artist,
-    wiki_id: form.wiki_id,
-    bpm: form.bpm,
-    cover: form.cover,
-    illustrator: form.illustrator,
-    version: form.version,
-    album: form.album,
-    genre: form.genre,
-    length: form.length,
-    b15: form.b15,
-    charts,
-  }
-  return base
-}
+
+const buildCreatePayload = (): CreateSongRequest => ({
+  title: form.title,
+  artist: form.artist,
+  wiki_id: form.wiki_id,
+  bpm: form.bpm,
+  cover: form.cover,
+  illustrator: form.illustrator,
+  version: form.version,
+  album: form.album,
+  genre: form.genre,
+  length: form.length,
+  b15: form.b15,
+  charts: buildCharts(),
+})
+
+const buildUpdatePayload = (id: number): UpdateSongRequest => ({
+  ...buildCreatePayload(),
+  id,
+})
 
 // ---- submit ----
 const onSubmit = async () => {
@@ -400,21 +401,17 @@ const onSubmit = async () => {
   }
   submitting.value = true
   try {
-    const payload = buildPayload()
     let resultCharts: ChartInfo[] = []
     if (props.mode === 'create') {
       if (!USE_MOCK) {
-        const res = await createSong(payload as unknown as CreateSongRequest)
+        const res = await createSong(buildCreatePayload())
         resultCharts = res.data
       }
       toastSuccess('admin.create_success')
     } else {
       if (form.id == null) return
       if (!USE_MOCK) {
-        const res = await updateSong({
-          ...(payload as unknown as UpdateSongRequest),
-          id: form.id,
-        })
+        const res = await updateSong(buildUpdatePayload(form.id))
         resultCharts = res.data
       }
       toastSuccess('admin.save_success')

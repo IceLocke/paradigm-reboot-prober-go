@@ -77,9 +77,10 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NModal, NRadioGroup, NRadio } from 'naive-ui'
+import type { Ref } from 'vue'
 
 import BaseButton from '@/components/ui/BaseButton.vue'
 import { getSingleSongInfo, updateSong } from '@/api/song'
@@ -87,7 +88,7 @@ import { USE_MOCK } from '@/api/mock'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 import type { SongListItem } from '@/views/AdminSongsView.vue'
-import type { Song, UpdateSongRequest } from '@/api/types'
+import type { Song, ChartInput, UpdateSongRequest } from '@/api/types'
 
 const { t } = useI18n()
 const { isMobile } = useBreakpoint()
@@ -113,26 +114,49 @@ const modalStyle = computed(() =>
 const previewIds = computed(() => props.songIds.slice(0, 10))
 
 // ---- Field definitions ----
-interface FieldDef<T = unknown> {
-  key: keyof UpdateSongRequest
-  label: string
-  type: 'text' | 'boolean'
-  placeholder?: string
-  enabled: { value: boolean }
-  value: { value: T }
-}
+// Only keys that map to “textual” / “boolean” fields on UpdateSongRequest can be
+// batch-edited. We key the field by `UpdateSongRequest` so any typo is caught.
+type TextKey = Extract<
+  keyof UpdateSongRequest,
+  'version' | 'album' | 'genre' | 'illustrator' | 'bpm' | 'length' | 'cover'
+>
+type BoolKey = Extract<keyof UpdateSongRequest, 'b15'>
 
-const mk = <T>(init: T): { value: T } => reactive({ value: init }) as { value: T }
+interface TextField {
+  key: TextKey
+  label: string
+  type: 'text'
+  placeholder?: string
+  enabled: Ref<boolean>
+  value: Ref<string>
+}
+interface BoolField {
+  key: BoolKey
+  label: string
+  type: 'boolean'
+  enabled: Ref<boolean>
+  value: Ref<boolean>
+}
+type FieldDef = TextField | BoolField
+
+const text = (key: TextKey, label: string, placeholder = ''): TextField => ({
+  key, label, type: 'text', placeholder,
+  enabled: ref(false), value: ref(''),
+})
+const bool = (key: BoolKey, label: string): BoolField => ({
+  key, label, type: 'boolean',
+  enabled: ref(false), value: ref(false),
+})
 
 const fields: FieldDef[] = [
-  { key: 'version', label: t('term.version'), type: 'text', placeholder: '1.0.0', enabled: mk(false), value: mk<string>('') },
-  { key: 'album',   label: t('term.album'),   type: 'text', placeholder: '',      enabled: mk(false), value: mk<string>('') },
-  { key: 'genre',   label: t('term.genre'),   type: 'text', placeholder: '',      enabled: mk(false), value: mk<string>('') },
-  { key: 'illustrator', label: t('term.illustrator'), type: 'text', placeholder: '', enabled: mk(false), value: mk<string>('') },
-  { key: 'bpm',     label: 'BPM',             type: 'text', placeholder: '180',   enabled: mk(false), value: mk<string>('') },
-  { key: 'length',  label: t('term.length'),  type: 'text', placeholder: '2:30',  enabled: mk(false), value: mk<string>('') },
-  { key: 'cover',   label: t('term.cover'),   type: 'text', placeholder: 'Cover_xxx.jpg', enabled: mk(false), value: mk<string>('') },
-  { key: 'b15',     label: t('term.season'),  type: 'boolean', enabled: mk(false), value: mk<boolean>(false) },
+  text('version', t('term.version'), '1.0.0'),
+  text('album', t('term.album')),
+  text('genre', t('term.genre')),
+  text('illustrator', t('term.illustrator')),
+  text('bpm', 'BPM', '180'),
+  text('length', t('term.length'), '2:30'),
+  text('cover', t('term.cover'), 'Cover_xxx.jpg'),
+  bool('b15', t('term.season')),
 ]
 
 const anyEnabled = computed(() => fields.some((f) => f.enabled.value))
@@ -145,6 +169,36 @@ const progress = reactive({
   failed: 0,
 })
 
+// Build a strongly-typed patch containing just the enabled overrides.
+type SongPatch = Partial<Pick<UpdateSongRequest, TextKey | BoolKey>>
+
+const collectOverrides = (): SongPatch => {
+  const patch: SongPatch = {}
+  for (const f of fields) {
+    if (!f.enabled.value) continue
+    if (f.type === 'text') patch[f.key] = f.value.value
+    else patch[f.key] = f.value.value
+  }
+  return patch
+}
+
+// Rebuild charts array from the existing song as typed ChartInput[] so
+// we never need an `as unknown as` cast.
+const chartsFromSong = (song: Song): ChartInput[] =>
+  (song.charts ?? []).map<ChartInput>((c) => {
+    const out: ChartInput = {
+      difficulty: c.difficulty,
+      level: c.level,
+      notes: c.notes,
+      level_design: c.level_design ?? '',
+    }
+    if (c.override_title) out.override_title = c.override_title
+    if (c.override_artist) out.override_artist = c.override_artist
+    if (c.override_version) out.override_version = c.override_version
+    if (c.override_cover) out.override_cover = c.override_cover
+    return out
+  })
+
 // ---- Apply ----
 const onApply = async () => {
   if (props.songIds.length === 0 || !anyEnabled.value) return
@@ -154,12 +208,7 @@ const onApply = async () => {
   progress.done = 0
   progress.failed = 0
 
-  // Collect overrides
-  const overrides: Record<string, unknown> = {}
-  for (const f of fields) {
-    if (!f.enabled.value) continue
-    overrides[f.key as string] = f.value.value
-  }
+  const overrides = collectOverrides()
 
   for (const id of props.songIds) {
     try {
@@ -170,7 +219,7 @@ const onApply = async () => {
         song = res.data
       }
       if (!song) {
-        // fallback: use listing info (won't have charts — skip safely)
+        // fallback: use listing info (won’t have charts — skip safely)
         const listItem = props.songsIndex.get(id)
         if (!listItem) throw new Error('song not found')
         progress.failed++
@@ -191,19 +240,7 @@ const onApply = async () => {
         genre: song.genre,
         length: song.length,
         b15: song.b15,
-        charts: (song.charts ?? []).map((c) => {
-          const chartOut: Record<string, unknown> = {
-            difficulty: c.difficulty,
-            level: c.level,
-            notes: c.notes,
-          }
-          if (c.level_design) chartOut.level_design = c.level_design
-          if (c.override_title) chartOut.override_title = c.override_title
-          if (c.override_artist) chartOut.override_artist = c.override_artist
-          if (c.override_version) chartOut.override_version = c.override_version
-          if (c.override_cover) chartOut.override_cover = c.override_cover
-          return chartOut
-        }) as unknown as UpdateSongRequest['charts'],
+        charts: chartsFromSong(song),
         ...overrides,
       }
 

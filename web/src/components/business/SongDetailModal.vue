@@ -75,9 +75,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NSpin, NModal } from 'naive-ui'
-import type { Song, Difficulty } from '@/api/types'
+import type { Song } from '@/api/types'
 import DifficultyBadge from './DifficultyBadge.vue'
 import { useBreakpoint } from '@/composables/useBreakpoint'
+import { sortByDifficulty } from '@/utils/difficulty'
 
 const { t } = useI18n()
 const { isMobile } = useBreakpoint()
@@ -87,17 +88,7 @@ const props = defineProps<{
   song: Song | null
 }>()
 
-const DIFF_ORDER: Record<Difficulty, number> = {
-  detected: 0,
-  invaded: 1,
-  massive: 2,
-  reboot: 3,
-}
-
-const sortedCharts = computed(() => {
-  const charts = props.song?.charts ?? []
-  return [...charts].sort((a, b) => DIFF_ORDER[a.difficulty] - DIFF_ORDER[b.difficulty])
-})
+const sortedCharts = computed(() => sortByDifficulty(props.song?.charts ?? []))
 
 const modalStyle = computed(() =>
   (isMobile.value
