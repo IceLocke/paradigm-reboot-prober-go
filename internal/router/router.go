@@ -2,7 +2,9 @@ package router
 
 import (
 	"net/http"
+	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/controller"
+	"paradigm-reboot-prober-go/internal/metrics"
 	"paradigm-reboot-prober-go/internal/middleware"
 	"paradigm-reboot-prober-go/internal/repository"
 	"paradigm-reboot-prober-go/internal/service"
@@ -29,7 +31,15 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestIDMiddleware())
-	r.Use(middleware.SlogRequestMiddleware())
+	r.Use(middleware.SlogRequestMiddleware(config.GlobalConfig.Logging.ExcludePaths))
+
+	// HTTP metrics middleware — kept as one of the outermost middlewares so the
+	// recorded duration/response size reflect what the client actually saw,
+	// including gzip, CORS and auth overhead. The /metrics endpoint itself is
+	// served on a separate HTTP server (see cmd/server/main.go).
+	if config.GlobalConfig.Metrics.Enabled {
+		r.Use(metrics.Middleware(config.GlobalConfig.Metrics.ExcludePaths))
+	}
 
 	// CORS middleware
 	r.Use(cors.New(cors.Config{

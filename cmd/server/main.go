@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/logging"
+	"paradigm-reboot-prober-go/internal/metrics"
 	"paradigm-reboot-prober-go/internal/router"
 	"paradigm-reboot-prober-go/internal/util"
 	"syscall"
@@ -39,7 +40,15 @@ func main() {
 	}
 
 	// Initialize structured logging
-	logging.Setup()
+	logCloser, err := logging.Setup(
+		config.GlobalConfig.Logging.Output,
+		config.GlobalConfig.Logging.File,
+		config.GlobalConfig.Logging.Format,
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = logCloser.Close() }()
 
 	// Initialize Database
 	util.InitDB()
@@ -51,7 +60,7 @@ func main() {
 		Handler: r,
 	}
 
-	// Start server in a goroutine
+	// Start API server in a goroutine
 	go func() {
 		slog.Info("server starting", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -59,6 +68,29 @@ func main() {
 			panic(err)
 		}
 	}()
+
+	// Start dedicated metrics server on a separate port so Prometheus scraping
+	// is not exposed on the public API port.
+	var metricsSrv *http.Server
+	if config.GlobalConfig.Metrics.Enabled {
+		mux := http.NewServeMux()
+		mux.Handle(config.GlobalConfig.Metrics.Path, metrics.Handler())
+		metricsSrv = &http.Server{
+			Addr:              config.GlobalConfig.Metrics.Addr,
+			Handler:           mux,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
+		go func() {
+			slog.Info("metrics server starting",
+				"addr", metricsSrv.Addr,
+				"path", config.GlobalConfig.Metrics.Path,
+			)
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("failed to start metrics server", "error", err)
+				panic(err)
+			}
+		}()
+	}
 
 	// Wait for interrupt signal
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
@@ -73,6 +105,11 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		slog.Error("server forced shutdown", "error", err)
 		panic(err)
+	}
+	if metricsSrv != nil {
+		if err := metricsSrv.Shutdown(shutdownCtx); err != nil {
+			slog.Error("metrics server forced shutdown", "error", err)
+		}
 	}
 	slog.Info("server exited")
 }

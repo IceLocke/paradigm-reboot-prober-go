@@ -58,7 +58,9 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── logging/                 # Structured logging infrastructure (slog + context)
 │   │   ├── context.go           # AppendCtx helper, context key for slog attrs
 │   │   ├── handler.go           # ContextHandler wrapping slog.Handler
-│   │   └── setup.go             # Global logger initialization (TextHandler)
+│   │   └── setup.go             # Global logger initialization (TextHandler / JSONHandler, file/stdout/stderr output)
+│   ├── metrics/                 # Prometheus metrics registry, Gin middleware, and /metrics handler
+│   │   └── metrics.go           # http_requests_total / _duration / _size / _in_flight, route-template `path` label, prefix-based exclusion
 │   ├── middleware/
 │   │   ├── auth.go              # AuthMiddleware, OptionalAuthMiddleware, AdminMiddleware
 │   │   ├── gzip.go              # GzipResponseMiddleware (compress responses), GzipRequestMiddleware (decompress request bodies)
@@ -129,12 +131,13 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 The application follows a **layered architecture**:
 
 ```
-Request → Router → RequestID → SlogRequest → CORS → Gzip → RateLimit → Auth → Controller → Service → Repository → Database
+Request → Router → RequestID → SlogRequest → Metrics → CORS → Gzip → RateLimit → Auth → Controller → Service → Repository → Database
 ```
 
 - **Router** (`internal/router/`): Registers all routes, sets up CORS and middleware, wires dependencies (manual DI, no framework). Uses `gin.New()` (not `gin.Default()`) with explicit middleware chain.
 - **RequestID** (`internal/middleware/logging.go`): `RequestIDMiddleware` generates a random 8-byte hex request ID (or reuses `X-Request-ID` header), injects it into slog context and response header.
-- **SlogRequest** (`internal/middleware/logging.go`): `SlogRequestMiddleware` enriches context with `method`, `path`, `client_ip`; logs a request-completed summary with status, latency, and bytes. WARN for 4xx, ERROR for 5xx.
+- **SlogRequest** (`internal/middleware/logging.go`): `SlogRequestMiddleware(excludePrefixes)` enriches context with `method`, `path`, `client_ip`; logs a request-completed summary with status, latency, and bytes. WARN for 4xx, ERROR for 5xx. Paths starting with any prefix in `logging.exclude_paths` (e.g. `/healthz`) skip only the final log line — context fields and request ID header are still applied.
+- **Metrics** (`internal/metrics/metrics.go`): `metrics.Middleware(excludePrefixes)` records `http_requests_total`, `http_request_duration_seconds`, `http_response_size_bytes` (all labelled by `method`, `path`, `status`) and `http_requests_in_flight`. The `path` label uses Gin's matched route template (`c.FullPath()`, e.g. `/api/v2/records/:username`) to keep cardinality bounded; unmatched routes are reported as `path="unknown"`. Paths matching `metrics.exclude_paths` (default `/healthz`) are not observed. Metrics are NOT served on the main API port — a dedicated `http.Server` started in `cmd/server/main.go` exposes `promhttp.Handler()` on `metrics.addr` (default `:2112`) at `metrics.path` (default `/metrics`).
 - **CORS**: Configured via `gin-contrib/cors` — allows all origins, standard methods and headers.
 - **Gzip** (`internal/middleware/`): `GzipRequestMiddleware` transparently decompresses `Content-Encoding: gzip` request bodies; `GzipResponseMiddleware` (via `gin-contrib/gzip`) compresses responses when the client sends `Accept-Encoding: gzip`.
 - **RateLimit** (`internal/middleware/ratelimit.go`): Per-IP token bucket rate limiter applied to login and registration endpoints.
@@ -209,7 +212,7 @@ GORM `AutoMigrate` handles schema creation/updates at startup. Foreign key const
 The application uses Go's `log/slog` package with a custom `ContextHandler` for structured, context-aware logging.
 
 **Architecture**: `internal/logging/` provides the foundation:
-- **`ContextHandler`** wraps `slog.TextHandler` and automatically extracts `[]slog.Attr` stored in `context.Context` via `AppendCtx()`. This means any field injected into the context upstream (by middleware or controllers) is automatically included in all downstream log records.
+- **`ContextHandler`** wraps a `slog.Handler` (either `TextHandler` or `JSONHandler`, selected via `logging.format`) and automatically extracts `[]slog.Attr` stored in `context.Context` via `AppendCtx()`. This means any field injected into the context upstream (by middleware or controllers) is automatically included in all downstream log records.
 - **`AppendCtx(ctx, attrs...)`** is the primary helper for injecting fields into context.
 - **`Setup()`** initializes the global `slog` default logger (called once from `main.go`).
 
@@ -223,9 +226,13 @@ Middleware (request_id, method, path, client_ip) → Auth (username) → Control
 - Services use `slog.InfoContext(ctx, ...)` / `slog.WarnContext(ctx, ...)` / `slog.ErrorContext(ctx, ...)` — fields from context are automatically attached.
 - The `request_id` field is shared across all log lines from the same HTTP request, enabling correlation during debugging.
 
-**Log output format**: `key=value` text (slog `TextHandler` to stdout). Example:
+**Log output format**: Configurable via `logging.format`. Default is `text` (slog `TextHandler`, `key=value` format); set to `json` to use `slog.JSONHandler` (one JSON object per line). Destination is configurable via `logging.output` (`stdout` / `stderr` / `file`). Example (text):
 ```
 time=2026-04-05T10:00:00.000+08:00 level=INFO msg="request completed" request_id=a1b2c3d4e5f6g7h8 method=POST path=/api/v2/records/testuser client_ip=203.0.113.42 username=adminuser status=201 latency_ms=87 bytes_out=2048
+```
+Example (json):
+```json
+{"time":"2026-04-05T10:00:00.000+08:00","level":"INFO","msg":"request completed","request_id":"a1b2c3d4e5f6g7h8","method":"POST","path":"/api/v2/records/testuser","client_ip":"203.0.113.42","username":"adminuser","status":201,"latency_ms":87,"bytes_out":2048}
 ```
 
 ## Build and Run Commands
@@ -260,7 +267,7 @@ docker-compose up -d
 docker build -t prprober-app .
 ```
 
-The server listens on port **8080** by default. Health check: `GET /health`.
+The server listens on port **8080** by default. Health check: `GET /healthz`.
 
 ### Database Migration (Legacy → Go)
 
@@ -368,8 +375,16 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `pagination.max_page_size`   | —              | `200`                                | Maximum allowed page size                |
 | `game.b35_limit`             | —              | `35`                                 | B35 best record count (old songs)        |
 | `game.b15_limit`             | —              | `15`                                 | B15 best record count (new songs)        |
+| `logging.output`             | `LOG_OUTPUT`   | `stdout`                             | Log destination: `stdout`, `stderr`, or `file` |
+| `logging.file`               | `LOG_FILE`     | —                                    | File path when `logging.output=file` (appended, parent dirs auto-created) |
+| `logging.format`             | `LOG_FORMAT`   | `text`                               | slog handler format: `text` or `json`    |
+| `logging.exclude_paths`      | `LOG_EXCLUDE_PATHS` | `["/healthz"]`                  | Path prefixes excluded from request logs (env var is comma-separated) |
+| `metrics.enabled`            | `METRICS_ENABLED` | `true`                           | Install the metrics middleware and start the dedicated metrics HTTP server |
+| `metrics.addr`               | `METRICS_ADDR`    | `:2112`                          | Listen address for the metrics server (MUST differ from `server.port`)   |
+| `metrics.path`               | `METRICS_PATH`    | `/metrics`                       | URL path that serves Prometheus metrics (must start with `/`)            |
+| `metrics.exclude_paths`      | `METRICS_EXCLUDE_PATHS` | `["/healthz"]`              | Route-template prefixes excluded from HTTP metrics (env var comma-separated) |
 
-**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range.
+**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range, or if `logging.output` is not one of `stdout`/`stderr`/`file`, or if `logging.output=file` but `logging.file` is empty, or if `logging.format` is not `text` or `json`, or if `metrics.enabled=true` and any of `metrics.addr` is empty / `metrics.path` does not start with `/` / `metrics.addr` equals `server.port`.
 
 ## CI/CD Pipeline
 
@@ -382,7 +397,7 @@ Defined in `.github/workflows/ci.yml`. Triggers on push/PR to `master` and `dev`
 3. **Unit Tests** (`test`): Runs `go test -v ./...`. Depends on `lint` and `frontend-lint`.
 4. **Docker Build & Push** (`docker-build`, depends on lint + test + frontend-lint):
    - Builds Docker image and pushes to `ghcr.io`.
-   - Runs Docker Compose integration test (health check on `/health`).
+   - Runs Docker Compose integration test (health check on `/healthz`).
    - Only runs on push events (not PRs).
 
 ### Docker Image Tags
@@ -432,8 +447,28 @@ Base path: `/api/v2`
 ### Non-API Routes
 | Method | Path              | Description          |
 |--------|-------------------|----------------------|
-| GET    | `/health`         | Health check         |
+| GET    | `/healthz`        | Health check         |
 | GET    | `/swagger/*any`   | Swagger UI           |
+
+### Observability Routes (separate port)
+
+Served by a dedicated `http.Server` on `metrics.addr` (default `:2112`). This port is intentionally distinct from the main API port so Prometheus scraping is not exposed on the public API surface.
+
+| Method | Path (default) | Description                                        |
+|--------|----------------|----------------------------------------------------|
+| GET    | `/metrics`     | Prometheus exposition (HTTP RED + Go/process stats) |
+
+Exposed metrics:
+
+| Metric                             | Type      | Labels                     |
+|------------------------------------|-----------|----------------------------|
+| `http_requests_total`              | Counter   | `method`, `path`, `status` |
+| `http_request_duration_seconds`    | Histogram | `method`, `path`, `status` |
+| `http_response_size_bytes`         | Histogram | `method`, `path`, `status` |
+| `http_requests_in_flight`          | Gauge     | —                          |
+| `go_*`, `process_*`                | various   | auto-registered by `client_golang` default registry |
+
+The `path` label is Gin's matched route template (e.g. `/api/v2/records/:username`); requests that match no route are reported as `path="unknown"`. Prefixes in `metrics.exclude_paths` are skipped entirely.
 
 ### GetPlayRecords Scopes
 
