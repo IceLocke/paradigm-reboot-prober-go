@@ -175,7 +175,7 @@ const zh = {
     apply: '应用',
     no_selection: '请至少选择一首',
     unsaved: '未保存',
-    no_song_selected: '从左侧选择一首歌曲进行编辑，或新建一首',
+    no_song_selected: '选择一首歌曲进行编辑，或新建一首',
     general: '基本信息',
     charts: '谱面',
     add_chart: '添加谱面',

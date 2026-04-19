@@ -35,8 +35,8 @@
         />
       </div>
 
-      <!-- Right: editor -->
-      <div class="admin-editor">
+      <!-- Right: editor (single scroll container) -->
+      <div class="admin-editor-wrap">
         <div v-if="!editorMode" class="editor-empty">
           <Music2 :size="48" :stroke-width="1" />
           <p>{{ t('admin.no_song_selected') }}</p>
@@ -272,8 +272,7 @@ function buildMockSong(id: number): Song {
 .admin-page {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100%;
+  max-height: calc(100vh - var(--app-header-height));
 }
 
 .page-actions {
@@ -304,8 +303,13 @@ function buildMockSong(id: number): Song {
 }
 
 @media (max-width: 1023px) {
+  .admin-page {
+    max-height: none;
+  }
   .admin-layout {
     grid-template-columns: 1fr;
+    flex: initial;
+    min-height: 0;
   }
 }
 
@@ -315,15 +319,21 @@ function buildMockSong(id: number): Song {
   flex-direction: column;
 }
 
-.admin-editor {
+/* Single scroll container for the editor (desktop) */
+.admin-editor-wrap {
   min-height: 0;
-  display: flex;
-  flex-direction: column;
   overflow-y: auto;
+  padding-right: 4px;
+}
+@media (max-width: 1023px) {
+  .admin-editor-wrap {
+    overflow-y: visible;
+    padding-right: 0;
+  }
 }
 
 .editor-empty {
-  flex: 1;
+  min-height: 280px;
   display: flex;
   flex-direction: column;
   align-items: center;

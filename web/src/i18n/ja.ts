@@ -173,7 +173,7 @@ const ja = {
     apply: '適用',
     no_selection: '1 件以上選択してください',
     unsaved: '未保存',
-    no_song_selected: '左から楽曲を選択するか、新規作成してください',
+    no_song_selected: '楽曲を選択するか、新規作成してください',
     general: '基本情報',
     charts: '譜面',
     add_chart: '譜面を追加',

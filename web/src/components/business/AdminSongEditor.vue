@@ -462,7 +462,6 @@ const coverUrl = (cover: string) => {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  min-height: 0;
 }
 .loading {
   display: flex;
@@ -476,6 +475,12 @@ const coverUrl = (cover: string) => {
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg-primary);
+  padding: var(--space-2) 0;
+  margin: calc(var(--space-2) * -1) 0 0 0;
 }
 .editor-header h3 {
   font-size: var(--text-lg);
