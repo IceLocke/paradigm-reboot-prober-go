@@ -49,7 +49,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { UserRound, ChartNoAxesColumn, Music2, FileText, Info } from '@lucide/vue';
+import { UserRound, ChartNoAxesColumn, Music2, FileText, Info, Shield } from '@lucide/vue';
 import { useUserStore } from '@/stores/user'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 
@@ -59,13 +59,19 @@ const { isDesktop } = useBreakpoint()
 
 const show = defineModel<boolean>({ required: true })
 
-const navItems = computed(() => [
-  { path: '/profile', label: userStore.profile?.nickname || userStore.username || t('auth.profile'), icon: UserRound },
-  { path: '/best50', label: t('term.b50'), icon: ChartNoAxesColumn },
-  { path: '/songs', label: t('term.charts'), icon: Music2 },
-  { path: '/records', label: t('term.records'), icon: FileText },
-  { path: '/about', label: t('common.about'), icon: Info },
-])
+const navItems = computed(() => {
+  const items: { path: string; label: string; icon: unknown }[] = [
+    { path: '/profile', label: userStore.profile?.nickname || userStore.username || t('auth.profile'), icon: UserRound },
+    { path: '/best50', label: t('term.b50'), icon: ChartNoAxesColumn },
+    { path: '/songs', label: t('term.charts'), icon: Music2 },
+    { path: '/records', label: t('term.records'), icon: FileText },
+  ]
+  if (userStore.is_admin) {
+    items.push({ path: '/admin/songs', label: t('admin.panel'), icon: Shield })
+  }
+  items.push({ path: '/about', label: t('common.about'), icon: Info })
+  return items
+})
 </script>
 
 <style scoped>

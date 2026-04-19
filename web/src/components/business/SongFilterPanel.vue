@@ -11,7 +11,7 @@
       <div v-if="show" class="adv-filters">
         <div class="adv-filters-grid">
           <!-- Level range -->
-          <div class="filter-group">
+          <div class="filter-group filter-group--level-range">
             <label class="filter-label">{{ t('term.level_range') }}</label>
             <div class="level-range-row">
               <n-select
@@ -187,6 +187,13 @@ const onBracketSelect = (val: number | null) => {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+/* Level range needs more width for its 3 inline controls — desktop only */
+@media (min-width: 640px) {
+  .filter-group--level-range {
+    grid-column: span 2;
+  }
 }
 
 .filter-label {
