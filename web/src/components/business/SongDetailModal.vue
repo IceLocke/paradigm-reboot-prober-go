@@ -55,7 +55,7 @@
           <div class="charts-section">
             <span class="info-label">{{ t('term.difficulty') }}</span>
             <div class="charts-list">
-              <div v-for="chart in song.charts" :key="chart.id" class="chart-row">
+              <div v-for="chart in sortedCharts" :key="chart.id" class="chart-row">
                 <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" />
                 <span class="chart-designer">{{ chart.level_design }}</span>
                 <span v-if="chart.notes" class="chart-notes mono">{{ chart.notes }} {{ t('term.notes') }}</span>
@@ -75,7 +75,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NSpin, NModal } from 'naive-ui'
-import type { Song } from '@/api/types'
+import type { Song, Difficulty } from '@/api/types'
 import DifficultyBadge from './DifficultyBadge.vue'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 
@@ -86,6 +86,18 @@ const show = defineModel<boolean>('show', { required: true })
 const props = defineProps<{
   song: Song | null
 }>()
+
+const DIFF_ORDER: Record<Difficulty, number> = {
+  detected: 0,
+  invaded: 1,
+  massive: 2,
+  reboot: 3,
+}
+
+const sortedCharts = computed(() => {
+  const charts = props.song?.charts ?? []
+  return [...charts].sort((a, b) => DIFF_ORDER[a.difficulty] - DIFF_ORDER[b.difficulty])
+})
 
 const modalStyle = computed(() =>
   (isMobile.value
