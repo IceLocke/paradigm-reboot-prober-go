@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"paradigm-reboot-prober-go/internal/logging"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,12 @@ func RequestIDMiddleware() gin.HandlerFunc {
 // RequestIDMiddleware so that request_id is already in the context.
 //
 // Log levels: INFO for 1xx–3xx, WARN for 4xx, ERROR for 5xx.
-func SlogRequestMiddleware() gin.HandlerFunc {
+//
+// excludePrefixes is a list of path prefixes that should NOT emit the
+// "request completed" summary line (e.g. "/healthz" to silence health probes).
+// Context fields (method/path/client_ip) are still injected so that any
+// downstream code using slog.*Context keeps its structured fields.
+func SlogRequestMiddleware(excludePrefixes []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
@@ -49,6 +55,10 @@ func SlogRequestMiddleware() gin.HandlerFunc {
 		c.Request = c.Request.WithContext(ctx)
 
 		c.Next()
+
+		if pathExcluded(c.Request.URL.Path, excludePrefixes) {
+			return
+		}
 
 		latency := time.Since(start)
 		status := c.Writer.Status()
@@ -72,4 +82,18 @@ func SlogRequestMiddleware() gin.HandlerFunc {
 			slog.InfoContext(ctx, "request completed", attrs...)
 		}
 	}
+}
+
+// pathExcluded reports whether path starts with any of the given prefixes.
+// An empty prefix is ignored to avoid accidentally silencing all requests.
+func pathExcluded(path string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if p == "" {
+			continue
+		}
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
 }

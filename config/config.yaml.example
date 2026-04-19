@@ -28,3 +28,17 @@ pagination:
 game:
   b35_limit: 35
   b15_limit: 15
+
+logging:
+  output: "stdout"          # stdout | stderr | file
+  file: ""                  # required when output == "file", e.g. "logs/server.log"
+  format: "text"            # text | json
+  exclude_paths:            # request paths starting with any of these prefixes are not logged
+    - "/healthz"
+
+metrics:
+  enabled: true             # expose Prometheus metrics on a dedicated HTTP server
+  addr: ":9090"             # listen address (MUST differ from server.port)
+  path: "/metrics"          # scrape path (default Prometheus convention)
+  exclude_paths:            # Gin route templates starting with any of these prefixes are not counted
+    - "/healthz"

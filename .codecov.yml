@@ -10,4 +10,5 @@ coverage:
 
 ignore:
   - "cmd/**"              # main() entry points — not unit-testable
-  - "docs/**"             # auto-generated Swagger docs
+  - "docs/**"             # auto-generated Swagger docs'
+  - "config/**"           # configuration files

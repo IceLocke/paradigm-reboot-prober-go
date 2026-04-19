@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -41,6 +42,18 @@ type Config struct {
 		B35Limit int `yaml:"b35_limit"`
 		B15Limit int `yaml:"b15_limit"`
 	} `yaml:"game"`
+	Logging struct {
+		Output       string   `yaml:"output"`        // "stdout" (default), "stderr", or "file"
+		File         string   `yaml:"file"`          // file path when Output == "file"
+		Format       string   `yaml:"format"`        // "text" (default) or "json"
+		ExcludePaths []string `yaml:"exclude_paths"` // request paths starting with any of these prefixes are not logged by SlogRequestMiddleware
+	} `yaml:"logging"`
+	Metrics struct {
+		Enabled      bool     `yaml:"enabled"`       // when true, HTTP metrics middleware is installed and a separate metrics server is started
+		Addr         string   `yaml:"addr"`          // listen address for the metrics HTTP server, e.g. ":9090" (must not overlap with Server.Port)
+		Path         string   `yaml:"path"`          // URL path that serves Prometheus metrics, e.g. "/metrics"
+		ExcludePaths []string `yaml:"exclude_paths"` // Gin route templates starting with any of these prefixes are not counted in HTTP metrics
+	} `yaml:"metrics"`
 }
 
 var GlobalConfig Config
@@ -69,6 +82,14 @@ func InitDefaults() {
 	GlobalConfig.Pagination.MaxPageSize = 200
 	GlobalConfig.Game.B35Limit = 35
 	GlobalConfig.Game.B15Limit = 15
+	GlobalConfig.Logging.Output = "stdout"
+	GlobalConfig.Logging.File = ""
+	GlobalConfig.Logging.Format = "text"
+	GlobalConfig.Logging.ExcludePaths = []string{"/healthz"}
+	GlobalConfig.Metrics.Enabled = true
+	GlobalConfig.Metrics.Addr = ":9090"
+	GlobalConfig.Metrics.Path = "/metrics"
+	GlobalConfig.Metrics.ExcludePaths = []string{"/healthz"}
 
 	// Parse derived values (defaults are always valid, no error expected)
 	JWTExpirationDuration, _ = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
@@ -124,6 +145,48 @@ func LoadConfig(configPath string) {
 	if secret := os.Getenv("SECRET_KEY"); secret != "" {
 		GlobalConfig.Auth.SecretKey = secret
 	}
+	if out := os.Getenv("LOG_OUTPUT"); out != "" {
+		GlobalConfig.Logging.Output = out
+	}
+	if f := os.Getenv("LOG_FILE"); f != "" {
+		GlobalConfig.Logging.File = f
+	}
+	if fmtEnv := os.Getenv("LOG_FORMAT"); fmtEnv != "" {
+		GlobalConfig.Logging.Format = fmtEnv
+	}
+	if paths := os.Getenv("LOG_EXCLUDE_PATHS"); paths != "" {
+		parts := strings.Split(paths, ",")
+		cleaned := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				cleaned = append(cleaned, trimmed)
+			}
+		}
+		GlobalConfig.Logging.ExcludePaths = cleaned
+	}
+	if v := os.Getenv("METRICS_ENABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			GlobalConfig.Metrics.Enabled = b
+		} else {
+			log.Fatalf("Invalid METRICS_ENABLED value %q: %v", v, err)
+		}
+	}
+	if v := os.Getenv("METRICS_ADDR"); v != "" {
+		GlobalConfig.Metrics.Addr = v
+	}
+	if v := os.Getenv("METRICS_PATH"); v != "" {
+		GlobalConfig.Metrics.Path = v
+	}
+	if paths := os.Getenv("METRICS_EXCLUDE_PATHS"); paths != "" {
+		parts := strings.Split(paths, ",")
+		cleaned := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if trimmed := strings.TrimSpace(p); trimmed != "" {
+				cleaned = append(cleaned, trimmed)
+			}
+		}
+		GlobalConfig.Metrics.ExcludePaths = cleaned
+	}
 	// Re-parse derived values after file/env overrides
 	JWTExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
 	if err != nil {
@@ -143,5 +206,38 @@ func LoadConfig(configPath string) {
 	// Validate bcrypt cost
 	if GlobalConfig.Auth.BcryptCost < 4 || GlobalConfig.Auth.BcryptCost > 31 {
 		log.Fatalf("Invalid bcrypt_cost %d: must be between 4 and 31", GlobalConfig.Auth.BcryptCost)
+	}
+
+	// Validate logging output
+	switch GlobalConfig.Logging.Output {
+	case "stdout", "stderr":
+		// ok
+	case "file":
+		if strings.TrimSpace(GlobalConfig.Logging.File) == "" {
+			log.Fatalf("logging.output=file requires logging.file to be set")
+		}
+	default:
+		log.Fatalf("Invalid logging.output %q: must be one of stdout, stderr, file", GlobalConfig.Logging.Output)
+	}
+
+	// Validate logging format
+	switch GlobalConfig.Logging.Format {
+	case "", "text", "json":
+		// ok
+	default:
+		log.Fatalf("Invalid logging.format %q: must be one of text, json", GlobalConfig.Logging.Format)
+	}
+
+	// Validate metrics
+	if GlobalConfig.Metrics.Enabled {
+		if strings.TrimSpace(GlobalConfig.Metrics.Addr) == "" {
+			log.Fatalf("metrics.enabled=true requires metrics.addr to be set (e.g. \":9090\")")
+		}
+		if !strings.HasPrefix(GlobalConfig.Metrics.Path, "/") {
+			log.Fatalf("Invalid metrics.path %q: must start with '/'", GlobalConfig.Metrics.Path)
+		}
+		if GlobalConfig.Metrics.Addr == GlobalConfig.Server.Port {
+			log.Fatalf("metrics.addr must differ from server.port (both are %q)", GlobalConfig.Metrics.Addr)
+		}
 	}
 }
