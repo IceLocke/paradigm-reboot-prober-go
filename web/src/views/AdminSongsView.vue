@@ -100,29 +100,50 @@ export interface SongListItem {
 
 const songList = computed<SongListItem[]>(() => {
   const charts = appStore.charts ?? []
-  const byId = new Map<number, SongListItem>()
+  // Group charts by song id first…
+  const grouped = new Map<number, ChartInfo[]>()
   for (const c of charts) {
-    const existing = byId.get(c.song_id)
-    if (existing) {
-      existing.diff_count += 1
-      if (!existing.diffs.includes(c.difficulty)) existing.diffs.push(c.difficulty)
-    } else {
-      byId.set(c.song_id, {
-        id: c.song_id,
-        title: c.title,
-        artist: c.artist,
-        version: c.version,
-        album: c.album,
-        genre: c.genre,
-        wiki_id: c.wiki_id,
-        cover: c.cover,
-        b15: c.b15,
-        diff_count: 1,
-        diffs: [c.difficulty],
-      })
-    }
+    const arr = grouped.get(c.song_id)
+    if (arr) arr.push(c)
+    else grouped.set(c.song_id, [c])
   }
-  return Array.from(byId.values()).sort((a, b) => a.id - b.id)
+
+  // …then pick a “canonical” chart per song to source title/artist/etc. from.
+  // MASSIVE is preferred because `override_*` fields on other difficulties may
+  // re-title or re-attribute the chart for that specific difficulty — MASSIVE
+  // generally carries the “main” metadata. Fall back in descending order when
+  // MASSIVE is absent.
+  const PREFERRED: Difficulty[] = ['massive', 'invaded', 'detected', 'reboot']
+  const pickCanonical = (group: ChartInfo[]): ChartInfo => {
+    for (const d of PREFERRED) {
+      const hit = group.find((c) => c.difficulty === d)
+      if (hit) return hit
+    }
+    return group[0]
+  }
+
+  const out: SongListItem[] = []
+  for (const [id, group] of grouped) {
+    const canonical = pickCanonical(group)
+    const diffs: Difficulty[] = []
+    for (const c of group) {
+      if (!diffs.includes(c.difficulty)) diffs.push(c.difficulty)
+    }
+    out.push({
+      id,
+      title: canonical.title,
+      artist: canonical.artist,
+      version: canonical.version,
+      album: canonical.album,
+      genre: canonical.genre,
+      wiki_id: canonical.wiki_id,
+      cover: canonical.cover,
+      b15: canonical.b15,
+      diff_count: group.length,
+      diffs,
+    })
+  }
+  return out.sort((a, b) => a.id - b.id)
 })
 
 const songsById = computed(() => {
@@ -315,6 +336,9 @@ function buildMockSong(id: number): Song {
 
 .admin-sidebar {
   min-height: 0;
+  /* Grid items default to min-width: auto which lets long content push the
+     column wider than its track. Reset to 0 so the 340px track is respected. */
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -322,6 +346,7 @@ function buildMockSong(id: number): Song {
 /* Single scroll container for the editor (desktop) */
 .admin-editor-wrap {
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
 }

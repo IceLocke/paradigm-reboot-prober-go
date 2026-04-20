@@ -176,6 +176,7 @@ const coverUrl = (cover: string) => {
   border-radius: 10px;
   padding: var(--space-3);
   min-height: 0;
+  min-width: 0;
   height: 100%;
   max-height: calc(100vh - var(--app-header-height) - var(--space-6));
   overflow: hidden;
@@ -361,6 +362,7 @@ const coverUrl = (cover: string) => {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
 }
 .song-title {
   font-weight: 500;
