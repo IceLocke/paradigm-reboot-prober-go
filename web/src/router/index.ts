@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -28,11 +29,27 @@ const router = createRouter({
       component: () => import('@/views/RecordsView.vue'),
     },
     {
+      path: '/admin/songs',
+      name: 'admin-songs',
+      component: () => import('@/views/AdminSongsView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
       path: '/about',
       name: 'about',
       component: () => import('@/views/AboutView.vue'),
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta?.requiresAdmin) {
+    const userStore = useUserStore()
+    if (!userStore.logged_in || !userStore.is_admin) {
+      return { path: '/best50' }
+    }
+  }
+  return true
 })
 
 export default router

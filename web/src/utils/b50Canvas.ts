@@ -3,6 +3,7 @@
  * Generates a B50 best records image using Canvas 2D API.
  */
 import type { PlayRecordInfo } from '@/api/types'
+import { coverUrl as coverFullUrl, coverThumbUrl } from '@/utils/cover'
 
 // ─── Render Options ────────────────────────────────────────────
 
@@ -191,11 +192,7 @@ function loadImage(url: string): Promise<HTMLImageElement | null> {
 }
 
 /** Build the URL for a cover thumbnail (Cover_xxx.jpg → Cover_xxx_thumb.jpg). */
-function coverThumbUrl(cover: string): string {
-  const dot = cover.lastIndexOf('.')
-  if (dot === -1) return `/cover/${cover}`
-  return `/cover/${cover.substring(0, dot)}_thumb${cover.substring(dot)}`
-}
+const coverThumbPath = coverThumbUrl
 
 async function preloadImages(
   records: PlayRecordInfo[],
@@ -208,8 +205,8 @@ async function preloadImages(
   const map = new Map<string, HTMLImageElement>()
   const tasks = Array.from(covers).map(async (cover) => {
     // Load thumbnail variant for B50 cards (each card is ~268×160px, no need for full-size)
-    const img = await loadImage(coverThumbUrl(cover))
-      ?? await loadImage(`/cover/${cover}`) // fallback to full-size if thumb not found
+    const img = await loadImage(coverThumbPath(cover))
+      ?? await loadImage(coverFullUrl(cover)) // fallback to full-size if thumb not found
     if (img) map.set(cover, img)
   })
   await Promise.all(tasks)

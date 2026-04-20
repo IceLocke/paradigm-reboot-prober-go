@@ -41,6 +41,7 @@ import { useI18n } from 'vue-i18n'
 import { Plus, Upload } from '@lucide/vue'
 import type { ChartInfo, Difficulty } from '@/api/types'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
+import { coverThumbUrl } from '@/utils/cover'
 
 const { t } = useI18n()
 
@@ -65,8 +66,7 @@ const coverUrl = computed(() => {
   if (!props.chart.cover) return ''
   if (props.chart.cover.startsWith('http')) return props.chart.cover
   // Use thumbnail for grid view to save bandwidth
-  const name = props.chart.cover.replace(/\.[^.]+$/, '')
-  return `/cover/${name}_thumb.jpg`
+  return coverThumbUrl(props.chart.cover)
 })
 </script>
 

@@ -116,12 +116,16 @@ web/
 │   │       ├── CsvImportModal.vue      # CSV file import modal (parse, preview, batch upload)
 │   │       ├── LoginModal.vue         # Login form modal
 │   │       ├── RegisterModal.vue      # Registration form modal
-│   │       └── ProfileModal.vue       # User profile editor modal
+│   │       ├── ProfileModal.vue       # User profile editor modal
+│   │       ├── AdminSongList.vue      # Admin: searchable song list with multi-select
+│   │       ├── AdminSongEditor.vue    # Admin: song + charts editor (create/edit)
+│   │       └── AdminBatchEditModal.vue # Admin: batch-edit common fields of selected songs
 │   │
 │   └── views/                    # Page-level components (one per route)
 │       ├── Best50View.vue        # B50 overview: stats, scatter charts, tables
 │       ├── SongsView.vue         # Charts list: search, filter tabs, pagination
 │       ├── RecordsView.vue       # Play records: scope tabs, table, pagination
+│       ├── AdminSongsView.vue    # Admin-only: song management (list + editor + batch edit)
 │       └── AboutView.vue         # About page: description, GitHub link
 │
 ├── dist/                         # Production build output (also a Git submodule for deployment)
@@ -300,6 +304,7 @@ The code fallback (when no env var is set) is `/api/v2`. Override per environmen
 | `/best50`  | `Best50View.vue`  | B50 stats, scatter charts, B35/B15 record tables, image export  |
 | `/songs`   | `SongsView.vue`   | All charts with search, difficulty/version filters, pagination |
 | `/records` | `RecordsView.vue` | Play records with scope tabs (best/all), pagination            |
+| `/admin/songs` | `AdminSongsView.vue` | Admin-only: song/chart management, quick search, batch edit (guarded by `router.beforeEach` — requires `userStore.is_admin`) |
 | `/about`   | `AboutView.vue`   | Project description and GitHub link                            |
 
 All view components are **lazy-loaded** via `() => import(...)`.

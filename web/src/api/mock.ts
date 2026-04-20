@@ -1,8 +1,8 @@
 import type { ChartInfo, PlayRecordInfo, PlayRecordResponse, User, AllChartsResponse } from './types'
-import type { Difficulty } from './types'
+import { DIFFICULTY_ORDER } from '@/utils/difficulty'
 
 // ---- Mock Song Data ----
-const difficulties: Difficulty[] = ['detected', 'invaded', 'massive', 'reboot']
+const difficulties = DIFFICULTY_ORDER
 
 const songTitles = [
   { title: 'Paradigm Shift', artist: 'Zekk', version: '1.0', album: 'Core', genre: 'Hardcore', cover: 'Paradigm Shift.png' },
