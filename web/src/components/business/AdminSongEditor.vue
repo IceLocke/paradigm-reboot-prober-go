@@ -192,6 +192,7 @@ import { createSong, updateSong } from '@/api/song'
 import { USE_MOCK } from '@/api/mock'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { DIFFICULTY_ORDER, sortByDifficulty } from '@/utils/difficulty'
+import { coverThumbUrl } from '@/utils/cover'
 import type {
   Song, Chart, ChartInfo, Difficulty,
   CreateSongRequest, UpdateSongRequest, ChartInput,
@@ -447,11 +448,8 @@ window.addEventListener('keydown', onKey)
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 // ---- utils ----
-const coverUrl = (cover: string) => {
-  if (!cover) return ''
-  if (cover.startsWith('http')) return cover
-  return `/cover/${cover}`
-}
+// Thumbnail is plenty for the 96×96 preview; saves bandwidth while editing.
+const coverUrl = coverThumbUrl
 </script>
 
 <style scoped>

@@ -110,6 +110,7 @@ import { NSelect, NEmpty } from 'naive-ui'
 import type { SelectOption } from 'naive-ui'
 import { Search, Check, X } from '@lucide/vue'
 import type { SongListItem } from '@/views/AdminSongsView.vue'
+import { coverThumbUrl } from '@/utils/cover'
 
 const { t } = useI18n()
 
@@ -159,11 +160,9 @@ const pageIndex = ref(1)
 const pagedSongs = computed(() => filteredSongs.value.slice(0, pageSize * pageIndex.value))
 watch(filteredSongs, () => { pageIndex.value = 1 })
 
-const coverUrl = (cover: string) => {
-  if (!cover) return ''
-  if (cover.startsWith('http')) return cover
-  return `/cover/${cover}`
-}
+// Use the thumbnail variant in the admin list — each list row shows the cover
+// at 40×40 CSS px, so the ~1/10 byte-size `_thumb` asset is plenty.
+const coverUrl = coverThumbUrl
 </script>
 
 <style scoped>
