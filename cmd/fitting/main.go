@@ -73,6 +73,7 @@ func main() {
 		MaxDeviation:        fp.MaxDeviation,
 		MinScore:            fp.MinScore,
 		TukeyK:              fp.TukeyK,
+		MinPlayerRecords:    fp.MinPlayerRecords,
 	}
 	cfg := fitting.RunnerConfig{
 		ChartBatchSize:  fp.ChartBatchSize,

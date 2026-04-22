@@ -32,6 +32,7 @@ type Params struct {
 	MaxDeviation        float64 // hard cap on |FittingLevel − Level|
 	MinScore            int     // discard samples with score below this
 	TukeyK              float64 // tuning constant for the Tukey biweight robustness step
+	MinPlayerRecords    int     // drop samples from players with fewer than this many best_play_records (0 = no filter)
 }
 
 // Result is the output of ComputeFitting. FittingLevel is nil when the chart

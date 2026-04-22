@@ -59,19 +59,40 @@ type RunReport struct {
 // batches → compute & persist fitting levels + statistics. Any context
 // cancellation aborts promptly; partial progress stays persisted (updates
 // are committed per-chart, not per-batch).
-func (r *Runner) Run(ctx context.Context) (RunReport, error) {
-	report := RunReport{Started: time.Now()}
+//
+// Named returns so the deferred finalizer can inspect err and emit a
+// per-outcome log line (errors → ERROR, otherwise INFO), plus unconditionally
+// stamp report.Completed / report.Duration regardless of exit path.
+func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
+	report.Started = time.Now()
 	slog.InfoContext(ctx, "fitting run starting",
 		"chart_batch_size", r.cfg.ChartBatchSize,
 		"player_batch_size", r.cfg.PlayerBatchSize,
 		"batch_pause_ms", r.cfg.BatchPause.Milliseconds(),
 	)
+	defer func() {
+		report.Completed = time.Now()
+		report.Duration = report.Completed.Sub(report.Started)
+		attrs := []any{
+			"duration_ms", report.Duration.Milliseconds(),
+			"players_considered", report.PlayersConsidered,
+			"charts_total", report.ChartsTotal,
+			"charts_processed", report.ChartsProcessed,
+			"charts_published", report.ChartsPublished,
+			"charts_abstained", report.ChartsAbstained,
+			"charts_empty", report.ChartsEmpty,
+			"errors", report.ErrorsEncountered,
+		}
+		if err != nil {
+			slog.ErrorContext(ctx, "fitting run failed", append(attrs, "err", err)...)
+		} else {
+			slog.InfoContext(ctx, "fitting run completed", attrs...)
+		}
+	}()
 
 	// 1. Player-skill snapshot (single pass over best_play_records).
 	skills, err := r.collectPlayerSkills(ctx)
 	if err != nil {
-		report.Completed = time.Now()
-		report.Duration = report.Completed.Sub(report.Started)
 		return report, fmt.Errorf("collect player skills: %w", err)
 	}
 	report.PlayersConsidered = len(skills)
@@ -80,8 +101,6 @@ func (r *Runner) Run(ctx context.Context) (RunReport, error) {
 	// 2. Pull the full chart list up front (bounded — charts is a small table).
 	charts, err := r.fetchChartsSorted(ctx)
 	if err != nil {
-		report.Completed = time.Now()
-		report.Duration = report.Completed.Sub(report.Started)
 		return report, fmt.Errorf("fetch charts: %w", err)
 	}
 	report.ChartsTotal = len(charts)
@@ -143,18 +162,6 @@ func (r *Runner) Run(ctx context.Context) (RunReport, error) {
 		}
 	}
 
-	report.Completed = time.Now()
-	report.Duration = report.Completed.Sub(report.Started)
-	slog.InfoContext(ctx, "fitting run completed",
-		"duration_ms", report.Duration.Milliseconds(),
-		"players_considered", report.PlayersConsidered,
-		"charts_total", report.ChartsTotal,
-		"charts_processed", report.ChartsProcessed,
-		"charts_published", report.ChartsPublished,
-		"charts_abstained", report.ChartsAbstained,
-		"charts_empty", report.ChartsEmpty,
-		"errors", report.ErrorsEncountered,
-	)
 	return report, nil
 }
 

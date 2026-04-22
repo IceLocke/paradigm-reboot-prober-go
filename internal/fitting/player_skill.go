@@ -6,7 +6,6 @@ import (
 	"sort"
 	"time"
 
-	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 )
 
@@ -172,7 +171,7 @@ func (r *Runner) fetchBestSamples(
 		return nil, err
 	}
 
-	minRecords := config.GlobalConfig.Fitting.MinPlayerRecords
+	minRecords := r.params.MinPlayerRecords
 	out := make(map[int][]Sample, len(chartIDs))
 	for _, row := range rows {
 		skill, ok := skills[row.Username]
