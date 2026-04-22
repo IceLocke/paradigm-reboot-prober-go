@@ -21,6 +21,7 @@ definitions:
         example: massive
       fitting_level:
         type: number
+        x-nullable: "true"
       id:
         type: integer
       level:
@@ -72,6 +73,7 @@ definitions:
       fitting_level:
         example: 13.4
         type: number
+        x-nullable: "true"
       genre:
         example: Pop
         type: string
@@ -120,6 +122,7 @@ definitions:
         $ref: '#/definitions/model.Difficulty'
       fitting_level:
         type: number
+        x-nullable: "true"
       id:
         type: integer
       level:

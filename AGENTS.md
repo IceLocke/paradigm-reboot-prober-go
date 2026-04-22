@@ -11,6 +11,20 @@ Core features:
 - **B50 Calculation**: Best 35 (old songs, `b15=false`) + Best 15 (new songs, `b15=true`) selection.
 - **Web Frontend**: Dark-themed Vue 3 + TypeScript + Naive UI single-page application.
 - **API Documentation**: Swagger UI auto-generated from code annotations.
+- **Fitting Level Microservice** (`cmd/fitting`): Offline calculator that derives `charts.fitting_level` from `best_play_records` on a configurable interval. Kept as a **separate binary** to honour the “保持查分器本体的单纯性” principle (see below). See `docs/fitting_level.en.md` (English) / `docs/fitting_level.zh.md` (中文) for the full math.
+
+## Design Principle: 保持查分器本体的单纯性
+
+The **probe service** (“查分器本体” = `cmd/server` + its direct dependency graph: controllers, services, repositories, middleware, router) must stay **single-purpose**: it receives score uploads, serves record/B50 queries, and nothing else. Any derived/analytical computation that is not strictly required to answer a live API request lives in a **separate binary** under `cmd/` with its own lifecycle and config namespace.
+
+Concretely this means:
+
+- `cmd/server` must **not** import `internal/fitting`, must not call fitting code, and must not read `config.fitting.*` at request time. The only shared artefact is the DB schema migration of `chart_statistics` (added to `util.InitDB()` so whichever binary starts first keeps the schema consistent).
+- Fitting results are delivered to the probe service **only via the `charts.fitting_level` column** that the existing `ChartInfo` / `ChartInfoSimple` DTOs already expose. No new HTTP surface, no background goroutine in the server process.
+- New analytics tables (currently `chart_statistics`) are owned by the analytical binary and are **not** exposed through any API route. If an endpoint is later needed, expose it from a separate read-only service, not by stapling it onto `cmd/server`.
+- When adding a new analytical workload (e.g. player clustering, chart similarity), create a new `cmd/<name>` binary and a new `internal/<name>` package. Do **not** collocate it with controllers/services/repositories of the probe service.
+
+This keeps the probe hot-path small, makes its memory / latency footprint predictable, and lets the analytical jobs be scaled, paused, or replaced independently.
 
 Go module: `paradigm-reboot-prober-go`
 
@@ -31,7 +45,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 | Linting        | golangci-lint v2.6                                            |
 | CI/CD          | GitHub Actions                                                |
 | Container      | Docker (multi-stage Alpine build)                             |
-| Orchestration  | Docker Compose (app + PostgreSQL 16)                          |
+| Orchestration  | Docker Compose (`db` + `app` by default, `fitting` via `--profile fitting`) |
 | Frontend       | Vue 3 + TypeScript + Vite + Naive UI (in `web/`), pako (gzip request body) |
 | Frontend Lint  | ESLint 10 + typescript-eslint + eslint-plugin-vue              |
 
@@ -42,6 +56,8 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 ├── cmd/
 │   ├── server/
 │   │   └── main.go              # Application entry point, Swagger annotations
+│   ├── fitting/
+│   │   └── main.go              # Fitting-level microservice (separate binary)
 │   └── migrate/
 │       ├── main.go              # Legacy → Go schema migration tool (PostgreSQL)
 │       └── verify/
@@ -55,6 +71,11 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── user.go              # Register, Login, GetMe, UpdateMe, RefreshUploadToken, ChangePassword, ResetPassword, RefreshToken
 │   │   ├── song.go              # GetAllCharts, GetSingleSongInfo, CreateSong, UpdateSong
 │   │   └── record.go            # GetPlayRecords, GetSongRecords, GetChartRecords, UploadRecords
+│   ├── fitting/                 # Fitting-level calculator library (used ONLY by cmd/fitting)
+│   │   ├── inverter.go          # Closed-form inverse of pkg/rating.SingleRating
+│   │   ├── calculator.go        # Weighting + robust aggregation + shrinkage + deviation cap
+│   │   ├── player_skill.go      # Per-player B50 mean rating collection (keyset pagination)
+│   │   └── runner.go            # Orchestrator: load → batch-process charts → persist
 │   ├── logging/                 # Structured logging infrastructure (slog + context)
 │   │   ├── context.go           # AppendCtx helper, context key for slog attrs
 │   │   ├── handler.go           # ContextHandler wrapping slog.Handler
@@ -71,6 +92,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   ├── user.go              # User, UserBase, UserInDB, UserPublic
 │   │   ├── song.go              # Song, SongBase, Difficulty enum, Chart, ChartInfo, ChartInfoSimple, ChartCSV, ChartWithScore, ChartInput
 │   │   ├── play_record.go       # PlayRecord, BestPlayRecord, PlayRecordBase, PlayRecordInfo, PlayRecordResponse, AllChartsResponse, ToPlayRecordInfo()
+│   │   ├── chart_statistic.go   # ChartStatistic (owned by cmd/fitting; one row per chart)
 │   │   ├── auth.go              # Token, UploadToken (access_token + refresh_token)
 │   │   ├── common.go            # Response (generic error/message response)
 │   │   └── request/             # Request DTOs
@@ -97,10 +119,12 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   │   └── auth.go              # Password hashing (bcrypt), JWT generation/validation
 │   └── rating/
 │       └── rating.go            # Single-chart rating calculation algorithm
-├── docs/                         # Auto-generated Swagger docs (do NOT edit manually)
+├── docs/                         # Auto-generated Swagger docs (do NOT edit manually) + hand-written design docs
 │   ├── docs.go
 │   ├── swagger.json
-│   └── swagger.yaml
+│   ├── swagger.yaml
+│   ├── fitting_level.en.md      # Mathematical specification of the fitting-level calculator (English)
+│   └── fitting_level.zh.md      # Mathematical specification of the fitting-level calculator (中文)
 ├── web/                          # Vue 3 frontend (has its own AGENTS.md)
 │   ├── src/                     # Vue components, stores, utils, styles
 │   ├── public/                  # Static assets (Git submodule → prp-resource)
@@ -195,13 +219,16 @@ The repository layer implements a **cache-aside** pattern using [`jellydator/ttl
 
 ### Database Tables
 
-| Table               | Model            | Primary Key       |
-|---------------------|------------------|-------------------|
-| `prober_users`      | `User`           | `id`              |
-| `songs`             | `Song`           | `id`              |
-| `charts`            | `Chart`          | `id`              |
-| `play_records`      | `PlayRecord`     | `id`              |
-| `best_play_records` | `BestPlayRecord` | `id`              |
+| Table                | Model            | Primary Key       |
+|----------------------|------------------|-------------------|
+| `prober_users`       | `User`           | `id`              |
+| `songs`              | `Song`           | `id`              |
+| `charts`             | `Chart`          | `id`              |
+| `play_records`       | `PlayRecord`     | `id`              |
+| `best_play_records`  | `BestPlayRecord` | `id`              |
+| `chart_statistics`   | `ChartStatistic` | `chart_id`        |
+
+`chart_statistics` is owned by the **fitting-calculator microservice** (`cmd/fitting`) and is not read by `cmd/server`. Its schema is migrated by `util.InitDB()` for consistency regardless of which binary starts first. See `docs/fitting_level.en.md` / `docs/fitting_level.zh.md` for its columns and semantics.
 
 All GORM entities embed `BaseModel` (`internal/model/base.go`), which provides `created_at`, `updated_at`, and `deleted_at` columns. GORM automatically manages `created_at`/`updated_at` timestamps and filters soft-deleted rows (`WHERE deleted_at IS NULL`) in all SELECT queries. The `Chart` entity uses a **partial unique index** on `(song_id, difficulty) WHERE deleted_at IS NULL`, so soft-deleted charts do not block re-adding a chart with the same difficulty — this is required because PostgreSQL and SQLite treat `NULL` values in composite UNIQUE indexes as distinct, so naively adding `deleted_at` to the unique index would break uniqueness on live rows instead.
 
@@ -260,12 +287,19 @@ pnpm lint         # ESLint
 ### Docker
 
 ```bash
-# Build and run with Docker Compose (app + PostgreSQL)
-docker-compose up -d
+# Default: start db + app (no fitting). Matches the CI integration test.
+docker compose up -d
 
-# Build Docker image only
+# Include the fitting-level microservice alongside app + db
+docker compose --profile fitting up -d
+# Or enable the profile permanently via the environment variable
+COMPOSE_PROFILES=fitting docker compose up -d
+
+# Build Docker image only (produces both ./server and ./fitting inside the image)
 docker build -t prprober-app .
 ```
+
+The image is multi-stage and compiles **both** binaries (`./server` and `./fitting`). The `app` service uses the default `CMD ["./server"]`; the `fitting` service overrides it via `command: ["./fitting"]` and is gated behind the `fitting` Compose profile so `docker compose up` keeps its existing behaviour (db + app only) and the CI integration test remains unchanged.
 
 The server listens on port **8080** by default. Health check: `GET /healthz`.
 
@@ -284,6 +318,34 @@ go run cmd/migrate/verify/main.go
 
 See `legacy/MIGRATION.md` for the full step-by-step guide.
 
+### Fitting-Level Microservice (cmd/fitting)
+
+```bash
+# Local: continuous mode (runs every fitting.interval, default 6h) until SIGINT/SIGTERM
+go run cmd/fitting/main.go -config config/config.yaml
+
+# Local: one-shot run (useful for cron, smoke tests, backfill)
+go run cmd/fitting/main.go -config config/config.yaml -once
+
+# Local: build standalone binary
+go build -o fitting ./cmd/fitting/main.go
+
+# Containerised: start alongside db + app via the `fitting` Compose profile
+docker compose --profile fitting up -d
+
+# Containerised: tail fitting logs
+docker compose --profile fitting logs -f fitting
+```
+
+Scheduling: the binary carries its **own internal `time.Ticker`** (period = `FITTING_INTERVAL`, default `6h`), so a single long-lived process is the full scheduler — **no host cron required**. For external scheduling (cron / systemd timer / k8s CronJob) override the service to `command: ["./fitting", "-once"]`, drop the `profiles` entry, set `restart: "no"`, and invoke via `docker compose run --rm fitting`; see the “Docker / docker-compose” subsection of `docs/fitting_level.en.md` / `docs/fitting_level.zh.md` for the exact snippet.
+
+The binary shares `config/config.yaml` and the DB schema with `cmd/server` but
+runs as a **separate process** — it never starts an HTTP listener, never
+imports `internal/router` or `internal/controller`, and only writes to
+`charts.fitting_level` + `chart_statistics`. See `docs/fitting_level.en.md` /
+`docs/fitting_level.zh.md` for the algorithm and its “Operational guide”
+section for deployment notes.
+
 ### Swagger Documentation
 
 ```bash
@@ -297,6 +359,18 @@ swag init -g cmd/server/main.go
 Swagger UI is available at: `http://localhost:8080/swagger/index.html`
 
 **Important**: After modifying any Swagger annotations (godoc comments on controller methods or in `cmd/server/main.go`), you MUST run `swag init -g cmd/server/main.go` and commit the regenerated files in `docs/`. The CI pipeline checks for Swagger doc consistency and will fail if they are out of date.
+
+#### Nullable JSON fields (`*T` without `omitempty`)
+
+When a Go struct field is a pointer without `omitempty` — e.g. `FittingLevel *float64 \`json:"fitting_level"\`` — the backend serializes `nil` as JSON `null` rather than omitting the key. To reflect this in the OpenAPI contract, add the `extensions:"x-nullable=true"` struct tag:
+
+```go
+FittingLevel *float64 `gorm:"column:fitting_level" json:"fitting_level" extensions:"x-nullable=true"`
+```
+
+`swag init` emits this as an `x-nullable` extension in `docs/swagger.json`. The frontend `pnpm generate:api` pipeline (`web/scripts/postprocess-openapi.mjs`) promotes it to OpenAPI 3's native `nullable: true`, so `openapi-typescript` generates `T | null` for the field. `types.ts`'s `DeepRequired<>` wrapper preserves the null.
+
+(Pointer fields **with** `omitempty`, e.g. `SongBaseOverride`'s `*string` fields, are genuinely optional — do not mark those nullable; the frontend handles them via `Partial<Pick<...>>` in `types.ts`.)
 
 ## Testing
 
@@ -332,6 +406,7 @@ go test -v ./pkg/rating/...
 | `internal/middleware`     | Auth middleware (valid/invalid/expired/missing tokens)  |
 | `internal/model`         | Model validation and enum logic                        |
 | `internal/util`          | CSV generation, parsing (UTF-8, GBK encoding, BOM)     |
+| `internal/fitting`       | Rating inverter round-trip; calculator (noise-free, outlier-robust, shrinkage, deviation cap, sparse); runner end-to-end against in-memory SQLite |
 
 
 ## Linting
@@ -383,8 +458,21 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `metrics.addr`               | `METRICS_ADDR`    | `:9090`                          | Listen address for the metrics server (MUST differ from `server.port`)   |
 | `metrics.path`               | `METRICS_PATH`    | `/metrics`                       | URL path that serves Prometheus metrics (must start with `/`)            |
 | `metrics.exclude_paths`      | `METRICS_EXCLUDE_PATHS` | `["/healthz"]`              | Route-template prefixes excluded from HTTP metrics (env var comma-separated) |
+| `fitting.enabled`            | `FITTING_ENABLED` | `true`                         | Master switch for the fitting-calculator microservice (`cmd/fitting`)     |
+| `fitting.interval`           | `FITTING_INTERVAL` | `6h`                         | Ticker period for continuous mode (Go duration string, must be > 0)       |
+| `fitting.min_samples`        | —               | `8.0`                             | Minimum effective sample size (`N_eff`) to publish `FittingLevel`         |
+| `fitting.min_player_records` | —               | `20`                              | Minimum total best records a player must have to contribute samples        |
+| `fitting.proximity_sigma`    | —               | `20.0`                            | Gaussian σ in rating units centered on 10×Level (proximity weight)        |
+| `fitting.volume_full_at`     | —               | `50`                              | Records count at which a player receives full volume weight (1.0)          |
+| `fitting.prior_strength`     | —               | `5.0`                             | κ in Bayesian shrinkage toward the official level                          |
+| `fitting.max_deviation`      | —               | `1.5`                             | Hard cap on \|FittingLevel − Level\|                                       |
+| `fitting.min_score`          | —               | `500000`                          | Discard samples with score below this threshold                            |
+| `fitting.tukey_k`            | —               | `4.685`                           | Tukey biweight tuning constant                                             |
+| `fitting.chart_batch_size`   | —               | `200`                             | Charts processed per DB batch (keeps per-tx footprint small)                |
+| `fitting.player_batch_size`  | —               | `500`                             | Distinct users fetched per paginated skill-collection query                 |
+| `fitting.batch_pause`        | `FITTING_BATCH_PAUSE` | `50ms`                     | Sleep between chart batches to ease DB load (Go duration string)           |
 
-**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range, or if `logging.output` is not one of `stdout`/`stderr`/`file`, or if `logging.output=file` but `logging.file` is empty, or if `logging.format` is not `text` or `json`, or if `metrics.enabled=true` and any of `metrics.addr` is empty / `metrics.path` does not start with `/` / `metrics.addr` equals `server.port`.
+**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range, or if `logging.output` is not one of `stdout`/`stderr`/`file`, or if `logging.output=file` but `logging.file` is empty, or if `logging.format` is not `text` or `json`, or if `metrics.enabled=true` and any of `metrics.addr` is empty / `metrics.path` does not start with `/` / `metrics.addr` equals `server.port`, or if `fitting.interval`/`fitting.batch_pause` cannot be parsed as durations, or if `fitting.interval` is non-positive, or if `fitting.proximity_sigma`/`fitting.tukey_k` is non-positive, or if `fitting.prior_strength`/`fitting.max_deviation` is negative, or if `fitting.chart_batch_size`/`fitting.player_batch_size` is non-positive.
 
 ## CI/CD Pipeline
 

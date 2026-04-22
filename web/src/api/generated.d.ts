@@ -886,7 +886,7 @@ export interface components {
             created_at?: string;
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
-            fitting_level?: number;
+            fitting_level?: number | null;
             id?: number;
             level?: number;
             level_design?: string;
@@ -917,7 +917,7 @@ export interface components {
             /** @example massive */
             difficulty?: components["schemas"]["model.Difficulty"];
             /** @example 13.4 */
-            fitting_level?: number;
+            fitting_level?: number | null;
             /** @example Pop */
             genre?: string;
             /** @example 10 */
@@ -945,7 +945,7 @@ export interface components {
             b15?: boolean;
             cover?: string;
             difficulty?: components["schemas"]["model.Difficulty"];
-            fitting_level?: number;
+            fitting_level?: number | null;
             id?: number;
             level?: number;
             song_id?: number;

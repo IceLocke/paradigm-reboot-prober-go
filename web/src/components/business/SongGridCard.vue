@@ -30,7 +30,14 @@
     <div class="card-info">
       <span class="card-title" :title="chart.title">{{ chart.title }}</span>
       <span :class="['card-version', { 'card-version--new': chart.b15 }]">v{{ chart.version }}{{ chart.b15 ? ' ✦' : '' }}</span>
-      <span><DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" :short="true" /></span>
+      <span class="card-badge-row">
+        <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" :short="true" />
+        <span
+          v-if="chart.fitting_level != null"
+          class="card-fitting"
+          :title="t('term.fitting_level') + ' ' + chart.fitting_level.toFixed(1)"
+        >≈{{ chart.fitting_level.toFixed(1) }}</span>
+      </span>
     </div>
   </div>
 </template>
@@ -170,5 +177,21 @@ const coverUrl = computed(() => {
 
 .card-version--new {
   color: var(--accent);
+}
+
+.card-badge-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.card-fitting {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  cursor: help;
 }
 </style>
