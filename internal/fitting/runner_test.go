@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
@@ -41,10 +42,11 @@ func setupTestDB(t *testing.T) *gorm.DB {
 }
 
 // TestRunner_EndToEnd runs the full pipeline against an in-memory DB seeded
-// with a single chart whose *true* level is 13.0 but officially 14.0, plus
+// with a single chart whose *true* level is 15.5 but officially 16.5, plus
 // many simulated best_play_records produced via the real SingleRating formula.
+// The chart lives in the lv15+ hot zone where most real plays actually happen.
 // After Run() we expect charts.fitting_level to be populated and pulled
-// toward 13.0 (bounded by the Bayesian prior).
+// toward 15.5 (bounded by the Bayesian prior).
 func TestRunner_EndToEnd(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
@@ -71,7 +73,7 @@ func TestRunner_EndToEnd(t *testing.T) {
 	chart := model.Chart{
 		SongID:     song.ID,
 		Difficulty: model.DifficultyMassive,
-		Level:      14.0, // official
+		Level:      16.5, // official
 		Notes:      1000,
 	}
 	if err := db.Create(&chart).Error; err != nil {
@@ -82,7 +84,7 @@ func TestRunner_EndToEnd(t *testing.T) {
 	fillerChart := model.Chart{
 		SongID:     song.ID,
 		Difficulty: model.DifficultyInvaded,
-		Level:      12.0,
+		Level:      14.5,
 		Notes:      800,
 	}
 	if err := db.Create(&fillerChart).Error; err != nil {
@@ -90,8 +92,8 @@ func TestRunner_EndToEnd(t *testing.T) {
 	}
 
 	// --- Seed 30 players, each with a best record on both charts. The test
-	// chart is "truly" level 13.0 (1 level easier than official). ---
-	const trueLevel = 13.0
+	// chart is "truly" level 15.5 (1 level easier than official). ---
+	const trueLevel = 15.5
 	for i := 0; i < 30; i++ {
 		username := fmt.Sprintf("player%02d", i)
 		user := model.User{
@@ -107,7 +109,9 @@ func TestRunner_EndToEnd(t *testing.T) {
 		if err := db.Create(&user).Error; err != nil {
 			t.Fatalf("create user: %v", err)
 		}
-		skill := 125.0 + float64(i)*0.8 // rating range [125, 148.2]
+		// skill ~ 155..162 — matches trueLevel so scores land in the real hot
+		// zone [1_000_000, 1_010_000].
+		skill := 155.0 + float64(i)*0.25
 
 		// Best record on the *test* chart. Score is synthesized to match
 		// SingleRating(trueLevel, score) ≈ skill.
@@ -129,8 +133,8 @@ func TestRunner_EndToEnd(t *testing.T) {
 		MaxDeviation:        1.5,
 		MinScore:            cfg.MinScore,
 		TukeyK:              cfg.TukeyK,
+		MinPlayerRecords:    1, // admit all players
 	}
-	config.GlobalConfig.Fitting.MinPlayerRecords = 1 // admit all players
 	runner := NewRunner(db, params, RunnerConfig{
 		ChartBatchSize:  10,
 		PlayerBatchSize: 50,
@@ -151,7 +155,7 @@ func TestRunner_EndToEnd(t *testing.T) {
 	if !assert.NotNil(t, updated.FittingLevel, "fitting_level should be populated") {
 		return
 	}
-	// Expect fitting to sit between trueLevel (13.0) and officialLevel (14.0),
+	// Expect fitting to sit between trueLevel (15.5) and officialLevel (16.5),
 	// closer to true because we have many samples and small prior.
 	assert.InDelta(t, trueLevel, *updated.FittingLevel, 0.6)
 	assert.Less(t, *updated.FittingLevel, updated.Level)
@@ -217,6 +221,92 @@ func TestRunner_InsufficientSamples(t *testing.T) {
 	}
 	assert.Nil(t, stat.FittingLevel)
 	assert.Equal(t, 0, stat.SampleCount)
+}
+
+// TestRunner_PersistUpdatesExistingStat covers the read-modify-write UPDATE
+// branch in persist(). The INSERT branch is exercised by every other runner
+// test — this one runs Run() twice to force the "row already exists" path.
+func TestRunner_PersistUpdatesExistingStat(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	song := model.Song{SongBase: model.SongBase{
+		WikiID: "rerun_song", Title: "Rerun", Artist: "A", Genre: "G", Cover: "c",
+		Illustrator: "I", Version: "V", Album: "Al", BPM: "100", Length: "1:00",
+	}}
+	if err := db.Create(&song).Error; err != nil {
+		t.Fatalf("create song: %v", err)
+	}
+	chart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyMassive, Level: 16.5, Notes: 1000}
+	if err := db.Create(&chart).Error; err != nil {
+		t.Fatalf("create chart: %v", err)
+	}
+	filler := model.Chart{SongID: song.ID, Difficulty: model.DifficultyInvaded, Level: 14.5, Notes: 800}
+	if err := db.Create(&filler).Error; err != nil {
+		t.Fatalf("create filler: %v", err)
+	}
+
+	const trueLevel = 15.5
+	for i := 0; i < 10; i++ {
+		u := fmt.Sprintf("p%02d", i)
+		seedUser(t, db, u)
+		skill := 155.0 + float64(i)*0.5
+		seedBestRecord(t, db, u, chart.ID, simulateScore(trueLevel, skill), chart.Level)
+		seedBestRecord(t, db, u, filler.ID, simulateScore(filler.Level, skill), filler.Level)
+	}
+
+	params := Params{
+		MinEffectiveSamples: 2.0,
+		ProximitySigma:      15.0,
+		VolumeFullAt:        3,
+		PriorStrength:       1.0,
+		MaxDeviation:        1.5,
+		MinScore:            500000,
+		TukeyK:              4.685,
+		MinPlayerRecords:    1,
+	}
+
+	// First pass — persist should INSERT a fresh chart_statistics row.
+	r1 := NewRunner(db, params, RunnerConfig{ChartBatchSize: 10, PlayerBatchSize: 50})
+	if _, err := r1.Run(ctx); err != nil {
+		t.Fatalf("first run: %v", err)
+	}
+	var first model.ChartStatistic
+	if err := db.Where("chart_id = ?", chart.ID).First(&first).Error; err != nil {
+		t.Fatalf("first stat: %v", err)
+	}
+	firstCreated := first.CreatedAt
+
+	// Sleep just long enough that SQLite's time.Now()-based timestamps can
+	// differ between runs (sqlite stores microsecond precision via GORM).
+	time.Sleep(5 * time.Millisecond)
+
+	// Second pass — same data, same chart, so persist must take the UPDATE
+	// branch. CreatedAt must be preserved; LastComputedAt should advance.
+	r2 := NewRunner(db, params, RunnerConfig{ChartBatchSize: 10, PlayerBatchSize: 50})
+	if _, err := r2.Run(ctx); err != nil {
+		t.Fatalf("second run: %v", err)
+	}
+	var second model.ChartStatistic
+	if err := db.Where("chart_id = ?", chart.ID).First(&second).Error; err != nil {
+		t.Fatalf("second stat: %v", err)
+	}
+
+	// Still exactly one stats row for this chart.
+	var count int64
+	if err := db.Model(&model.ChartStatistic{}).Where("chart_id = ?", chart.ID).Count(&count).Error; err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	assert.Equal(t, int64(1), count, "UPDATE must not create a duplicate row")
+
+	// CreatedAt is preserved across UPDATE.
+	assert.WithinDuration(t, firstCreated, second.CreatedAt, time.Microsecond,
+		"CreatedAt must be preserved by UPDATE branch")
+
+	// LastComputedAt advanced — proves the UPDATE actually wrote.
+	assert.True(t, second.LastComputedAt.After(first.LastComputedAt) ||
+		second.LastComputedAt.Equal(first.LastComputedAt),
+		"LastComputedAt should be >= first run's")
 }
 
 // seedBestRecord inserts one PlayRecord + one BestPlayRecord pointing at it,
