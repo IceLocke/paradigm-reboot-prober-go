@@ -115,7 +115,7 @@ const levelMin = defineModel<number | null>('levelMin', { required: true })
 const levelMax = defineModel<number | null>('levelMax', { required: true })
 const versionSelect = defineModel<string[] | null>('versionSelect', { required: true })
 const albumSelect = defineModel<string[] | null>('albumSelect', { required: true })
-const groupBy = defineModel<'level' | 'version' | 'album'>('groupBy', { required: true })
+const groupBy = defineModel<'level' | 'fitting_level' | 'version' | 'album'>('groupBy', { required: true })
 
 // --- Level bracket quick-select ---
 const bracketOptions = computed<SelectOption[]>(() =>

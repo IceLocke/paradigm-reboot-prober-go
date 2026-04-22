@@ -18,13 +18,29 @@ import type { components } from './generated'
 type Schemas = components['schemas']
 
 /**
- * Recursively make all properties required and non-nullable.
- * Used for API *response* models where the backend always returns full objects.
+ * Recursively make all properties required — but **preserve** nullability.
+ *
+ * The backend always returns complete response objects, so every property in
+ * an OpenAPI response schema is really non-optional. Here `-?` strips the
+ * optional marker, then:
+ *   - If the field's type union contains `null` (backend declared it
+ *     `nullable: true`, Go `*T` without `omitempty`), we recurse on
+ *     `NonNullable<T[K]>` and add `| null` back — the compiler still forces
+ *     callers to handle the null case.
+ *   - Otherwise we recurse on `NonNullable<T[K]>` so nested `T | undefined`
+ *     noise from OpenAPI is collapsed to `T`.
+ *
+ * Genuinely optional fields (Go `*T` **with** `omitempty`, e.g.
+ * `SongBaseOverride`) are a different thing — they may be absent from the
+ * response entirely. Those are handled via targeted `Omit` + `Partial` below.
  */
 type DeepRequired<T> = T extends (infer U)[]
   ? DeepRequired<U>[]
   : T extends object
-    ? { [K in keyof T]-?: DeepRequired<NonNullable<T[K]>> }
+    ? { [K in keyof T]-?: null extends T[K]
+        ? DeepRequired<NonNullable<T[K]>> | null
+        : DeepRequired<NonNullable<T[K]>>
+      }
     : T
 
 // ─── Enums ────────────────────────────────────────────────────────
@@ -37,7 +53,7 @@ export type UploadToken = DeepRequired<Schemas['model.UploadToken']>
 // ─── Domain Models (response — always complete) ───────────────────
 export type User = DeepRequired<Schemas['model.User']>
 
-/** Fields from SongBaseOverride — genuinely optional (Go `*string`), excluded from DeepRequired. */
+/** Fields from SongBaseOverride — genuinely optional (Go `*string` + `omitempty`), excluded from DeepRequired. */
 type SongBaseOverrideKeys = 'override_title' | 'override_artist' | 'override_version' | 'override_cover'
 
 export type Chart = Omit<DeepRequired<Schemas['model.Chart']>, 'song' | SongBaseOverrideKeys> &
@@ -55,8 +71,13 @@ export type PlayRecord = Omit<DeepRequired<Schemas['model.PlayRecord']>, 'chart'
   chart?: Chart
 }
 export type PlayRecordBase = DeepRequired<Schemas['model.PlayRecordBase']>
-export type PlayRecordInfo = DeepRequired<Schemas['model.PlayRecordInfo']>
-export type PlayRecordResponse = DeepRequired<Schemas['model.PlayRecordResponse']>
+export type PlayRecordInfo = Omit<DeepRequired<Schemas['model.PlayRecordInfo']>, 'chart'> & {
+  // ChartInfoSimple already has fitting_level: number | null via DeepRequired.
+  chart: ChartInfoSimple
+}
+export type PlayRecordResponse = Omit<DeepRequired<Schemas['model.PlayRecordResponse']>, 'records'> & {
+  records: PlayRecordInfo[]
+}
 
 // ─── All-Charts scope ──────────────────────────────────────────────
 export type ChartWithScore = DeepRequired<Schemas['model.ChartWithScore']>

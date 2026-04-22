@@ -360,6 +360,18 @@ Swagger UI is available at: `http://localhost:8080/swagger/index.html`
 
 **Important**: After modifying any Swagger annotations (godoc comments on controller methods or in `cmd/server/main.go`), you MUST run `swag init -g cmd/server/main.go` and commit the regenerated files in `docs/`. The CI pipeline checks for Swagger doc consistency and will fail if they are out of date.
 
+#### Nullable JSON fields (`*T` without `omitempty`)
+
+When a Go struct field is a pointer without `omitempty` — e.g. `FittingLevel *float64 \`json:"fitting_level"\`` — the backend serializes `nil` as JSON `null` rather than omitting the key. To reflect this in the OpenAPI contract, add the `extensions:"x-nullable=true"` struct tag:
+
+```go
+FittingLevel *float64 `gorm:"column:fitting_level" json:"fitting_level" extensions:"x-nullable=true"`
+```
+
+`swag init` emits this as an `x-nullable` extension in `docs/swagger.json`. The frontend `pnpm generate:api` pipeline (`web/scripts/postprocess-openapi.mjs`) promotes it to OpenAPI 3's native `nullable: true`, so `openapi-typescript` generates `T | null` for the field. `types.ts`'s `DeepRequired<>` wrapper preserves the null.
+
+(Pointer fields **with** `omitempty`, e.g. `SongBaseOverride`'s `*string` fields, are genuinely optional — do not mark those nullable; the frontend handles them via `Partial<Pick<...>>` in `types.ts`.)
+
 ## Testing
 
 ### Running Tests
