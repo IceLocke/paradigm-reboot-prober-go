@@ -35,8 +35,8 @@
         <span
           v-if="chart.fitting_level != null"
           class="card-fitting"
-          :title="t('term.fitting_level') + ' ' + chart.fitting_level.toFixed(1)"
-        >≈{{ chart.fitting_level.toFixed(1) }}</span>
+          :title="t('term.fitting_level') + ' ' + chart.fitting_level.toFixed(2)"
+        >≈{{ chart.fitting_level.toFixed(2) }}</span>
       </span>
     </div>
   </div>
