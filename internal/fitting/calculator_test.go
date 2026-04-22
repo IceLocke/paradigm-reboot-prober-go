@@ -434,3 +434,118 @@ func TestWeightedMedian_EdgeCases(t *testing.T) {
 	// Sorted: [1, 2, 3, 4, 5], positional median at index n/2 = 2 → value 3.
 	assert.InDelta(t, 3.0, weightedMedian([]float64{5, 1, 3, 2, 4}, []float64{0, 0, 0, 0, 0}), 1e-9)
 }
+
+
+// --- DeviationPenalty coverage --------------------------------------------
+//
+// The penalty targets the exact scenario the user hit in production: an
+// official lv14 chart that ended up with a handful of high-skill plays and
+// therefore appeared "much harder" than it really is. Without the penalty,
+// the static κ=5 shrinkage leaves the fit at (or near) the MaxDeviation cap.
+// With the penalty, the prior is inflated by (dev² × nRef/nEff) and the fit
+// collapses back toward the official level. The mirror test below verifies
+// that DeviationPenalty=0 recovers the original behaviour exactly.
+
+// fiveHighSkillSamples builds 5 identical high-skill samples that, when fed
+// to ComputeFitting with *any* officialLevel, all invert to ≈17.0.
+func fiveHighSkillSamples() []Sample {
+	const trueLevel = 17.0
+	const skill = 170.0
+	score := simulateScore(trueLevel, skill)
+	out := make([]Sample, 5)
+	for i := range out {
+		out[i] = Sample{
+			Username:      string(rune('a' + i)),
+			Score:         score,
+			PlayerSkill:   skill,
+			PlayerRecords: 100, // full volume weight
+		}
+	}
+	return out
+}
+
+// TestComputeFitting_DeviationPenalty_PullsSmallSampleTowardOfficial covers
+// the core motivation: a scarcely-played lv14 chart whose 5 samples reflect a
+// "true" level of ~17. The penalty must override the static MaxDeviation cap
+// so the published fit lands close to the official 14.0 rather than at the
+// cap edge (15.5).
+func TestComputeFitting_DeviationPenalty_PullsSmallSampleTowardOfficial(t *testing.T) {
+	params := defaultParams()
+	params.MinEffectiveSamples = 3.0
+	params.PriorStrength = 5.0
+	params.MaxDeviation = 1.5
+	params.DeviationPenalty = 2.0
+
+	officialLevel := 14.0
+	res := ComputeFitting(officialLevel, fiveHighSkillSamples(), params)
+
+	if !assert.NotNil(t, res.FittingLevel, "should still publish with 5 effective samples") {
+		return
+	}
+	// Expected (see penalty derivation in calculator.go): boost ≈ 22.6,
+	// κ_eff ≈ 113, shrunk ≈ 14.13. We assert a generous upper bound to absorb
+	// proximity-weight / Tukey-scale jitter while still proving the penalty
+	// pulled us well below the static-cap value (15.5).
+	assert.Less(t, *res.FittingLevel, 14.5,
+		"penalty must pull fit back toward official, beating the MaxDeviation cap")
+	assert.Greater(t, *res.FittingLevel, officialLevel-0.01,
+		"must not overshoot below the official level")
+}
+
+// TestComputeFitting_DeviationPenalty_Disabled_HitsStaticCap verifies that
+// DeviationPenalty=0 is a *no-op*: the same data lands exactly at the legacy
+// MaxDeviation-capped value. This is a regression guard for users who want
+// to keep the old behaviour by zeroing the new parameter.
+func TestComputeFitting_DeviationPenalty_Disabled_HitsStaticCap(t *testing.T) {
+	params := defaultParams()
+	params.MinEffectiveSamples = 3.0
+	params.PriorStrength = 5.0
+	params.MaxDeviation = 1.5
+	params.DeviationPenalty = 0 // explicitly disabled
+
+	officialLevel := 14.0
+	res := ComputeFitting(officialLevel, fiveHighSkillSamples(), params)
+
+	if !assert.NotNil(t, res.FittingLevel) {
+		return
+	}
+	// Without the penalty, shrunk = (5·17 + 5·14)/10 = 15.5 exactly matches
+	// the 1.5-level cap, so the published fit is pinned to officialLevel+1.5.
+	assert.InDelta(t, officialLevel+params.MaxDeviation, *res.FittingLevel, 0.01,
+		"disabled penalty ⇒ behaviour must equal the old static-κ + MaxDeviation path")
+}
+
+// TestComputeFitting_DeviationPenalty_LowDeviation_NoOp proves that when the
+// weighted mean is *close* to the official level, the penalty is negligible
+// (≈1× boost) regardless of sample sparsity. This guards against accidental
+// over-shrinkage of well-behaved charts.
+func TestComputeFitting_DeviationPenalty_LowDeviation_NoOp(t *testing.T) {
+	params := defaultParams()
+	params.MinEffectiveSamples = 3.0
+	params.PriorStrength = 5.0
+	params.DeviationPenalty = 2.0
+
+	// Samples that imply ≈14.1 for a chart labelled 14.0 (dev = 0.1).
+	officialLevel := 14.0
+	const trueLevel = 14.1
+	const skill = 141.0
+	score := simulateScore(trueLevel, skill)
+	samples := make([]Sample, 5)
+	for i := range samples {
+		samples[i] = Sample{
+			Username:      string(rune('a' + i)),
+			Score:         score,
+			PlayerSkill:   skill,
+			PlayerRecords: 100,
+		}
+	}
+	res := ComputeFitting(officialLevel, samples, params)
+	if !assert.NotNil(t, res.FittingLevel) {
+		return
+	}
+	// boost ≈ 1 + 2·0.01·(6/5) ≈ 1.024 ⇒ barely touches κ. With κ=5, nEff≈5,
+	// the old formula would give (5·14.1+5·14)/10 = 14.05. The new formula
+	// yields ≈14.0495 — indistinguishable at our tolerance.
+	assert.InDelta(t, 14.05, *res.FittingLevel, 0.02,
+		"negligible penalty when dev≈0: must track the old shrinkage result")
+}

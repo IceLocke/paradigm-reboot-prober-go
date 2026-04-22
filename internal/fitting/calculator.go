@@ -29,6 +29,7 @@ type Params struct {
 	ProximitySigma      float64 // σ of the Gaussian proximity weight, in rating units
 	VolumeFullAt        int     // saturation point of the volume weight (records)
 	PriorStrength       float64 // κ in the Bayesian shrinkage toward the official level
+	DeviationPenalty    float64 // λ; extra prior weight when sample-mean deviates from official (0 disables)
 	MaxDeviation        float64 // hard cap on |FittingLevel − Level|
 	MinScore            int     // discard samples with score below this
 	TukeyK              float64 // tuning constant for the Tukey biweight robustness step
@@ -165,8 +166,36 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 		return res
 	}
 
-	// ----- 5. Shrinkage + deviation cap -----
-	shrunk := (nEff*mean + params.PriorStrength*officialLevel) / (nEff + params.PriorStrength)
+	// ----- 5. Bayesian shrinkage + deviation cap -----
+	//
+	// Standard conjugate shrinkage is (nEff·mean + κ·official)/(nEff + κ).
+	// With a static κ, a handful of outlier players on a scarcely-played
+	// chart can drag the fit several levels away from the official value,
+	// which is almost never what we want: the dataset simply isn't large
+	// enough to justify that much confidence.
+	//
+	// We therefore inflate κ dynamically when **both** of these are true:
+	//
+	//   (a) the weighted mean has drifted far from the official level, and
+	//   (b) the effective sample count is small relative to the threshold
+	//       we consider "fully trustworthy" (2× MinEffectiveSamples).
+	//
+	// The multiplicative form  (1 + λ·dev²·nRef/nEff)  is zero-cost when
+	// dev≈0 or nEff≫nRef, and grows quadratically in dev / inversely in
+	// nEff, which matches the intuition that larger deviations demand more
+	// evidence. λ = params.DeviationPenalty; set it to 0 to recover the
+	// original static-κ behaviour.
+	dev := mean - officialLevel
+	nRef := 2.0 * params.MinEffectiveSamples
+	if nRef < 1.0 {
+		nRef = 1.0
+	}
+	boost := 1.0
+	if params.DeviationPenalty > 0 {
+		boost = 1.0 + params.DeviationPenalty*dev*dev*(nRef/nEff)
+	}
+	kappaEff := params.PriorStrength * boost
+	shrunk := (nEff*mean + kappaEff*officialLevel) / (nEff + kappaEff)
 	if params.MaxDeviation > 0 {
 		if diff := shrunk - officialLevel; diff > params.MaxDeviation {
 			shrunk = officialLevel + params.MaxDeviation

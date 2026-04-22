@@ -62,6 +62,7 @@ type Config struct {
 		ProximitySigma   float64 `yaml:"proximity_sigma"`    // Gaussian σ (rating units) centered at 10×Level for the proximity weight
 		VolumeFullAt     int     `yaml:"volume_full_at"`     // record count at which a player receives full volume weight (1.0)
 		PriorStrength    float64 `yaml:"prior_strength"`     // κ in Bayesian-style shrinkage toward the official level
+		DeviationPenalty float64 `yaml:"deviation_penalty"`  // λ; extra prior weight when sample-mean deviates from official (0 disables)
 		MaxDeviation     float64 `yaml:"max_deviation"`      // |FittingLevel − Level| hard cap, in level units
 		MinScore         int     `yaml:"min_score"`          // discard samples with score below this threshold
 		TukeyK           float64 `yaml:"tukey_k"`            // Tukey biweight tuning constant (usually 4.685)
@@ -114,6 +115,7 @@ func InitDefaults() {
 	GlobalConfig.Fitting.ProximitySigma = 20.0
 	GlobalConfig.Fitting.VolumeFullAt = 50
 	GlobalConfig.Fitting.PriorStrength = 5.0
+	GlobalConfig.Fitting.DeviationPenalty = 2.0
 	GlobalConfig.Fitting.MaxDeviation = 1.5
 	GlobalConfig.Fitting.MinScore = 500000
 	GlobalConfig.Fitting.TukeyK = 4.685
@@ -311,6 +313,9 @@ func LoadConfig(configPath string) {
 	}
 	if GlobalConfig.Fitting.PriorStrength < 0 {
 		log.Fatalf("fitting.prior_strength must be ≥ 0, got %f", GlobalConfig.Fitting.PriorStrength)
+	}
+	if GlobalConfig.Fitting.DeviationPenalty < 0 {
+		log.Fatalf("fitting.deviation_penalty must be ≥ 0, got %f", GlobalConfig.Fitting.DeviationPenalty)
 	}
 	if GlobalConfig.Fitting.MaxDeviation < 0 {
 		log.Fatalf("fitting.max_deviation must be ≥ 0, got %f", GlobalConfig.Fitting.MaxDeviation)

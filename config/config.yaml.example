@@ -55,6 +55,7 @@ fitting:
   proximity_sigma: 20.0     # Gaussian σ in rating units (centered on 10×Level)
   volume_full_at: 50        # a player at this record count receives full volume weight
   prior_strength: 5.0       # κ in Bayesian shrinkage toward the official level
+  deviation_penalty: 2.0    # λ; scales extra prior weight with dev² and sample sparsity (0 disables)
   max_deviation: 1.5        # hard cap on |fitting_level − level|
   min_score: 500000         # discard samples below this score threshold
   tukey_k: 4.685            # Tukey biweight tuning constant (outlier trimming)

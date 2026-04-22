@@ -70,6 +70,7 @@ func main() {
 		ProximitySigma:      fp.ProximitySigma,
 		VolumeFullAt:        fp.VolumeFullAt,
 		PriorStrength:       fp.PriorStrength,
+		DeviationPenalty:    fp.DeviationPenalty,
 		MaxDeviation:        fp.MaxDeviation,
 		MinScore:            fp.MinScore,
 		TukeyK:              fp.TukeyK,
