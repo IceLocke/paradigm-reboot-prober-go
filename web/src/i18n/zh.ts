@@ -211,6 +211,23 @@ const zh = {
     content_2: '本网站与击弦网络及相关游戏开发、发行、分发公司无任何关系，均使用互联网公开资源，相关版权归属于它们各自的所有者。本网站不包含任何直接访问官方服务器中用户数据的功能。',
     github: '在 GitHub 上查看',
   },
+  health: {
+    title: '服务状态',
+    subtitle: '后端 API 实时健康检查',
+    endpoint: '端点',
+    http_status: 'HTTP 状态',
+    latency: '延迟',
+    checked_at: '检查时间',
+    response: '响应内容',
+    error: '错误信息',
+    empty_body: '（空响应）',
+    status: {
+      checking: '检查中...',
+      healthy: '正常',
+      unhealthy: '异常',
+      unreachable: '无法访问',
+    },
+  },
 }
 
 export default zh
