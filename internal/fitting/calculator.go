@@ -26,7 +26,8 @@ type Sample struct {
 // the full derivation.
 type Params struct {
 	MinEffectiveSamples float64 // minimum N_eff to publish a FittingLevel
-	ProximitySigma      float64 // σ of the Gaussian proximity weight, in rating units
+	ProximitySigma      float64 // σ of the Gaussian proximity weight (skill ≤ 10·Level side), in rating units
+	HighSkillSigmaRatio float64 // σ multiplier for skill > 10·Level; <=0 or =1 means symmetric (disabled)
 	VolumeFullAt        int     // saturation point of the volume weight (records)
 	PriorStrength       float64 // κ in the Bayesian shrinkage toward the official level
 	DeviationPenalty    float64 // λ; extra prior weight when sample-mean deviates from official (0 disables)
@@ -84,9 +85,33 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 			continue
 		}
 		raw++
-		// proximity weight: Gaussian on |skill − 10·Level| in rating units.
+		// proximity weight: Gaussian on (skill − 10·Level) in rating units.
+		//
+		// Crucially, the σ is **asymmetric**. A player whose skill greatly
+		// exceeds 10·Level (i.e. a high-rank player on a low-level chart) is
+		// almost certain to hit an AP-tier score, at which point InverseLevel
+		// degenerates into simply echoing the player's skill rather than
+		// measuring the chart. We therefore shrink σ on that side
+		// (σ_high = σ · HighSkillSigmaRatio).
+		//
+		// Just rescaling σ is not enough on its own — Kish's N_eff is
+		// scale-invariant, so 5 identically-weighted samples still count as
+		// N_eff=5 even when each carries 1% weight. We therefore also
+		// **hard-discard** any sample beyond a 2.5 · σ radius, so raw /
+		// inferred / N_eff all drop together. Combined with asymmetric σ,
+		// over-skilled samples (diff > 2.5 · σ_high) are dropped entirely,
+		// which is what causes chronically mis-played lv14 charts to correctly
+		// abstain rather than publish a skill-echoed fit.
+		const proximityCutoffSigmas = 2.5
 		diff := s.PlayerSkill - 10.0*officialLevel
-		proximity := math.Exp(-(diff * diff) / (2.0 * params.ProximitySigma * params.ProximitySigma))
+		sigma := params.ProximitySigma
+		if diff > 0 && params.HighSkillSigmaRatio > 0 {
+			sigma = sigma * params.HighSkillSigmaRatio
+		}
+		if math.Abs(diff) > proximityCutoffSigmas*sigma {
+			continue
+		}
+		proximity := math.Exp(-(diff * diff) / (2.0 * sigma * sigma))
 		// volume weight: linear ramp to 1.0 at VolumeFullAt records.
 		volume := 1.0
 		if params.VolumeFullAt > 0 && s.PlayerRecords < params.VolumeFullAt {

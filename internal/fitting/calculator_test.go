@@ -549,3 +549,101 @@ func TestComputeFitting_DeviationPenalty_LowDeviation_NoOp(t *testing.T) {
 	assert.InDelta(t, 14.05, *res.FittingLevel, 0.02,
 		"negligible penalty when dev≈0: must track the old shrinkage result")
 }
+
+
+// --- HighSkillSigmaRatio coverage -----------------------------------------
+//
+// Even with DeviationPenalty protecting the aggregator, the *right* answer for
+// a scarcely-played lv14 chart that only received high-skill plays is not
+// "pull the fit back" but "abstain entirely" — the samples don't contain any
+// genuine difficulty signal. The asymmetric σ achieves that by driving
+// per-sample weight toward zero, which in turn collapses N_eff through the
+// MinEffectiveSamples gate.
+
+// TestComputeFitting_HighSkillSigmaRatio_AbstainsOnOverSkilledSamples covers
+// the user-reported pathology: an "official lv14" chart received 5 samples
+// from skill ≈ 170 players. Without the asymmetric σ, they all get symmetric
+// proximity weight (~0.32 each) and the chart publishes a (wrong) fit.
+// With ratio=0.5, per-sample weight drops by ~30× on the over-skill side,
+// N_eff collapses below 3, and ComputeFitting abstains — which is what we
+// want when the data is actively misleading.
+func TestComputeFitting_HighSkillSigmaRatio_AbstainsOnOverSkilledSamples(t *testing.T) {
+	params := defaultParams()
+	params.MinEffectiveSamples = 3.0
+	params.ProximitySigma = 20.0
+	params.HighSkillSigmaRatio = 0.5 // shrinks σ for skill > 10·Level
+	params.DeviationPenalty = 0      // isolate the proximity-asymmetry effect
+
+	officialLevel := 14.0
+	res := ComputeFitting(officialLevel, fiveHighSkillSamples(), params)
+
+	assert.Nil(t, res.FittingLevel,
+		"must abstain: 5 over-skilled samples should not clear MinEffectiveSamples")
+	assert.Less(t, res.EffectiveSampleSize, params.MinEffectiveSamples,
+		"N_eff collapses because asymmetric σ drives per-sample weight toward 0")
+}
+
+// TestComputeFitting_HighSkillSigmaRatio_Symmetric_MatchesOld guards the
+// rollback path: when ratio is zero (unset) or 1.0 the proximity weight is
+// symmetric, so the same over-skilled scenario publishes a (capped) fit.
+func TestComputeFitting_HighSkillSigmaRatio_Symmetric_MatchesOld(t *testing.T) {
+	params := defaultParams()
+	params.MinEffectiveSamples = 3.0
+	params.ProximitySigma = 20.0
+	params.HighSkillSigmaRatio = 0 // unset ⇒ symmetric (legacy behaviour)
+	params.DeviationPenalty = 0
+
+	officialLevel := 14.0
+	res := ComputeFitting(officialLevel, fiveHighSkillSamples(), params)
+
+	if !assert.NotNil(t, res.FittingLevel,
+		"symmetric σ ⇒ samples pass the N_eff gate and a fit is published") {
+		return
+	}
+	// Old behaviour: shrunk hits the static MaxDeviation cap (official+1.5).
+	assert.InDelta(t, officialLevel+params.MaxDeviation, *res.FittingLevel, 0.01,
+		"ratio=0 is the legacy path and must reproduce the old cap-limited result")
+}
+
+// TestComputeFitting_HighSkillSigmaRatio_UnderSkilledUnchanged proves the
+// asymmetry does NOT affect players on the under-skilled side. A skill below
+// 10·Level (e.g. a mid-rank player on a high-level chart) is still a valid,
+// if noisy, data point and must be kept with the original σ.
+func TestComputeFitting_HighSkillSigmaRatio_UnderSkilledUnchanged(t *testing.T) {
+	params := defaultParams()
+	params.MinEffectiveSamples = 0.5
+	params.ProximitySigma = 20.0
+	params.HighSkillSigmaRatio = 0.5
+	params.DeviationPenalty = 0
+	params.PriorStrength = 0 // isolate the weight-asymmetry effect
+
+	// lv16 chart, samples from skill-150 players (diff = -10, i.e. under-skilled).
+	const officialLevel = 16.0
+	const trueLevel = 14.5
+	const skill = 150.0
+	score := simulateScore(trueLevel, skill)
+
+	samples := make([]Sample, 8)
+	for i := range samples {
+		samples[i] = Sample{
+			Username: string(rune('a' + i)), Score: score,
+			PlayerSkill: skill, PlayerRecords: 100,
+		}
+	}
+
+	resAsym := ComputeFitting(officialLevel, samples, params)
+
+	// Compare against symmetric σ (HighSkillSigmaRatio=0): on the under-skilled
+	// side the two paths must produce identical weighted means and N_eff.
+	paramsSym := params
+	paramsSym.HighSkillSigmaRatio = 0
+	resSym := ComputeFitting(officialLevel, samples, paramsSym)
+
+	if !assert.NotNil(t, resAsym.FittingLevel) ||
+		!assert.NotNil(t, resSym.FittingLevel) {
+		return
+	}
+	assert.InDelta(t, *resSym.FittingLevel, *resAsym.FittingLevel, 1e-9,
+		"under-skilled samples must be unaffected by HighSkillSigmaRatio")
+	assert.InDelta(t, resSym.EffectiveSampleSize, resAsym.EffectiveSampleSize, 1e-9)
+}

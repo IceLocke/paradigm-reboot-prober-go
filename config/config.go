@@ -55,20 +55,21 @@ type Config struct {
 		ExcludePaths []string `yaml:"exclude_paths"` // Gin route templates starting with any of these prefixes are not counted in HTTP metrics
 	} `yaml:"metrics"`
 	Fitting struct {
-		Enabled          bool    `yaml:"enabled"`            // master switch for the fitting-calculator microservice
-		Interval         string  `yaml:"interval"`           // Go duration string (e.g. "6h"); run continuously via ticker
-		MinSamples       float64 `yaml:"min_samples"`        // minimum effective sample size required to publish FittingLevel
-		MinPlayerRecords int     `yaml:"min_player_records"` // a player needs at least this many best_play_records to contribute
-		ProximitySigma   float64 `yaml:"proximity_sigma"`    // Gaussian σ (rating units) centered at 10×Level for the proximity weight
-		VolumeFullAt     int     `yaml:"volume_full_at"`     // record count at which a player receives full volume weight (1.0)
-		PriorStrength    float64 `yaml:"prior_strength"`     // κ in Bayesian-style shrinkage toward the official level
-		DeviationPenalty float64 `yaml:"deviation_penalty"`  // λ; extra prior weight when sample-mean deviates from official (0 disables)
-		MaxDeviation     float64 `yaml:"max_deviation"`      // |FittingLevel − Level| hard cap, in level units
-		MinScore         int     `yaml:"min_score"`          // discard samples with score below this threshold
-		TukeyK           float64 `yaml:"tukey_k"`            // Tukey biweight tuning constant (usually 4.685)
-		ChartBatchSize   int     `yaml:"chart_batch_size"`   // number of charts processed per DB batch
-		PlayerBatchSize  int     `yaml:"player_batch_size"`  // number of users fetched per page during skill collection
-		BatchPause       string  `yaml:"batch_pause"`        // Go duration string; sleep between chart batches to ease DB load
+		Enabled             bool    `yaml:"enabled"`                // master switch for the fitting-calculator microservice
+		Interval            string  `yaml:"interval"`               // Go duration string (e.g. "6h"); run continuously via ticker
+		MinSamples          float64 `yaml:"min_samples"`            // minimum effective sample size required to publish FittingLevel
+		MinPlayerRecords    int     `yaml:"min_player_records"`     // a player needs at least this many best_play_records to contribute
+		ProximitySigma      float64 `yaml:"proximity_sigma"`        // Gaussian σ (rating units) centered at 10×Level for the proximity weight
+		HighSkillSigmaRatio float64 `yaml:"high_skill_sigma_ratio"` // σ multiplier for skill > 10×Level (0 or 1 = symmetric)
+		VolumeFullAt        int     `yaml:"volume_full_at"`         // record count at which a player receives full volume weight (1.0)
+		PriorStrength       float64 `yaml:"prior_strength"`         // κ in Bayesian-style shrinkage toward the official level
+		DeviationPenalty    float64 `yaml:"deviation_penalty"`      // λ; extra prior weight when sample-mean deviates from official (0 disables)
+		MaxDeviation        float64 `yaml:"max_deviation"`          // |FittingLevel − Level| hard cap, in level units
+		MinScore            int     `yaml:"min_score"`              // discard samples with score below this threshold
+		TukeyK              float64 `yaml:"tukey_k"`                // Tukey biweight tuning constant (usually 4.685)
+		ChartBatchSize      int     `yaml:"chart_batch_size"`       // number of charts processed per DB batch
+		PlayerBatchSize     int     `yaml:"player_batch_size"`      // number of users fetched per page during skill collection
+		BatchPause          string  `yaml:"batch_pause"`            // Go duration string; sleep between chart batches to ease DB load
 	} `yaml:"fitting"`
 }
 
@@ -113,6 +114,7 @@ func InitDefaults() {
 	GlobalConfig.Fitting.MinSamples = 8.0
 	GlobalConfig.Fitting.MinPlayerRecords = 20
 	GlobalConfig.Fitting.ProximitySigma = 20.0
+	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.5
 	GlobalConfig.Fitting.VolumeFullAt = 50
 	GlobalConfig.Fitting.PriorStrength = 5.0
 	GlobalConfig.Fitting.DeviationPenalty = 2.0
@@ -316,6 +318,9 @@ func LoadConfig(configPath string) {
 	}
 	if GlobalConfig.Fitting.DeviationPenalty < 0 {
 		log.Fatalf("fitting.deviation_penalty must be ≥ 0, got %f", GlobalConfig.Fitting.DeviationPenalty)
+	}
+	if GlobalConfig.Fitting.HighSkillSigmaRatio < 0 {
+		log.Fatalf("fitting.high_skill_sigma_ratio must be ≥ 0, got %f", GlobalConfig.Fitting.HighSkillSigmaRatio)
 	}
 	if GlobalConfig.Fitting.MaxDeviation < 0 {
 		log.Fatalf("fitting.max_deviation must be ≥ 0, got %f", GlobalConfig.Fitting.MaxDeviation)

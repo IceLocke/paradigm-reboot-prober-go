@@ -68,6 +68,7 @@ func main() {
 	params := fitting.Params{
 		MinEffectiveSamples: fp.MinSamples,
 		ProximitySigma:      fp.ProximitySigma,
+		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
 		VolumeFullAt:        fp.VolumeFullAt,
 		PriorStrength:       fp.PriorStrength,
 		DeviationPenalty:    fp.DeviationPenalty,
