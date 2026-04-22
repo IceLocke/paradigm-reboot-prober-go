@@ -271,14 +271,13 @@ pnpm generate:api
 ### API Type Generation Pipeline
 
 ```
-docs/swagger.json  ──swagger2openapi──▶  src/api/openapi3.json  ──postprocess-openapi.mjs──▶  src/api/openapi3.json  ──openapi-typescript──▶  src/api/generated.d.ts
-                    (Swagger 2.0 → 3.0)                            (x-nullable → nullable: true)                                 (OpenAPI 3.0 → TypeScript)
+docs/swagger.json  ──swagger2openapi──▶  src/api/openapi3.json  ──openapi-typescript──▶  src/api/generated.d.ts
+                    (Swagger 2.0 → 3.0)                          (OpenAPI 3.0 → TypeScript)
 ```
 
 - **`generated.d.ts`** is auto-generated and committed to the repo. DO NOT edit manually.
 - **`openapi3.json`** is a build intermediate, gitignored.
-- **`scripts/postprocess-openapi.mjs`** walks the intermediate OpenAPI 3 doc and promotes Swagger-2 `x-nullable` extensions (which `swagger2openapi` passes through verbatim) to OpenAPI 3's native `nullable: true`. This is what lets nullable Go fields (e.g. `FittingLevel *float64`, see the backend `AGENTS.md` “Nullable JSON fields” section) reach the frontend as `T | null`.
-- **`types.ts`** is a hand-maintained thin adapter that re-exports from `generated.d.ts` with `DeepRequired<>` wrappers for response models. `DeepRequired<T>` strips the optional marker but *preserves* `null` on nullable fields — callers are forced to handle the null case.
+- **`types.ts`** is a hand-maintained thin adapter that re-exports from `generated.d.ts` with `DeepRequired<>` wrappers for response models (because the backend always returns complete objects, but Go struct tags don't mark every field `required`).
 - When the backend Swagger spec changes, run `pnpm generate:api` and fix any resulting type errors.
 
 ### Dev Server Proxy

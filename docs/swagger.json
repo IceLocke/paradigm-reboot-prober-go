@@ -853,8 +853,7 @@
                     "example": "massive"
                 },
                 "fitting_level": {
-                    "type": "number",
-                    "x-nullable": "true"
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"
@@ -933,7 +932,6 @@
                 },
                 "fitting_level": {
                     "type": "number",
-                    "x-nullable": "true",
                     "example": 13.4
                 },
                 "genre": {
@@ -995,8 +993,7 @@
                     "$ref": "#/definitions/model.Difficulty"
                 },
                 "fitting_level": {
-                    "type": "number",
-                    "x-nullable": "true"
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"

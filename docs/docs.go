@@ -856,8 +856,7 @@ const docTemplate = `{
                     "example": "massive"
                 },
                 "fitting_level": {
-                    "type": "number",
-                    "x-nullable": "true"
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"
@@ -936,7 +935,6 @@ const docTemplate = `{
                 },
                 "fitting_level": {
                     "type": "number",
-                    "x-nullable": "true",
                     "example": 13.4
                 },
                 "genre": {
@@ -998,8 +996,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/model.Difficulty"
                 },
                 "fitting_level": {
-                    "type": "number",
-                    "x-nullable": "true"
+                    "type": "number"
                 },
                 "id": {
                     "type": "integer"

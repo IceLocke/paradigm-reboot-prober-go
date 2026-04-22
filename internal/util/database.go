@@ -44,9 +44,6 @@ func InitDB() {
 		&model.Chart{},
 		&model.PlayRecord{},
 		&model.BestPlayRecord{},
-		// chart_statistics is owned by the fitting-calculator microservice (cmd/fitting);
-		// migrating it here ensures the schema exists regardless of which binary starts first.
-		&model.ChartStatistic{},
 	)
 	if err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)

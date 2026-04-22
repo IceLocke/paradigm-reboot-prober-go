@@ -96,7 +96,7 @@ type Chart struct {
 	SongID       int        `gorm:"not null;uniqueIndex:idx_song_difficulty,where:deleted_at IS NULL" json:"song_id"`
 	Difficulty   Difficulty `gorm:"type:varchar(20);not null;uniqueIndex:idx_song_difficulty,where:deleted_at IS NULL" json:"difficulty" example:"massive"`
 	Level        float64    `gorm:"not null" json:"level"`
-	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level" extensions:"x-nullable=true"`
+	FittingLevel *float64   `gorm:"column:fitting_level" json:"fitting_level"`
 	LevelDesign  *string    `gorm:"column:level_design" json:"level_design"`
 	Notes        int        `gorm:"not null" json:"notes"`
 	SongBaseOverride
@@ -124,7 +124,7 @@ type ChartInfo struct {
 	ID           int        `json:"id" example:"10"`
 	Difficulty   Difficulty `json:"difficulty" example:"massive"`
 	Level        float64    `json:"level" example:"13.2"`
-	FittingLevel *float64   `json:"fitting_level" example:"13.4" extensions:"x-nullable=true"`
+	FittingLevel *float64   `json:"fitting_level" example:"13.4"`
 	LevelDesign  *string    `json:"level_design" example:"Designer"`
 	Notes        int        `json:"notes" example:"850"`
 }
@@ -140,7 +140,7 @@ type ChartInfoSimple struct {
 	Difficulty   Difficulty `json:"difficulty"`
 	Level        float64    `json:"level"`
 	Cover        string     `json:"cover"`
-	FittingLevel *float64   `json:"fitting_level" extensions:"x-nullable=true"`
+	FittingLevel *float64   `json:"fitting_level"`
 }
 
 // ChartWithScore represents a chart with the user's best score

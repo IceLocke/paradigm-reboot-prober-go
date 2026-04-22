@@ -23,14 +23,6 @@ export default tseslint.config(
     },
   },
 
-  // Node.js globals for build/tooling scripts
-  {
-    files: ['scripts/**/*.{js,mjs,cjs}'],
-    languageOptions: {
-      globals: globals.node,
-    },
-  },
-
   // TypeScript recommended rules
   ...tseslint.configs.recommended,
 
