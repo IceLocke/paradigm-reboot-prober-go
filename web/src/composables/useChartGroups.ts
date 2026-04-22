@@ -20,8 +20,6 @@ const compareVersions = (a: string, b: string): number => {
 
 const AUTO_EXPAND_LIMIT = 20
 
-export const FITTING_LEVEL_UNKNOWN_KEY = '—'
-
 const computeAutoCollapsed = (groups: ChartGroup[]): Set<string> => {
   const collapsed = new Set<string>()
   let total = 0
@@ -37,7 +35,7 @@ const computeAutoCollapsed = (groups: ChartGroup[]): Set<string> => {
 
 export function useChartGroups(
   filteredData: ComputedRef<ChartInfo[]>,
-  groupBy: Ref<'level' | 'fitting_level' | 'version' | 'album'>
+  groupBy: Ref<'level' | 'version' | 'album'>
 ) {
   const collapsedLevels = ref(new Set<string>())
 
@@ -63,15 +61,6 @@ export function useChartGroups(
         case 'album':
           key = chart.album || '-'
           break
-        case 'fitting_level':
-          // Charts that the fitting microservice abstained from (insufficient
-          // samples) have fitting_level === null; see docs/fitting_level.en.md
-          // §4.4. They are grouped together under a dedicated sentinel key
-          // which later sorts to the end of the group list.
-          key = chart.fitting_level == null
-            ? FITTING_LEVEL_UNKNOWN_KEY
-            : (Math.round(chart.fitting_level * 10) / 10).toFixed(1)
-          break
         default:
           key = (Math.round(chart.level * 10) / 10).toFixed(1)
           break
@@ -86,28 +75,12 @@ export function useChartGroups(
 
     const groups: ChartGroup[] = []
     for (const [key, charts] of map) {
-      if (groupBy.value === 'fitting_level') {
-        // Within a fitting_level group sort by fitting_level desc; nulls last.
-        charts.sort((a, b) => {
-          const av = a.fitting_level ?? -Infinity
-          const bv = b.fitting_level ?? -Infinity
-          return bv - av
-        })
-      } else {
-        charts.sort((a, b) => b.level - a.level)
-      }
+      charts.sort((a, b) => b.level - a.level)
       groups.push({ key, charts })
     }
 
     if (groupBy.value === 'level') {
       groups.sort((a, b) => parseFloat(b.key) - parseFloat(a.key))
-    } else if (groupBy.value === 'fitting_level') {
-      // Numeric keys desc, with the unknown sentinel sinking to the end.
-      groups.sort((a, b) => {
-        const av = a.key === FITTING_LEVEL_UNKNOWN_KEY ? -Infinity : parseFloat(a.key)
-        const bv = b.key === FITTING_LEVEL_UNKNOWN_KEY ? -Infinity : parseFloat(b.key)
-        return bv - av
-      })
     } else if (groupBy.value === 'version') {
       groups.sort((a, b) => compareVersions(b.key, a.key))
     } else {
