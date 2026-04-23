@@ -11,8 +11,13 @@ COPY . .
 # `fitting` is the offline fitting-level microservice (cmd/fitting).
 # They share the same image so deployments can pick one via docker-compose
 # command override or `docker run <image> ./fitting`.
-RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server/main.go \
- && CGO_ENABLED=0 GOOS=linux go build -o fitting ./cmd/fitting/main.go
+#
+# Use package paths (./cmd/fitting), NOT single-file paths
+# (./cmd/fitting/main.go) — cmd/fitting is a multi-file main package
+# (main.go + run.go + analyze.go) and single-file builds will fail to
+# resolve cross-file symbols like cmdRun / cmdAnalyze.
+RUN CGO_ENABLED=0 GOOS=linux go build -o server ./cmd/server \
+ && CGO_ENABLED=0 GOOS=linux go build -o fitting ./cmd/fitting
 
 
 FROM alpine:3.21
