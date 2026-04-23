@@ -2,6 +2,8 @@
 
 *Available in: **English** · [中文](./fitting_level.zh.md)*
 
+*Plain-language guide for players: [English](./fitting_level_for_players.en.md) · [中文](./fitting_level_for_players.zh.md)*
+
 > **Scope.** This document specifies how the fitting-calculator microservice
 > (`cmd/fitting`) derives each chart's `fitting_level` from the observed
 > `best_play_records`. It is intentionally self-contained: readers do not need
@@ -106,16 +108,46 @@ their skill target, driving $\hat{\delta}_{p,c}$ below $L_c$.
 
 ### 4.2 Pre-weighting
 
-**Proximity weight.** Players whose skill $B_p$ is close to $10\cdot L_c$
-play near the intended difficulty band; their score distribution is most
-informative. We use a zero-mean Gaussian in rating units:
+**Proximity weight (asymmetric Gaussian with hard cutoff).** Players whose
+skill $B_p$ is close to $10\cdot L_c$ play near the intended difficulty
+band; their score distribution is most informative about $L_c$. Players far
+from the band are either ignoring the chart (too hard for them) or are
+overwhelmingly saturating it at SSS (too easy) — in both cases the inverter
+$\operatorname{Inv}(\cdot)$ degenerates toward "echoing the player's own
+skill" rather than reporting a chart signal, so such samples should carry
+little weight.
+
+A naive symmetric Gaussian weights both sides the same, which is almost
+right — but not quite. For AP-saturated high-skill players the inversion is
+especially degenerate (a clipped score $\ge$ AP boundary provides no upper
+bound on how hard the chart might actually be for them), and empirically this
+pushed estimates of mid-level charts upward. We therefore widen the penalty
+on the over-skilled side only:
 
 $$
-w^{\text{prox}}_{p,c} = \exp\!\left(-\dfrac{(B_p - 10L_c)^2}{2\sigma_{\text{prox}}^{2}}\right).
+\sigma_{\text{eff}}(\Delta_p) =
+\begin{cases}
+\sigma_{\text{prox}}, & \Delta_p := B_p - 10L_c \le 0,\\[3pt]
+\alpha\cdot\sigma_{\text{prox}}, & \Delta_p > 0,
+\end{cases}
+\qquad
+\alpha \in (0,1],\ \alpha = \text{high\_skill\_sigma\_ratio}\ (\text{default } 0.3).
 $$
 
-The default $\sigma_{\text{prox}} = 20$ corresponds to $\pm 2.0$ level units
-of "effective skill", capturing the band a chart's realistic audience spans.
+$$
+w^{\text{prox}}_{p,c} = \exp\!\left(-\dfrac{\Delta_p^{2}}{2\,\sigma_{\text{eff}}(\Delta_p)^{2}}\right).
+$$
+
+The Gaussian only decays, so we also impose a **$2.5\sigma_{\text{eff}}$**
+hard cutoff — samples beyond that band are dropped entirely. This is
+critical for a robust Kish effective sample size $N^{\text{eff}}$: without a
+hard cutoff, a large mass of tiny-weight over-skilled samples could still
+inflate $\sum w$ enough to pass the `min_samples` gate.
+
+The default $\sigma_{\text{prox}} = 20$ corresponds to $\pm 2.0$ level
+units of "effective skill" on the under-skilled side and $\pm 0.6$ level
+units on the over-skilled side, capturing the realistic audience band of a
+chart while heavily discounting over-skilled dabblers.
 
 **Volume weight.** Players with very few records have noisier $B_p$
 estimates. We apply a linear ramp that saturates at $V_{\text{full}} = 50$
@@ -184,28 +216,89 @@ We abstain from publishing a fitting level when $N^{\text{eff}}_c <
 written as `NULL`, while `chart_statistics` still records the diagnostic
 fields for review.
 
-### 4.5 Bayesian shrinkage toward the official level
+### 4.5 Bayesian shrinkage toward the official level (with deviation penalty)
 
 Treat $L_c$ as a Gaussian prior with strength $\kappa$, and $\mu_c$ as the
 likelihood mean with precision $N^{\text{eff}}_c$. The posterior mean is the
 precision-weighted combination
 
 $$
-\hat{L}_c = \dfrac{N^{\text{eff}}_c\,\mu_c + \kappa\,L_c}{N^{\text{eff}}_c + \kappa}.
+\hat{L}_c = \dfrac{N^{\text{eff}}_c\,\mu_c + \kappa_{\text{eff}}\,L_c}{N^{\text{eff}}_c + \kappa_{\text{eff}}}.
 $$
 
-Equivalently: the "confidence" of the official level is $\kappa$ pseudo-
-samples, so a chart with $N^{\text{eff}}_c \gg \kappa$ effectively follows
-the data, while a chart with $N^{\text{eff}}_c \ll \kappa$ stays near the
-official value.
-
-### 4.6 Deviation cap
-
-As a final safety net against model mis-specification we enforce
+where $\kappa_{\text{eff}}$ is a deviation-sensitive dynamic prior strength.
+Plugging a plain $\kappa$ into the formula has a failure mode: on
+small-sample charts, a few outlier players can drag $\mu_c$ several levels
+away from the official value, while there simply isn't enough data to
+support that confidence. We therefore introduce a multiplicative deviation
+penalty:
 
 $$
-\hat{L}_c \leftarrow L_c + \operatorname{clip}\!\bigl(\hat{L}_c - L_c,\ -\Delta_{\max},\ \Delta_{\max}\bigr).
+\kappa_{\text{eff}} = \kappa\cdot\left(1 + \lambda\,(\mu_c - L_c)^2\cdot\dfrac{n_{\text{ref}}}{N^{\text{eff}}_c}\right),
+\qquad n_{\text{ref}} = 2\cdot\text{min\_samples}.
 $$
+
+When the deviation is zero or when $N^{\text{eff}}_c \gg n_{\text{ref}}$ the
+boost degenerates to 1 (no runtime cost); when the deviation is large and
+the effective sample is small, $\kappa_{\text{eff}}$ scales quadratically
+with the gap and inversely with $N^{\text{eff}}_c$ — matching the intuition
+that the further a chart drifts from its official value, the more evidence
+we should demand before publishing that drift. The default is $\lambda = 2$.
+Setting $\lambda = 0$ reverts to the old static-$\kappa$ behaviour; all
+pre-existing tests pin $\lambda = 0$ for regression coverage.
+
+Equivalent reading: the "confidence" of the official level is
+$\kappa_{\text{eff}}$ pseudo-samples — a chart with $N^{\text{eff}}_c \gg
+\kappa_{\text{eff}}$ essentially follows the data, a chart with
+$N^{\text{eff}}_c \ll \kappa_{\text{eff}}$ stays near the official value,
+and larger deviations tilt the balance further toward the official side.
+
+### 4.6 Deviation cap (level-dependent log-linear ramp)
+
+As a final safety net against model mis-specification we enforce a hard
+clip on the post-shrinkage estimate:
+
+$$
+\hat{L}_c \leftarrow L_c + \operatorname{clip}\!\bigl(\hat{L}_c - L_c,\ -\Delta(L_c),\ \Delta(L_c)\bigr).
+$$
+
+**Why level-dependent?** Reboot's official level axis is *perceptually*
+roughly logarithmic — the gameplay gap from lv12 to lv13 is much smaller
+than the gap from lv16 to lv17. A tight cap at the low end protects
+against fitting values leaping across "real" difficulty tiers; a wider cap
+at the high end is needed because the official spacing itself is coarser
+and the algorithm should have more room to discover surprises. We therefore
+interpolate the cap **log-linearly** between two anchor points:
+
+$$
+\Delta(L) =
+\begin{cases}
+\Delta_{\min}, & L \le L_{\text{low}},\\[4pt]
+\Delta_{\min}\cdot\left(\dfrac{\Delta_{\max}}{\Delta_{\min}}\right)^{t(L)}, & L_{\text{low}} < L < L_{\text{high}},\\[8pt]
+\Delta_{\max}, & L \ge L_{\text{high}}.
+\end{cases}
+\qquad t(L) = \dfrac{L - L_{\text{low}}}{L_{\text{high}} - L_{\text{low}}}.
+$$
+
+Defaults: $\Delta_{\min} = 0.6$, $\Delta_{\max} = 1.5$, $L_{\text{low}} =
+12.0$, $L_{\text{high}} = 17.0$. The midpoint $L = 14.5$ sits at the
+geometric mean $\Delta(14.5) = \sqrt{\Delta_{\min}\cdot\Delta_{\max}}
+\approx 0.949$, consistent with the "monotone, no-jumps" design goal.
+
+**Degeneration rule.** When $\Delta_{\min} \le 0$ or the anchors
+$L_{\text{low}}$/$L_{\text{high}}$ are misconfigured (see
+`internal/fitting/calculator.go:effectiveMaxDeviation`), the implementation
+silently falls back to a **flat** cap $\Delta(L) \equiv \Delta_{\max}$; the
+startup validator rejects the most common misconfigurations (see
+`AGENTS.md`). The ramp only controls the **width** of the cap, never its
+**symmetry** — the same $\Delta(L_c)$ is used on both sides.
+
+**A safety net, not a corrector.** On the current dataset the vast
+majority of fitted values already sit inside the trapezoidal window, so
+$\Delta(L)$ fires only very rarely — it is a guardrail against the
+occasional catastrophic outlier, not a lever for pulling mid-level charts
+closer to their official values. The real levers for mid-level bias are
+$\alpha$ and $\kappa$ — see §4.2 and §4.5.
 
 ## 5. Summary pipeline
 
@@ -213,44 +306,56 @@ $$
 for each chart c with official level L_c:
     samples := { (p, s_{p,c}) : p ∈ P_c, s_{p,c} ≥ s_min }
     for each sample:
-        δ̂ := InverseRating(s_{p,c}, B_p)          # §4.1
+        δ̂ := InverseRating(s_{p,c}, B_p)                      # §4.1
         if δ̂ ∉ [0.1, 20.0]: drop
-        w_prox := exp(-(B_p - 10 L_c)^2 / 2σ_prox^2)  # §4.2
+        diff  := B_p - 10·L_c                                   # §4.2
+        σ_eff := (diff > 0 ? α·σ_prox : σ_prox)
+        if |diff| > 2.5·σ_eff: drop                              #  ← hard cutoff
+        w_prox := exp(-diff² / (2·σ_eff²))
         w_vol  := min(1, n_p / V_full)
         w_pre  := w_prox * w_vol
-    m_c  := weighted_median(δ̂; w_pre)               # §4.3
+    m_c  := weighted_median(δ̂; w_pre)                          # §4.3
     MAD  := weighted_median(|δ̂ - m_c|; w_pre)
     for each sample:
         u := (δ̂ - m_c) / (k · max(MAD, ε))
-        w_rob := (1 - u^2)^2  if |u| < 1 else 0
+        w_rob := (1 - u²)²  if |u| < 1 else 0
         w     := w_pre * w_rob
-    μ_c     := Σ w·δ̂ / Σ w                          # §4.4
-    N_eff_c := (Σ w)^2 / Σ w^2
+    μ_c     := Σ w·δ̂ / Σ w                                    # §4.4
+    N_eff_c := (Σ w)² / Σ w²
     if N_eff_c < min_samples:
         publish FittingLevel = NULL; keep stats; continue
-    L̂_c := (N_eff_c · μ_c + κ · L_c) / (N_eff_c + κ)  # §4.5
-    L̂_c := L_c + clip(L̂_c - L_c, -Δ_max, Δ_max)       # §4.6
+    dev     := μ_c - L_c                                       # §4.5
+    n_ref   := 2 · min_samples
+    κ_eff   := κ · (1 + λ·dev²·n_ref / N_eff_c)
+    L̂_c     := (N_eff_c·μ_c + κ_eff·L_c) / (N_eff_c + κ_eff)
+    Δ       := effectiveMaxDeviation(L_c)                      # §4.6
+    L̂_c     := L_c + clip(L̂_c - L_c, -Δ, Δ)
     UPDATE charts SET fitting_level = L̂_c WHERE id = c
     UPSERT chart_statistics (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
 ```
 
 ## 6. Hyperparameters (from `config.yaml`)
 
-| Key                          | Symbol              | Default   | Role                                       |
-|------------------------------|---------------------|-----------|--------------------------------------------|
-| `fitting.enabled`            | —                   | `true`    | Master switch for the microservice.         |
-| `fitting.interval`           | —                   | `6h`      | Ticker period (Go duration).                |
-| `fitting.min_samples`        | min_samples         | `8.0`     | $N^{\text{eff}}$ below this → abstain.      |
-| `fitting.min_player_records` | —                   | `20`      | Exclude players with fewer best records.     |
-| `fitting.proximity_sigma`    | $\sigma_{\text{prox}}$ | `20.0` | Gaussian bandwidth around $10L_c$.          |
-| `fitting.volume_full_at`     | $V_{\text{full}}$    | `50`      | Volume weight saturation point.             |
-| `fitting.prior_strength`     | $\kappa$            | `5.0`     | Shrinkage toward $L_c$.                     |
-| `fitting.max_deviation`      | $\Delta_{\max}$      | `1.5`     | Hard cap on $|\hat{L}_c - L_c|$.            |
-| `fitting.min_score`          | $s_{\min}$          | `500000`  | Minimum score admitted.                     |
-| `fitting.tukey_k`            | $k$                 | `4.685`   | Biweight tuning constant.                   |
-| `fitting.chart_batch_size`   | —                   | `200`     | Charts processed per DB batch.              |
-| `fitting.player_batch_size`  | —                   | `500`     | Users fetched per page.                     |
-| `fitting.batch_pause`        | —                   | `50ms`    | Sleep between batches (DB load relief).      |
+| Key                             | Symbol                 | Default   | Role                                                                                   |
+|---------------------------------|------------------------|-----------|----------------------------------------------------------------------------------------|
+| `fitting.enabled`               | —                      | `true`    | Master switch for the microservice.                                                    |
+| `fitting.interval`              | —                      | `6h`      | Ticker period (Go duration).                                                           |
+| `fitting.min_samples`           | min_samples            | `8.0`     | $N^{\text{eff}}$ below this → abstain.                                                 |
+| `fitting.min_player_records`    | —                      | `20`      | Exclude players with fewer best records.                                               |
+| `fitting.proximity_sigma`       | $\sigma_{\text{prox}}$ | `20.0`    | Gaussian bandwidth around $10L_c$.                                                     |
+| `fitting.high_skill_sigma_ratio`| $\alpha$               | `0.3`     | $\sigma$ multiplier on the over-skilled side (asymmetric Gaussian). `1.0` = symmetric, smaller = stronger discount on over-skilled players. Samples outside $2.5\cdot\sigma$ are dropped. |
+| `fitting.volume_full_at`        | $V_{\text{full}}$      | `50`      | Volume weight saturation point.                                                        |
+| `fitting.prior_strength`        | $\kappa$               | `5.0`     | Baseline shrinkage strength toward $L_c$.                                              |
+| `fitting.deviation_penalty`     | $\lambda$              | `2.0`     | Deviation penalty; sets $\kappa_{\text{eff}} = \kappa(1+\lambda\cdot\text{dev}^2\cdot n_{\text{ref}}/N^{\text{eff}})$. `0` reverts to static $\kappa$. |
+| `fitting.max_deviation`         | $\Delta_{\max}$        | `1.5`     | Cap at the high-level end ($\ge L_{\text{high}}$); also the flat cap when the ramp is disabled. |
+| `fitting.max_deviation_low`     | $\Delta_{\min}$        | `0.6`     | Cap at the low-level end ($\le L_{\text{low}}$); set to `0` to disable the ramp and fall back to flat $\Delta_{\max}$. |
+| `fitting.max_deviation_low_at`  | $L_{\text{low}}$       | `12.0`    | Anchor where the cap equals $\Delta_{\min}$; must be less than $L_{\text{high}}$.      |
+| `fitting.max_deviation_high_at` | $L_{\text{high}}$      | `17.0`    | Anchor where the cap equals $\Delta_{\max}$; in between, $\Delta(L) = \Delta_{\min}\cdot(\Delta_{\max}/\Delta_{\min})^t$. |
+| `fitting.min_score`             | $s_{\min}$             | `500000`  | Minimum score admitted.                                                                |
+| `fitting.tukey_k`               | $k$                    | `4.685`   | Biweight tuning constant.                                                              |
+| `fitting.chart_batch_size`      | —                      | `200`     | Charts processed per DB batch.                                                         |
+| `fitting.player_batch_size`     | —                      | `500`     | Users fetched per page.                                                                |
+| `fitting.batch_pause`           | —                      | `50ms`    | Sleep between batches (DB load relief).                                                |
 
 ## 7. Database impact and schema
 
@@ -279,10 +384,13 @@ To minimize impact on the live probe service:
 
 ```bash
 # Continuous mode (default, honours fitting.interval)
-go run cmd/fitting/main.go -config config/config.yaml
+go run ./cmd/fitting -config config/config.yaml
 
 # One-shot (useful for cron, debugging, CI smoke tests)
-go run cmd/fitting/main.go -config config/config.yaml -once
+go run ./cmd/fitting --once -config config/config.yaml
+
+# Read-only diagnostic for one chart (does not write the DB)
+go run ./cmd/fitting analyze -chart 870 -config config/config.yaml
 ```
 
 The binary exits cleanly on `SIGINT` / `SIGTERM`. In continuous mode a

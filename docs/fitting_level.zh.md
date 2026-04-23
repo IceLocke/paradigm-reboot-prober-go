@@ -2,6 +2,8 @@
 
 *语言版本:[English](./fitting_level.en.md) · **中文***
 
+*面向玩家的人话版说明:[中文](./fitting_level_for_players.zh.md) · [English](./fitting_level_for_players.en.md)*
+
 > **适用范围。** 本文档说明拟合定数微服务(`cmd/fitting`)如何从 `best_play_records`
 > 中推导每张谱面的 `fitting_level`。文档力求自包含:读者无需查阅查分器本体
 > (`cmd/server`)的源码即可复现全部数学推导。
@@ -36,13 +38,17 @@ $p$ 对该谱面的最佳成绩分布 $\{s_{p,c}\}$,给出一个后验点估计 
 | $B_p$                        | 玩家 $p$ 的**浮点 B50 均值 rating**:其前 $K$ 个最高单曲 rating 的算术平均,$K = \min(\|\text{best}_p\|, 50)$。 |
 | $n_p$                        | 玩家 $p$ 的最佳记录总数。                                                               |
 | $\hat{\delta}_{p,c}$         | 根据 $(s_{p,c}, B_p)$ 反推出的单样本定数;见 §4.1。                                      |
-| $w^{\text{prox}}_{p,c}$      | 邻近权重(玩家实力离 $10L_c$ 越近越高)。                                                |
+| $w^{\text{prox}}_{p,c}$      | 邻近权重(玩家实力离 $10L_c$ 越近越高,远超 2.5σ 直接丢弃)。                          |
 | $w^{\text{vol}}_p$           | 数据量权重(玩家记录越多越高,存在饱和点)。                                              |
 | $w^{\text{rob}}_{p,c}$       | 鲁棒权重(Tukey 双权,远离中心的样本收到惩罚)。                                          |
 | $w_{p,c}$                    | 合成权重 $w^{\text{prox}}\cdot w^{\text{vol}}\cdot w^{\text{rob}}$。                    |
 | $N^{\text{eff}}_c$           | 谱面 $c$ 的 Kish 有效样本量。                                                           |
 | $\kappa$                     | 先验强度(贝叶斯收缩系数),`config.fitting.prior_strength`。                            |
-| $\Delta_{\max}$              | $\|\hat{L}_c - L_c\|$ 的硬上限,`config.fitting.max_deviation`。                         |
+| $\lambda$                    | 偏差惩罚系数,对偏离官方定数的少样本动态加强 $\kappa$;`config.fitting.deviation_penalty`。 |
+| $\alpha$                     | over-skilled 一侧的 σ 缩放比(不对称邻近权重),`config.fitting.high_skill_sigma_ratio`。 |
+| $\Delta_{\max}$              | $\|\hat{L}_c - L_c\|$ 的硬上限上端,`config.fitting.max_deviation`。                    |
+| $\Delta_{\min}$              | cap 在低定数端的值,`config.fitting.max_deviation_low`;≤0 时关闭斗形坡道回退到平顶 $\Delta_{\max}$。 |
+| $L_{\text{low}},L_{\text{high}}$ | cap 斗形坡道的两端点(默认 12.0 / 17.0),`config.fitting.max_deviation_{low_at, high_at}`。 |
 | $\sigma_{\text{prox}}$       | 邻近权重高斯带宽(rating 单位),`config.fitting.proximity_sigma`。                      |
 | $V_{\text{full}}$            | 数据量权重饱和到 1 所需的记录数,`config.fitting.volume_full_at`。                       |
 | $k$                          | Tukey 双权调节常数,`config.fitting.tukey_k`(默认 4.685)。                             |
@@ -96,15 +102,28 @@ $$
 
 ### 4.2 预权重
 
-**邻近权重。** 实力 $B_p$ 接近 $10\cdot L_c$ 的玩家正处于该谱面的"目标难度区间",
-他们的成绩分布信息量最大。我们使用 rating 单位下、均值为零的高斯核:
+**邻近权重(不对称 · 硬截断)。** 实力 $B_p$ 接近 $10\cdot L_c$ 的玩家正处于该谱面的“目标难度区间”,他们的成绩分布信息量最大。我们以 rating 单位下、均值为零的**不对称**高斯核打分,并在 2.5·σ 处**硬截断**:
 
 $$
-w^{\text{prox}}_{p,c} = \exp\!\left(-\dfrac{(B_p - 10L_c)^2}{2\sigma_{\text{prox}}^{2}}\right).
+\sigma_{\text{eff}}(B_p) =
+\begin{cases}
+\alpha \cdot \sigma_{\text{prox}}, & B_p - 10L_c > 0,\\[4pt]
+\sigma_{\text{prox}},               & B_p - 10L_c \le 0,
+\end{cases}
+\qquad
+w^{\text{prox}}_{p,c} = \begin{cases}
+\exp\!\left(-\dfrac{(B_p - 10L_c)^2}{2\,\sigma_{\text{eff}}(B_p)^{2}}\right), & \bigl|B_p - 10L_c\bigr| \le 2.5\,\sigma_{\text{eff}}(B_p),\\[8pt]
+0\ (\text{样本丢弃,不计入 raw 与}\ N^{\text{eff}}), & \bigl|B_p - 10L_c\bigr| > 2.5\,\sigma_{\text{eff}}(B_p).
+\end{cases}
 $$
 
-默认 $\sigma_{\text{prox}} = 20$,对应 $\pm 2.0$ 定数单位的"有效实力区间",足以
-覆盖一张谱面的实际受众带宽。
+默认 $\sigma_{\text{prox}} = 20$(对应 $\pm 2.0$ 定数单位的实力带宽),$\alpha = 0.3$。
+
+**为什么不对称?** 实力远超 $10L_c$ 的大佬在低定数谱面上几乎必然 AP,此时 §4.1 的单样本反推退化为“回声”玩家自己的 $B_p/10$,而不再度量谱面难度。这类样本会系统性地将 $\hat{\delta}$ 拉高,正是中段偏差的主要来源。在 over-skilled 一侧缩小 σ(乘以 α)将这一福度大幅压缩,但不影响 under-skilled 一侧—— 实力跟不上的玩家仍然提供信息,只是权重自然较低。
+
+**为什么还要硬截断?** Kish 的 $N^{\text{eff}}$ 是尺度无关的(它度量的是权重的相对分布而非绝对大小),仅缩小 σ 不会让这类样本在样本数的估计上消失—— 5 个权重皆为 1% 的样本仍算 $N^{\text{eff}} = 5$。因此我们在 $2.5\,\sigma_{\text{eff}}$ 处直接截断,让 raw / inferred / $N^{\text{eff}}$ 一起下降。结果:一张长期被大佬乱打的低定数谱面会因为样本不足而正确地**弃算**(§4.4),而不是发布一个被大佬实力回声主导的拟合值。
+
+**默认 $\alpha = 0.3$ 的来历。** 最初版本采用对称 σ($\alpha = 1$),考察全局偏差后发现中段(lv13–lv15.5)的 $\hat{L}_c$ 系统性高于官方定数 $+0.5 \sim +0.8$。$\alpha = 0.5$ 缩半后仍剩 $+0.4 \sim +0.7$;进一步缩到 $\alpha = 0.3$ 持续推进,中段偏差降至 $\sim +0.1 \sim +0.4$ 且 lv17+ 高定数端几乎不受影响(高定数谱面本身缺大佬玩家,不对称项几乎不触发)。继续缩到 $\alpha = 0.2$ 会在 lv14 带造成 $-0.36$ 的反向过度修正,故选取 0.3 作为甜蜜点。
 
 **数据量权重。** 记录太少的玩家 $B_p$ 估计噪声较大。我们采用线性斜坡,在
 $V_{\text{full}} = 50$ 条记录时饱和:
@@ -166,25 +185,51 @@ $$
 `charts.fitting_level` 写入 `NULL`,但 `chart_statistics` 依然写入诊断字段供离线
 排查。
 
-### 4.5 向官方定数的贝叶斯收缩
+### 4.5 向官方定数的贝叶斯收缩(含偏差惩罚)
 
 将 $L_c$ 视作强度为 $\kappa$ 的高斯先验,把 $\mu_c$ 视作精度为 $N^{\text{eff}}_c$
 的似然均值,则后验均值为二者的精度加权:
 
 $$
-\hat{L}_c = \dfrac{N^{\text{eff}}_c\,\mu_c + \kappa\,L_c}{N^{\text{eff}}_c + \kappa}.
+\hat{L}_c = \dfrac{N^{\text{eff}}_c\,\mu_c + \kappa_{\text{eff}}\,L_c}{N^{\text{eff}}_c + \kappa_{\text{eff}}}.
 $$
 
-等价地:"相信官方定数"的程度相当于 $\kappa$ 个伪样本;当 $N^{\text{eff}}_c \gg \kappa$
-时估计值基本等于数据,而当 $N^{\text{eff}}_c \ll \kappa$ 时估计值靠近官方定数。
-
-### 4.6 偏差上限
-
-作为防止模型错配的最终安全网,我们施加硬截断
+其中 $\kappa_{\text{eff}}$ 是偏差敏感的动态先验强度。将 $\kappa$ 直接代入会有一个问题:在样本稀少的谱面上,几个离群玩家可以把 $\mu_c$ 拉离官方定数好几个 level,但数据量不足以支撑这样的置信。我们因此引入乘法型偏差惩罚,令
 
 $$
-\hat{L}_c \leftarrow L_c + \operatorname{clip}\!\bigl(\hat{L}_c - L_c,\ -\Delta_{\max},\ \Delta_{\max}\bigr).
+\kappa_{\text{eff}} = \kappa\cdot\left(1 + \lambda\,(\mu_c - L_c)^2\cdot\dfrac{n_{\text{ref}}}{N^{\text{eff}}_c}\right),
+\qquad n_{\text{ref}} = 2\cdot\text{min\_samples},
 $$
+
+当偏差为零或 $N^{\text{eff}}_c \gg n_{\text{ref}}$ 时 boost 退化为 1(无绩效开销),而当偏差大且样本少时 $\kappa_{\text{eff}}$ 二次放大、反比于 $N^{\text{eff}}_c$,恰好符合“偏得越多越需要证据”的直觉。默认 $\lambda = 2$。将 $\lambda = 0$ 即回退到旧的静态- $\kappa$ 行为,所有测试设置 $\lambda = 0$ 进行回归。
+
+等价解读:“相信官方定数”的程度相当于 $\kappa_{\text{eff}}$ 个伪样本—— $N^{\text{eff}}_c \gg \kappa_{\text{eff}}$ 时估计值基本等于数据,$N^{\text{eff}}_c \ll \kappa_{\text{eff}}$ 时靠近官方定数;且偏差越大这条天秤越向官方端倾斜。
+
+### 4.6 偏差上限(随定数变化的对数尺度斗形坡道)
+
+作为防止模型错配的最终安全网,我们在收缩后施加硬截断:
+
+$$
+\hat{L}_c \leftarrow L_c + \operatorname{clip}\!\bigl(\hat{L}_c - L_c,\ -\Delta(L_c),\ \Delta(L_c)\bigr).
+$$
+
+**为什么随定数变化?** Reboot 的官方定数轴在游戏体验上是大致对数的—— 从 lv12 到 lv13 的难度跳跃远小于从 lv16 到 lv17 的难度跳跃。因此在低定数端我们希望 cap 更紧,不让拟合值跈过“真实难度梯级”;在高定数端则希望 cap 更宽,因为官方步长更粗,需要给算法更多“发挥空间”。我们在两个端点间用**对数线性**插值:
+
+$$
+\Delta(L) =
+\begin{cases}
+\Delta_{\min}, & L \le L_{\text{low}},\\[4pt]
+\Delta_{\min}\cdot\left(\dfrac{\Delta_{\max}}{\Delta_{\min}}\right)^{t(L)}, & L_{\text{low}} < L < L_{\text{high}},\\[8pt]
+\Delta_{\max}, & L \ge L_{\text{high}}.
+\end{cases}
+\qquad t(L) = \dfrac{L - L_{\text{low}}}{L_{\text{high}} - L_{\text{low}}}.
+$$
+
+默认值:$\Delta_{\min} = 0.6$,$\Delta_{\max} = 1.5$,$L_{\text{low}} = 12.0$,$L_{\text{high}} = 17.0$。从端点对处中间点 $L = 14.5$ 有 $\Delta(14.5) = \sqrt{\Delta_{\min}\cdot\Delta_{\max}} \approx 0.949$,符合“随 level 单调上升且不突变”的期望。
+
+**退化规则。** 当 $\Delta_{\min} \le 0$,或 $L_{\text{low}}$/$L_{\text{high}}$ 配置不合法(参见 `internal/fitting/calculator.go:effectiveMaxDeviation`),实现静默回退到**平顶** $\Delta(L) \equiv \Delta_{\max}$;启动时的配置校验会拒绝最常见的误配置(见 `AGENTS.md`)。斗形坡道只影响上限的**宽窄**,不影响上限的**对称性**—— 在双向上都采用同一 $\Delta(L_c)$。
+
+**防护 · 而非修正。** 在当前数据集上,绝大多数拟合值本就在斗形窗口内,$\Delta(L)$ 很少触发—— 它是拦住偶发灾难性离群值的护栏,不是用来拉近中段整体 bias 的工具。中段 bias 的真正杆杆是 α 与 κ—— 见 §4.2 与 §4.5。
 
 ## 5. 流水线总览
 
@@ -192,23 +237,30 @@ $$
 对每张官方定数为 L_c 的谱面 c:
     samples := { (p, s_{p,c}) : p ∈ P_c, s_{p,c} ≥ s_min }
     对每条样本:
-        δ̂ := InverseRating(s_{p,c}, B_p)          # §4.1
+        δ̂ := InverseRating(s_{p,c}, B_p)                      # §4.1
         若 δ̂ ∉ [0.1, 20.0] 则丢弃
-        w_prox := exp(-(B_p - 10 L_c)^2 / 2σ_prox^2)  # §4.2
+        diff  := B_p - 10·L_c                                  # §4.2
+        σ_eff := (diff > 0 ? α·σ_prox : σ_prox)
+        若 |diff| > 2.5·σ_eff 则丢弃                           #  ← 硬截断
+        w_prox := exp(-diff² / (2·σ_eff²))
         w_vol  := min(1, n_p / V_full)
         w_pre  := w_prox * w_vol
-    m_c  := weighted_median(δ̂; w_pre)              # §4.3
+    m_c  := weighted_median(δ̂; w_pre)                          # §4.3
     MAD  := weighted_median(|δ̂ - m_c|; w_pre)
     对每条样本:
         u := (δ̂ - m_c) / (k · max(MAD, ε))
-        w_rob := (1 - u^2)^2  若 |u| < 1,否则 0
+        w_rob := (1 - u²)²  若 |u| < 1,否则 0
         w     := w_pre * w_rob
-    μ_c     := Σ w·δ̂ / Σ w                         # §4.4
-    N_eff_c := (Σ w)^2 / Σ w^2
+    μ_c     := Σ w·δ̂ / Σ w                                    # §4.4
+    N_eff_c := (Σ w)² / Σ w²
     若 N_eff_c < min_samples:
         写入 FittingLevel = NULL;仍写 chart_statistics;继续
-    L̂_c := (N_eff_c · μ_c + κ · L_c) / (N_eff_c + κ)  # §4.5
-    L̂_c := L_c + clip(L̂_c - L_c, -Δ_max, Δ_max)       # §4.6
+    dev     := μ_c - L_c                                       # §4.5
+    n_ref   := 2 · min_samples
+    κ_eff   := κ · (1 + λ·dev²·n_ref / N_eff_c)
+    L̂_c     := (N_eff_c·μ_c + κ_eff·L_c) / (N_eff_c + κ_eff)
+    Δ       := effectiveMaxDeviation(L_c)                      # §4.6
+    L̂_c     := L_c + clip(L̂_c - L_c, -Δ, Δ)
     UPDATE charts SET fitting_level = L̂_c WHERE id = c
     UPSERT chart_statistics (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
 ```
@@ -222,9 +274,14 @@ $$
 | `fitting.min_samples`         | min_samples            | `8.0`     | $N^{\text{eff}}$ 低于此值则弃算。                          |
 | `fitting.min_player_records`  | —                      | `20`      | 少于此记录数的玩家完全排除。                               |
 | `fitting.proximity_sigma`     | $\sigma_{\text{prox}}$ | `20.0`    | 邻近权重高斯带宽(围绕 $10L_c$)。                         |
+| `fitting.high_skill_sigma_ratio` | $\alpha$            | `0.3`     | over-skilled 一侧 σ 的缩放比(不对称高斯)。`1.0` 为对称高斯,更小值对大佬玩家折扣更重;样本离中心 2.5·σ 直接丢弃。 |
 | `fitting.volume_full_at`      | $V_{\text{full}}$      | `50`      | 数据量权重饱和到 1 的临界记录数。                          |
-| `fitting.prior_strength`      | $\kappa$               | `5.0`     | 官方定数的先验强度。                                       |
-| `fitting.max_deviation`       | $\Delta_{\max}$        | `1.5`     | $\|\hat{L}_c - L_c\|$ 的硬上限。                           |
+| `fitting.prior_strength`      | $\kappa$               | `5.0`     | 官方定数的先验强度(收缩基准)。                         |
+| `fitting.deviation_penalty`   | $\lambda$              | `2.0`     | 偏差惩罚;让 $\kappa_{\text{eff}} = \kappa(1+\lambda\cdot\text{dev}^2\cdot n_{\text{ref}}/N^{\text{eff}})$。`0` 时回退到静态 $\kappa$。 |
+| `fitting.max_deviation`       | $\Delta_{\max}$        | `1.5`     | 高定数端(≥ $L_{\text{high}}$)上限;另作斗形坡道关闭时的平顶。 |
+| `fitting.max_deviation_low`   | $\Delta_{\min}$        | `0.6`     | 低定数端(≤ $L_{\text{low}}$)上限;设为 0 即关闭斗形坡道,回退到平顶 $\Delta_{\max}$。 |
+| `fitting.max_deviation_low_at`| $L_{\text{low}}$       | `12.0`    | cap 等于 $\Delta_{\min}$ 的端点;必须小于 $L_{\text{high}}$。 |
+| `fitting.max_deviation_high_at`| $L_{\text{high}}$     | `17.0`    | cap 等于 $\Delta_{\max}$ 的端点;两端点之间用对数线性插值 $\Delta(L) = \Delta_{\min}\cdot(\Delta_{\max}/\Delta_{\min})^t$。 |
 | `fitting.min_score`           | $s_{\min}$             | `500000`  | 成绩低于此阈值的样本直接丢弃。                             |
 | `fitting.tukey_k`             | $k$                    | `4.685`   | Tukey 双权调节常数。                                       |
 | `fitting.chart_batch_size`    | —                      | `200`     | 每个数据库批次处理的谱面数(控制单次事务规模)。           |
@@ -256,10 +313,13 @@ $$
 
 ```bash
 # 持续模式(默认,遵循 fitting.interval)
-go run cmd/fitting/main.go -config config/config.yaml
+go run ./cmd/fitting -config config/config.yaml
 
 # 一次性模式(适合 cron、调试、CI 冒烟测试)
-go run cmd/fitting/main.go -config config/config.yaml -once
+go run ./cmd/fitting --once -config config/config.yaml
+
+# 只时诊断某张谱面(只读,不写库)
+go run ./cmd/fitting analyze -chart 870 -config config/config.yaml
 ```
 
 进程收到 `SIGINT` / `SIGTERM` 时会干净退出。在持续模式下,单次迭代的数据库错误
