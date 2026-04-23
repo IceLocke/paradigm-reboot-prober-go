@@ -121,7 +121,7 @@ func InitDefaults() {
 	GlobalConfig.Fitting.MinSamples = 8.0
 	GlobalConfig.Fitting.MinPlayerRecords = 20
 	GlobalConfig.Fitting.ProximitySigma = 20.0
-	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.3
+	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.2
 	GlobalConfig.Fitting.VolumeFullAt = 50
 	GlobalConfig.Fitting.PriorStrength = 5.0
 	GlobalConfig.Fitting.DeviationPenalty = 2.0
@@ -130,10 +130,14 @@ func InitDefaults() {
 	GlobalConfig.Fitting.MaxDeviationLowAt = 12.0
 	GlobalConfig.Fitting.MaxDeviationHighAt = 17.0
 	GlobalConfig.Fitting.MinScore = 500000
-	GlobalConfig.Fitting.ScoreFloorAt = 1000000
-	GlobalConfig.Fitting.ScoreGoodAt = 1007500
-	GlobalConfig.Fitting.ScoreFullAt = 1009000
-	GlobalConfig.Fitting.ScoreGoodWeight = 0.6
+	// Score-quality weight is opt-in. DB sweeps on prod data showed that enabling it
+	// in combination with α=0.2 over-corrects lv11-13 toward negative bias (the mid-
+	// level InverseLevel regime is the most sensitive). Leave all four anchors at 0
+	// to disable; populate all four together to activate.
+	GlobalConfig.Fitting.ScoreFloorAt = 0
+	GlobalConfig.Fitting.ScoreGoodAt = 0
+	GlobalConfig.Fitting.ScoreFullAt = 0
+	GlobalConfig.Fitting.ScoreGoodWeight = 0
 	GlobalConfig.Fitting.TukeyK = 4.685
 	GlobalConfig.Fitting.ChartBatchSize = 200
 	GlobalConfig.Fitting.PlayerBatchSize = 500

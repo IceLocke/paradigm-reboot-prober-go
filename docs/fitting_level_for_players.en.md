@@ -45,24 +45,20 @@ helping players calibrate their own sense of a chart's real difficulty.
 
 ## What is the probe service actually doing?
 
-Skipping the math, the probe service does exactly four things:
+Skipping the math, the probe service does exactly three things:
 
 1. **Weight by player skill.** Players whose skill sits close to the
    chart's difficulty give the most informative scores; players way
    above the chart (AP'ing it casually) or way below the chart (can't
-   clear it) are downweighted.
-2. **Weight by score tier.** A sample where the player only just scraped
-   past 1{,}000{,}000 carries less information than a sample where the
-   player sits comfortably in the "high-score" band. The probe service
-   nudges the former down and keeps the latter at full strength,
-   reducing the survivorship bias that comes from counting "barely
-   passed" attempts while never seeing the same-skill players who
-   didn't pass at all.
-3. **Strip out suspicious samples.** A handful of scores that clearly
+   clear it) are downweighted. On the over-skilled side an extra
+   asymmetric discount kicks in — a top player casually AP'ing a lower-
+   level chart cannot really measure its difficulty, so that sample is
+   pushed down even harder.
+2. **Strip out suspicious samples.** A handful of scores that clearly
    deviate from the group (in either direction) are downweighted or
    discarded, so one or two top players — or one or two disastrous
    attempts — cannot swing the whole conclusion.
-4. **The fewer the samples, the more we trust the official value.**
+3. **The fewer the samples, the more we trust the official value.**
    When data is thin, the fitted value is pulled back toward the
    official level; only with enough evidence is it allowed to drift
    noticeably away.
