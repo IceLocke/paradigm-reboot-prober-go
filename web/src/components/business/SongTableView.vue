@@ -109,7 +109,7 @@ const columns = computed<DataTableColumns<ChartInfo>>(() => [
     width: 90,
     sorter: true,
     render(row) {
-      return h('span', { class: 'mono' }, row.fitting_level != null ? row.fitting_level.toFixed(1) : '-')
+      return h('span', { class: 'mono' }, row.fitting_level != null ? row.fitting_level.toFixed(2) : '-')
     },
   },
   {

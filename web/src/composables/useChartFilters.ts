@@ -64,7 +64,7 @@ export function useChartFilters() {
   const albumSelect = ref<string[] | null>(null)
   const b50Filter = ref(false)
   const b50Loading = ref(false)
-  const groupBy = ref<'level' | 'version' | 'album'>('level')
+  const groupBy = ref<'level' | 'fitting_level' | 'version' | 'album'>('level')
 
   // --- Difficulty options (multi-select) ---
   const diffOptions = [
@@ -111,6 +111,7 @@ export function useChartFilters() {
 
   const groupByOptions = computed(() => [
     { label: t('term.level'), value: 'level' },
+    { label: t('term.fitting_level'), value: 'fitting_level' },
     { label: t('term.version'), value: 'version' },
     { label: t('term.album'), value: 'album' },
   ])
@@ -174,9 +175,16 @@ export function useChartFilters() {
           case 'level':
             result = a.level - b.level
             break
-          case 'fitting_level':
-            result = (a.fitting_level ?? 0) - (b.fitting_level ?? 0)
+          case 'fitting_level': {
+            // Keep null (abstained charts) at the tail irrespective of asc/desc:
+            // sentinel flips sign with the `order === 'ascend' ? result : -result`
+            // transformation applied below.
+            const sentinel = order === 'ascend' ? Infinity : -Infinity
+            const av = a.fitting_level ?? sentinel
+            const bv = b.fitting_level ?? sentinel
+            result = av - bv
             break
+          }
         }
         return order === 'ascend' ? result : -result
       })

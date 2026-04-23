@@ -54,6 +54,26 @@ type Config struct {
 		Path         string   `yaml:"path"`          // URL path that serves Prometheus metrics, e.g. "/metrics"
 		ExcludePaths []string `yaml:"exclude_paths"` // Gin route templates starting with any of these prefixes are not counted in HTTP metrics
 	} `yaml:"metrics"`
+	Fitting struct {
+		Enabled             bool    `yaml:"enabled"`                // master switch for the fitting-calculator microservice
+		Interval            string  `yaml:"interval"`               // Go duration string (e.g. "6h"); run continuously via ticker
+		MinSamples          float64 `yaml:"min_samples"`            // minimum effective sample size required to publish FittingLevel
+		MinPlayerRecords    int     `yaml:"min_player_records"`     // a player needs at least this many best_play_records to contribute
+		ProximitySigma      float64 `yaml:"proximity_sigma"`        // Gaussian σ (rating units) centered at 10×Level for the proximity weight
+		HighSkillSigmaRatio float64 `yaml:"high_skill_sigma_ratio"` // σ multiplier for skill > 10×Level (0 or 1 = symmetric)
+		VolumeFullAt        int     `yaml:"volume_full_at"`         // record count at which a player receives full volume weight (1.0)
+		PriorStrength       float64 `yaml:"prior_strength"`         // κ in Bayesian-style shrinkage toward the official level
+		DeviationPenalty    float64 `yaml:"deviation_penalty"`      // λ; extra prior weight when sample-mean deviates from official (0 disables)
+		MaxDeviation        float64 `yaml:"max_deviation"`          // |FittingLevel − Level| hard cap at high levels (in level units); also used as the flat cap when the ramp below is disabled
+		MaxDeviationLow     float64 `yaml:"max_deviation_low"`      // cap at or below MaxDeviationLowAt; ≤0 disables the level-dependent ramp (falls back to flat MaxDeviation)
+		MaxDeviationLowAt   float64 `yaml:"max_deviation_low_at"`   // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt
+		MaxDeviationHighAt  float64 `yaml:"max_deviation_high_at"`  // level at which cap = MaxDeviation; caps are log-interpolated between the two points
+		MinScore            int     `yaml:"min_score"`              // discard samples with score below this threshold
+		TukeyK              float64 `yaml:"tukey_k"`                // Tukey biweight tuning constant (usually 4.685)
+		ChartBatchSize      int     `yaml:"chart_batch_size"`       // number of charts processed per DB batch
+		PlayerBatchSize     int     `yaml:"player_batch_size"`      // number of users fetched per page during skill collection
+		BatchPause          string  `yaml:"batch_pause"`            // Go duration string; sleep between chart batches to ease DB load
+	} `yaml:"fitting"`
 }
 
 var GlobalConfig Config
@@ -63,6 +83,8 @@ var (
 	JWTExpirationDuration          time.Duration
 	RefreshTokenExpirationDuration time.Duration
 	UsernameRegex                  *regexp.Regexp
+	FittingIntervalDuration        time.Duration
+	FittingBatchPauseDuration      time.Duration
 )
 
 // InitDefaults sets all config fields to their default values and parses derived values.
@@ -90,11 +112,31 @@ func InitDefaults() {
 	GlobalConfig.Metrics.Addr = ":9090"
 	GlobalConfig.Metrics.Path = "/metrics"
 	GlobalConfig.Metrics.ExcludePaths = []string{"/healthz"}
+	GlobalConfig.Fitting.Enabled = true
+	GlobalConfig.Fitting.Interval = "6h"
+	GlobalConfig.Fitting.MinSamples = 8.0
+	GlobalConfig.Fitting.MinPlayerRecords = 20
+	GlobalConfig.Fitting.ProximitySigma = 20.0
+	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.3
+	GlobalConfig.Fitting.VolumeFullAt = 50
+	GlobalConfig.Fitting.PriorStrength = 5.0
+	GlobalConfig.Fitting.DeviationPenalty = 2.0
+	GlobalConfig.Fitting.MaxDeviation = 1.5
+	GlobalConfig.Fitting.MaxDeviationLow = 0.6
+	GlobalConfig.Fitting.MaxDeviationLowAt = 12.0
+	GlobalConfig.Fitting.MaxDeviationHighAt = 17.0
+	GlobalConfig.Fitting.MinScore = 500000
+	GlobalConfig.Fitting.TukeyK = 4.685
+	GlobalConfig.Fitting.ChartBatchSize = 200
+	GlobalConfig.Fitting.PlayerBatchSize = 500
+	GlobalConfig.Fitting.BatchPause = "50ms"
 
 	// Parse derived values (defaults are always valid, no error expected)
 	JWTExpirationDuration, _ = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
 	RefreshTokenExpirationDuration, _ = time.ParseDuration(GlobalConfig.Auth.RefreshTokenExpiration)
 	UsernameRegex = regexp.MustCompile(GlobalConfig.Auth.UsernamePattern)
+	FittingIntervalDuration, _ = time.ParseDuration(GlobalConfig.Fitting.Interval)
+	FittingBatchPauseDuration, _ = time.ParseDuration(GlobalConfig.Fitting.BatchPause)
 }
 
 func LoadConfig(configPath string) {
@@ -187,6 +229,19 @@ func LoadConfig(configPath string) {
 		}
 		GlobalConfig.Metrics.ExcludePaths = cleaned
 	}
+	if v := os.Getenv("FITTING_ENABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			GlobalConfig.Fitting.Enabled = b
+		} else {
+			log.Fatalf("Invalid FITTING_ENABLED value %q: %v", v, err)
+		}
+	}
+	if v := os.Getenv("FITTING_INTERVAL"); v != "" {
+		GlobalConfig.Fitting.Interval = v
+	}
+	if v := os.Getenv("FITTING_BATCH_PAUSE"); v != "" {
+		GlobalConfig.Fitting.BatchPause = v
+	}
 	// Re-parse derived values after file/env overrides
 	JWTExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
 	if err != nil {
@@ -239,5 +294,67 @@ func LoadConfig(configPath string) {
 		if GlobalConfig.Metrics.Addr == GlobalConfig.Server.Port {
 			log.Fatalf("metrics.addr must differ from server.port (both are %q)", GlobalConfig.Metrics.Addr)
 		}
+	}
+
+	// Validate + parse fitting durations. These are not gated by Fitting.Enabled because
+	// the fitting-calculator microservice (cmd/fitting) reads them on startup even when
+	// the master switch is off (in --once mode, or to report the current status).
+	FittingIntervalDuration, err = time.ParseDuration(GlobalConfig.Fitting.Interval)
+	if err != nil {
+		log.Fatalf("Invalid fitting.interval %q: %v", GlobalConfig.Fitting.Interval, err)
+	}
+	if FittingIntervalDuration <= 0 {
+		log.Fatalf("fitting.interval must be > 0, got %q", GlobalConfig.Fitting.Interval)
+	}
+	FittingBatchPauseDuration, err = time.ParseDuration(GlobalConfig.Fitting.BatchPause)
+	if err != nil {
+		log.Fatalf("Invalid fitting.batch_pause %q: %v", GlobalConfig.Fitting.BatchPause, err)
+	}
+	if FittingBatchPauseDuration < 0 {
+		log.Fatalf("fitting.batch_pause must be ≥ 0, got %q", GlobalConfig.Fitting.BatchPause)
+	}
+	if GlobalConfig.Fitting.ProximitySigma <= 0 {
+		log.Fatalf("fitting.proximity_sigma must be > 0, got %f", GlobalConfig.Fitting.ProximitySigma)
+	}
+	if GlobalConfig.Fitting.TukeyK <= 0 {
+		log.Fatalf("fitting.tukey_k must be > 0, got %f", GlobalConfig.Fitting.TukeyK)
+	}
+	if GlobalConfig.Fitting.PriorStrength < 0 {
+		log.Fatalf("fitting.prior_strength must be ≥ 0, got %f", GlobalConfig.Fitting.PriorStrength)
+	}
+	if GlobalConfig.Fitting.DeviationPenalty < 0 {
+		log.Fatalf("fitting.deviation_penalty must be ≥ 0, got %f", GlobalConfig.Fitting.DeviationPenalty)
+	}
+	if GlobalConfig.Fitting.HighSkillSigmaRatio < 0 {
+		log.Fatalf("fitting.high_skill_sigma_ratio must be ≥ 0, got %f", GlobalConfig.Fitting.HighSkillSigmaRatio)
+	}
+	if GlobalConfig.Fitting.MaxDeviation < 0 {
+		log.Fatalf("fitting.max_deviation must be ≥ 0, got %f", GlobalConfig.Fitting.MaxDeviation)
+	}
+	// Level-dependent cap ramp: only validated when enabled (MaxDeviationLow > 0). Consistency with
+	// effectiveMaxDeviation(): if any endpoint is misconfigured we fall back silently to the flat cap,
+	// but we still surface the most likely-to-be-wrong configurations as fatal at startup.
+	if GlobalConfig.Fitting.MaxDeviationLow < 0 {
+		log.Fatalf("fitting.max_deviation_low must be ≥ 0, got %f", GlobalConfig.Fitting.MaxDeviationLow)
+	}
+	if GlobalConfig.Fitting.MaxDeviationLow > 0 {
+		if GlobalConfig.Fitting.MaxDeviationLow > GlobalConfig.Fitting.MaxDeviation {
+			log.Fatalf("fitting.max_deviation_low (%f) must be ≤ fitting.max_deviation (%f)",
+				GlobalConfig.Fitting.MaxDeviationLow, GlobalConfig.Fitting.MaxDeviation)
+		}
+		if GlobalConfig.Fitting.MaxDeviationLowAt <= 0 {
+			log.Fatalf("fitting.max_deviation_low_at must be > 0 when fitting.max_deviation_low > 0, got %f",
+				GlobalConfig.Fitting.MaxDeviationLowAt)
+		}
+		if GlobalConfig.Fitting.MaxDeviationHighAt <= GlobalConfig.Fitting.MaxDeviationLowAt {
+			log.Fatalf("fitting.max_deviation_high_at (%f) must be > fitting.max_deviation_low_at (%f)",
+				GlobalConfig.Fitting.MaxDeviationHighAt, GlobalConfig.Fitting.MaxDeviationLowAt)
+		}
+	}
+	if GlobalConfig.Fitting.ChartBatchSize <= 0 {
+		log.Fatalf("fitting.chart_batch_size must be > 0, got %d", GlobalConfig.Fitting.ChartBatchSize)
+	}
+	if GlobalConfig.Fitting.PlayerBatchSize <= 0 {
+		log.Fatalf("fitting.player_batch_size must be > 0, got %d", GlobalConfig.Fitting.PlayerBatchSize)
 	}
 }

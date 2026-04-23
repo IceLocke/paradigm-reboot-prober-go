@@ -54,6 +54,12 @@ function generateChartInfoList(): ChartInfo[] {
 
     for (let d = 0; d < diffCount; d++) {
       const level = Math.round(baseLevels[d] * 10) / 10
+      // Simulate the fitting microservice abstaining for ~10% of charts
+      // (insufficient samples → fitting_level === null). See
+      // docs/fitting_level.en.md §4.4.
+      const fittingLevel = Math.random() < 0.1
+        ? null
+        : Math.round((level + (Math.random() - 0.5) * 0.4) * 10) / 10
       charts.push({
         id: chartId++,
         song_id: songId,
@@ -70,7 +76,7 @@ function generateChartInfoList(): ChartInfo[] {
         wiki_id: `w${songId}`,
         difficulty: difficulties[d],
         level,
-        fitting_level: Math.round((level + (Math.random() - 0.5) * 0.4) * 10) / 10,
+        fitting_level: fittingLevel,
         level_design: ['Chart_A', 'Chart_B', 'Chart_C', 'Chart_D'][d],
         notes: 400 + Math.floor(Math.random() * 800),
       })

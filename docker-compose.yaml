@@ -5,13 +5,13 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: prprober
+      POSTGRES_DB: prp
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d prprober"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d prp"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,10 +31,50 @@ services:
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=password
-      - DB_NAME=prprober
+      - DB_NAME=prp
       - DB_SSLMODE=disable
       - SERVER_PORT=:8080
       - SECRET_KEY=your_ci_secret_key
+
+  # Fitting-level microservice (cmd/fitting). See docs/fitting_level.en.md
+  # and docs/fitting_level.zh.md for the algorithm, and AGENTS.md →
+  # "保持查分器本体的单纯性" for the design principle.
+  #
+  # Gated behind the `fitting` Compose profile so `docker compose up` keeps
+  # its existing behaviour (db + app only). To run the fitting loop alongside
+  # the probe server:
+  #   docker compose --profile fitting up -d
+  # Or permanently via the environment variable:
+  #   export COMPOSE_PROFILES=fitting && docker compose up -d
+  #
+  # The binary uses its OWN internal ticker (FITTING_INTERVAL, default 6h),
+  # so a single long-lived container is the full scheduler — no host cron
+  # needed. If you instead prefer external scheduling (cron, systemd timer,
+  # k8s CronJob), drop the profile line below, change `command` to
+  # ["./fitting", "-once"], set `restart: "no"`, and invoke it with
+  # `docker compose run --rm fitting` from your scheduler.
+  fitting:
+    image: ${APP_IMAGE:-ghcr.io/icelocke/paradigm-reboot-prober-go:latest}
+    build: .
+    container_name: prp-fitting
+    command: ["./fitting"]
+    profiles: ["fitting"]
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+      - DB_NAME=prp
+      - DB_SSLMODE=disable
+      - SECRET_KEY=your_ci_secret_key
+      - FITTING_ENABLED=true
+      - FITTING_INTERVAL=6h
+      - FITTING_BATCH_PAUSE=50ms
 
 volumes:
   postgres_data:
