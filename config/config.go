@@ -69,6 +69,10 @@ type Config struct {
 		MaxDeviationLowAt   float64 `yaml:"max_deviation_low_at"`   // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt
 		MaxDeviationHighAt  float64 `yaml:"max_deviation_high_at"`  // level at which cap = MaxDeviation; caps are log-interpolated between the two points
 		MinScore            int     `yaml:"min_score"`              // discard samples with score below this threshold
+		ScoreFloorAt        int     `yaml:"score_floor_at"`         // score below this gets zero score-quality weight; ≤0 disables the score-quality weight entirely
+		ScoreGoodAt         int     `yaml:"score_good_at"`          // score at which score-quality weight = ScoreGoodWeight ("会打" threshold)
+		ScoreFullAt         int     `yaml:"score_full_at"`          // score at which score-quality weight saturates to 1.0 ("高分" threshold)
+		ScoreGoodWeight     float64 `yaml:"score_good_weight"`      // score-quality weight at ScoreGoodAt; must be in (0, 1)
 		TukeyK              float64 `yaml:"tukey_k"`                // Tukey biweight tuning constant (usually 4.685)
 		ChartBatchSize      int     `yaml:"chart_batch_size"`       // number of charts processed per DB batch
 		PlayerBatchSize     int     `yaml:"player_batch_size"`      // number of users fetched per page during skill collection
@@ -126,6 +130,10 @@ func InitDefaults() {
 	GlobalConfig.Fitting.MaxDeviationLowAt = 12.0
 	GlobalConfig.Fitting.MaxDeviationHighAt = 17.0
 	GlobalConfig.Fitting.MinScore = 500000
+	GlobalConfig.Fitting.ScoreFloorAt = 1000000
+	GlobalConfig.Fitting.ScoreGoodAt = 1007500
+	GlobalConfig.Fitting.ScoreFullAt = 1009000
+	GlobalConfig.Fitting.ScoreGoodWeight = 0.6
 	GlobalConfig.Fitting.TukeyK = 4.685
 	GlobalConfig.Fitting.ChartBatchSize = 200
 	GlobalConfig.Fitting.PlayerBatchSize = 500
@@ -349,6 +357,27 @@ func LoadConfig(configPath string) {
 		if GlobalConfig.Fitting.MaxDeviationHighAt <= GlobalConfig.Fitting.MaxDeviationLowAt {
 			log.Fatalf("fitting.max_deviation_high_at (%f) must be > fitting.max_deviation_low_at (%f)",
 				GlobalConfig.Fitting.MaxDeviationHighAt, GlobalConfig.Fitting.MaxDeviationLowAt)
+		}
+	}
+	// Score-quality weight: validated only when opted in (any anchor > 0). The calculator silently
+	// falls back to uniform weighting when the knobs are all zero/unset, which is what tests assume.
+	if GlobalConfig.Fitting.ScoreFloorAt > 0 ||
+		GlobalConfig.Fitting.ScoreGoodAt > 0 ||
+		GlobalConfig.Fitting.ScoreFullAt > 0 {
+		if GlobalConfig.Fitting.ScoreFloorAt <= 0 {
+			log.Fatalf("fitting.score_floor_at must be > 0 when any score-quality anchor is set, got %d", GlobalConfig.Fitting.ScoreFloorAt)
+		}
+		if GlobalConfig.Fitting.ScoreGoodAt <= GlobalConfig.Fitting.ScoreFloorAt {
+			log.Fatalf("fitting.score_good_at (%d) must be > fitting.score_floor_at (%d)",
+				GlobalConfig.Fitting.ScoreGoodAt, GlobalConfig.Fitting.ScoreFloorAt)
+		}
+		if GlobalConfig.Fitting.ScoreFullAt <= GlobalConfig.Fitting.ScoreGoodAt {
+			log.Fatalf("fitting.score_full_at (%d) must be > fitting.score_good_at (%d)",
+				GlobalConfig.Fitting.ScoreFullAt, GlobalConfig.Fitting.ScoreGoodAt)
+		}
+		if GlobalConfig.Fitting.ScoreGoodWeight <= 0 || GlobalConfig.Fitting.ScoreGoodWeight >= 1 {
+			log.Fatalf("fitting.score_good_weight must be in (0, 1) when score-quality weighting is enabled, got %f",
+				GlobalConfig.Fitting.ScoreGoodWeight)
 		}
 	}
 	if GlobalConfig.Fitting.ChartBatchSize <= 0 {

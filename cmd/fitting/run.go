@@ -71,6 +71,10 @@ func cmdRun(args []string) {
 		MaxDeviationLowAt:   fp.MaxDeviationLowAt,
 		MaxDeviationHighAt:  fp.MaxDeviationHighAt,
 		MinScore:            fp.MinScore,
+		ScoreFloorAt:        fp.ScoreFloorAt,
+		ScoreGoodAt:         fp.ScoreGoodAt,
+		ScoreFullAt:         fp.ScoreFullAt,
+		ScoreGoodWeight:     fp.ScoreGoodWeight,
 		TukeyK:              fp.TukeyK,
 		MinPlayerRecords:    fp.MinPlayerRecords,
 	}

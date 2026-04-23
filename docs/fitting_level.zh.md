@@ -132,7 +132,24 @@ $$
 w^{\text{vol}}_p = \min\!\left(1, \dfrac{n_p}{V_{\text{full}}}\right).
 $$
 
-**合成预权重:** $\tilde{w}_{p,c} = w^{\text{prox}}_{p,c} \cdot w^{\text{vol}}_p$。
+**分数质量权重(可选,默认开启)。** 一个仅仅 barely passed 某谱面(score 刚过 100 万)的样本与一个稳定稳在社区公认的 “高分”区间($\ge 1\,009\,000$)的样本,携带的信息并不等值。我们用三段分段线性斜坡把原始 score 映射到一个额外的权重因子 $w^{\text{score}}_{p,c} \in [0, 1]$:
+
+$$
+w^{\text{score}}_{p,c} = \begin{cases}
+0, & s < s_{\text{floor}},\\[2pt]
+w_{\text{good}} \cdot \dfrac{s - s_{\text{floor}}}{s_{\text{good}} - s_{\text{floor}}}, & s_{\text{floor}} \le s < s_{\text{good}},\\[10pt]
+w_{\text{good}} + (1 - w_{\text{good}}) \cdot \dfrac{s - s_{\text{good}}}{s_{\text{full}} - s_{\text{good}}}, & s_{\text{good}} \le s < s_{\text{full}},\\[10pt]
+1, & s \ge s_{\text{full}}.
+\end{cases}
+$$
+
+默认锚点:$s_{\text{floor}} = 1{,}000{,}000$(业务定义的 “没真正过了”阈值),$s_{\text{good}} = 1{,}007{,}500$(“会打”阈值),$s_{\text{full}} = 1{,}009{,}000$(“高分”阈值),$w_{\text{good}} = 0.6$。`score_floor_at`、`score_good_at`、`score_full_at`、`score_good_weight` 任意一项全部置为 0 / 错配时该因子退化为 $1$,等价于关闭本子节。
+
+**这一步在解决什么问题?** 原样本库中大约 24% 的成绩在 100 万以下,另有 40% 在 100 万到 100.75 万之间(“刚过”带)。这些样本在同权重时给出的反推 $\hat{\delta}$ 存在幸存者偏差(survivorship bias)——我们只看到“恰好过了”的样本,没看到“没过”的同能力玩家。把这些样本降权相当于在预权重阶段对幸存者偏差做折扣。实测对比上线前后,全局 $\mathrm{avg}(\hat{\delta})$ 从 $+0.20$ 压到 $+0.08$(-59%),lv14–lv15 带的偏差一并回落,代价是 lv11–lv13 出现 ≈$-0.19$ 的轻微负漂移(该区间每 level 样本本来就少,$N=5\sim17$,统计显著性较弱)。设计上它与 $\alpha$ 不交易——$\alpha$ 管 over-skilled 的玩家,$w^{\text{score}}$ 管 under-scored 的样本,两者相加。
+
+**与 InverseLevel 数学的相互作用(重要的副作用)。** 在 rating 公式下,同一 $B_p$ 的玩家在 AP(score = 1{,}010{,}000)时反推到的 $\hat{L} = B_p/10 - 1$,而在 score = 1{,}000{,}500 时反推到的 $\hat{L} \approx B_p/10 - 0.033$——也就是说,**高分样本在数学上就会反推出更低的 level**。引入分数权重等于加大高分样本的声音,因此会把整体 $\hat{L}_c$ 轻度向下推,而不仅仅是把 lv15 正偏差 “修平”——这也是为什么低 level(lv11–lv13)会出现小幅负漂移。我们认为这个 trade-off 是值得的(主力谱 lv14–lv16 样本最密集且流量最高),但如果低端的偏移进一步放大,可换成 $w_{\text{good}} = 0.85$ + $s_{\text{floor}} = 500{,}000$ 的“几乎 no-op”配置、或直接将四个 `score_*` 按锈全置 0 关闭本小节。
+
+**合成预权重:** $\tilde{w}_{p,c} = w^{\text{prox}}_{p,c} \cdot w^{\text{vol}}_p \cdot w^{\text{score}}_{p,c}$。
 
 ### 4.3 鲁棒裁剪(Tukey 双权)
 
@@ -282,7 +299,11 @@ $$
 | `fitting.max_deviation_low`   | $\Delta_{\min}$        | `0.6`     | 低定数端(≤ $L_{\text{low}}$)上限;设为 0 即关闭斗形坡道,回退到平顶 $\Delta_{\max}$。 |
 | `fitting.max_deviation_low_at`| $L_{\text{low}}$       | `12.0`    | cap 等于 $\Delta_{\min}$ 的端点;必须小于 $L_{\text{high}}$。 |
 | `fitting.max_deviation_high_at`| $L_{\text{high}}$     | `17.0`    | cap 等于 $\Delta_{\max}$ 的端点;两端点之间用对数线性插值 $\Delta(L) = \Delta_{\min}\cdot(\Delta_{\max}/\Delta_{\min})^t$。 |
-| `fitting.min_score`           | $s_{\min}$             | `500000`  | 成绩低于此阈值的样本直接丢弃。                             |
+| `fitting.min_score`           | $s_{\min}$            | `500000`  | 成绩低于此阈值的样本直接丢弃。                             |
+| `fitting.score_floor_at`      | $s_{\text{floor}}$    | `1000000` | 低于此分数的样本分数质量权重为 0(业务上的 “没真正过”线);置为 0 关闭分数权重。 |
+| `fitting.score_good_at`       | $s_{\text{good}}$     | `1007500` | 分数质量权重达到 $w_{\text{good}}$ 的锚点(“会打” 阈值)。      |
+| `fitting.score_full_at`       | $s_{\text{full}}$     | `1009000` | 分数质量权重饱和到 1.0 的锚点(“高分” 阈值)。               |
+| `fitting.score_good_weight`   | $w_{\text{good}}$     | `0.6`     | 在 $s_{\text{good}}$ 处的权重值;启用时须在 $(0, 1)$ 内。      |
 | `fitting.tukey_k`             | $k$                    | `4.685`   | Tukey 双权调节常数。                                       |
 | `fitting.chart_batch_size`    | —                      | `200`     | 每个数据库批次处理的谱面数(控制单次事务规模)。           |
 | `fitting.player_batch_size`   | —                      | `500`     | 玩家实力分页时每页用户数(键集分页)。                     |

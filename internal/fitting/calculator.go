@@ -36,6 +36,10 @@ type Params struct {
 	MaxDeviationLowAt   float64 // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt for the ramp to be active
 	MaxDeviationHighAt  float64 // level at which cap = MaxDeviation; above this the cap stays at MaxDeviation (clamped)
 	MinScore            int     // discard samples with score below this
+	ScoreFloorAt        int     // score below this gets zero score-quality weight; <=0 disables the score-quality weight entirely
+	ScoreGoodAt         int     // score at which score-quality weight equals ScoreGoodWeight ("会打" threshold, typical 1007500)
+	ScoreFullAt         int     // score at which score-quality weight saturates to 1.0 ("高分" threshold, typical 1009000)
+	ScoreGoodWeight     float64 // score-quality weight at ScoreGoodAt; must be in (0, 1)
 	TukeyK              float64 // tuning constant for the Tukey biweight robustness step
 	MinPlayerRecords    int     // drop samples from players with fewer than this many best_play_records (0 = no filter)
 }
@@ -59,9 +63,12 @@ type Result struct {
 //  1. Per-sample inverse-rating: given (score, PlayerSkill), solve for the
 //     level that makes SingleRating match the player's typical B50 rating.
 //  2. Pre-weighting: each sample receives a composite weight equal to
-//     proximityWeight × volumeWeight. proximityWeight is a Gaussian centered
-//     on 10·Level (so players whose skill matches the chart's official level
-//     dominate); volumeWeight ramps linearly up to VolumeFullAt records.
+//     proximityWeight × volumeWeight × scoreQualityWeight. proximityWeight
+//     is a Gaussian centered on 10·Level (so players whose skill matches
+//     the chart's official level dominate); volumeWeight ramps linearly
+//     up to VolumeFullAt records; scoreQualityWeight encodes that only
+//     samples in or above the "会打" / "高分" score tiers are reliable
+//     signals about the chart.
 //  3. Robust trimming: compute the weighted median of inferred levels, the
 //     weighted MAD, then apply Tukey biweight attenuation so extreme
 //     residuals receive zero weight.
@@ -120,7 +127,18 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 		if params.VolumeFullAt > 0 && s.PlayerRecords < params.VolumeFullAt {
 			volume = float64(s.PlayerRecords) / float64(params.VolumeFullAt)
 		}
-		w := proximity * volume
+		// score-quality weight: the actual score a player achieved conveys how
+		// much of the chart they "really" have under control. Business domain
+		// knowledge from Paradigm: Reboot:
+		//   - score < 1,000,000: the player has not really "passed" the chart
+		//     (the rating curve's inversion is also numerically unstable below
+		//     1M) — give zero weight.
+		//   - score ≥ 1,007,500: the player "会打" (has a handle on) the chart;
+		//     samples here carry substantial weight.
+		//   - score ≥ 1,009,000: the commonly pursued "高分" tier; saturate the
+		//     weight to 1.0 — these are the most reliable samples.
+		scoreQ := scoreQualityWeight(s.Score, params)
+		w := proximity * volume * scoreQ
 		if w <= 0 || math.IsNaN(w) {
 			continue
 		}
@@ -277,6 +295,59 @@ func effectiveMaxDeviation(params Params, level float64) float64 {
 	}
 	t := (level - params.MaxDeviationLowAt) / (params.MaxDeviationHighAt - params.MaxDeviationLowAt)
 	return params.MaxDeviationLow * math.Pow(params.MaxDeviation/params.MaxDeviationLow, t)
+}
+
+// scoreQualityWeight converts a raw score into a weight factor in [0, 1]
+// reflecting "how confident are we that this (player, score) pair tells us
+// anything about the chart?". It encodes the gameplay-level reality that a
+// player who only barely scraped above the min_score threshold has not
+// really "played" the chart in any meaningful sense, while a player who
+// reached the community's "高分" / high-score tier has.
+//
+// The curve is a piecewise-linear ramp with three anchor points:
+//
+//	score < ScoreFloorAt    → weight = 0           ("<1M": throw away)
+//	score = ScoreGoodAt     → weight = ScoreGoodWeight  ("会打": e.g. 0.6)
+//	score ≥ ScoreFullAt     → weight = 1           ("高分": fully trusted)
+//
+// and linear interpolation in between. Multiplicatively combined with the
+// proximity and volume pre-weights, this acts as a third axis of sample
+// quality. A sample that is close to the chart's skill band AND played by
+// a veteran AND has a high score carries the full weight; missing any of
+// the three shrinks the contribution.
+//
+// The feature is deliberately opt-in: if the thresholds are misconfigured
+// (non-positive anchors, non-monotone ordering, or ScoreGoodWeight outside
+// (0, 1)) the function returns 1.0, so existing callers and tests that
+// leave these fields at their zero values retain the original uniform
+// weighting exactly.
+func scoreQualityWeight(score int, params Params) float64 {
+	if params.ScoreFloorAt <= 0 ||
+		params.ScoreGoodAt <= 0 ||
+		params.ScoreFullAt <= 0 ||
+		params.ScoreGoodAt <= params.ScoreFloorAt ||
+		params.ScoreFullAt <= params.ScoreGoodAt ||
+		params.ScoreGoodWeight <= 0 ||
+		params.ScoreGoodWeight >= 1 {
+		return 1.0
+	}
+	if score < params.ScoreFloorAt {
+		return 0.0
+	}
+	if score >= params.ScoreFullAt {
+		return 1.0
+	}
+	s := float64(score)
+	floor := float64(params.ScoreFloorAt)
+	good := float64(params.ScoreGoodAt)
+	full := float64(params.ScoreFullAt)
+	goodW := params.ScoreGoodWeight
+	if score < params.ScoreGoodAt {
+		// linear ramp 0 → goodW across [floor, good]
+		return goodW * (s - floor) / (good - floor)
+	}
+	// linear ramp goodW → 1 across [good, full)
+	return goodW + (1.0-goodW)*(s-good)/(full-good)
 }
 
 // weightedMedian returns the value v such that the cumulative weight of

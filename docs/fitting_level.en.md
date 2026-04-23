@@ -157,8 +157,61 @@ $$
 w^{\text{vol}}_p = \min\!\left(1, \dfrac{n_p}{V_{\text{full}}}\right).
 $$
 
+**Score-quality weight (opt-in, enabled by default).** A sample from a
+player who only barely passed a chart (score just over 1{,}000{,}000) and a
+sample from the same player comfortably in the community "high-score"
+band ($\ge 1{,}009{,}000$) do not carry equal information. We map the raw
+score to an extra weight factor $w^{\text{score}}_{p,c} \in [0, 1]$ via a
+three-segment piecewise-linear ramp:
+
+$$
+w^{\text{score}}_{p,c} = \begin{cases}
+0, & s < s_{\text{floor}},\\[2pt]
+w_{\text{good}} \cdot \dfrac{s - s_{\text{floor}}}{s_{\text{good}} - s_{\text{floor}}}, & s_{\text{floor}} \le s < s_{\text{good}},\\[10pt]
+w_{\text{good}} + (1 - w_{\text{good}}) \cdot \dfrac{s - s_{\text{good}}}{s_{\text{full}} - s_{\text{good}}}, & s_{\text{good}} \le s < s_{\text{full}},\\[10pt]
+1, & s \ge s_{\text{full}}.
+\end{cases}
+$$
+
+Default anchors: $s_{\text{floor}} = 1{,}000{,}000$ (the business-defined
+"didn't really pass" threshold), $s_{\text{good}} = 1{,}007{,}500$ (the
+"can play" threshold), $s_{\text{full}} = 1{,}009{,}000$ (the "high-score"
+threshold), $w_{\text{good}} = 0.6$. Setting any of `score_floor_at`,
+`score_good_at`, `score_full_at`, or `score_good_weight` to `0` (or a
+non-monotone configuration) makes the factor degenerate to $1$, which is
+equivalent to disabling this sub-section entirely.
+
+**What problem does this solve?** About 24% of the raw best-record pool
+sits below 1{,}000{,}000 and another 40% sits in the 1{,}000{,}000–1{,}007{,}500
+"just scraped by" band. Giving every such sample the same weight as a
+stable high-score run introduces survivorship bias in the inferred
+$\hat{\delta}$ — we only see the players who “barely made it”, not the
+same-skill players who failed and never produced a best record. Damping
+these samples at the pre-weight stage discounts that bias. End-to-end on
+the production dataset, the global $\mathrm{avg}(\hat{\delta})$ fell
+from $+0.20$ to $+0.08$ ($-59\%$) and the lv14–lv15 band biases went
+down in tandem, at the cost of lv11–lv13 picking up a mild $\approx
+-0.19$ negative drift (those buckets are sparse, $N = 5\sim 17$, so the
+drift is statistically weak). The knob is orthogonal to $\alpha$: $\alpha$
+handles over-skilled players; $w^{\text{score}}$ handles under-scored
+samples.
+
+**Interaction with the InverseLevel math (important side-effect).** Under
+the rating formula, for a fixed $B_p$, an AP sample (score = 1{,}010{,}000)
+inverts to $\hat{L} = B_p/10 - 1$, while a score = 1{,}000{,}500 sample
+inverts to $\hat{L} \approx B_p/10 - 0.033$ — that is, **high-score
+samples inherently infer a lower level than low-score samples do, for the
+same $B_p$**. Up-weighting high-score samples therefore nudges the whole
+$\hat{L}_c$ distribution down, not just the positive lv15 bias we wanted
+to fix; this is the mechanism behind the lv11–lv13 drift. We accept the
+trade-off because the lv14–lv16 buckets (where the bulk of players live
+and most charts are clustered) improve substantially, but if the
+low-level drift grows further the knobs can be relaxed to $w_{\text{good}}
+= 0.85$ + $s_{\text{floor}} = 500{,}000$ (nearly no-op) or disabled
+outright by zeroing the four `score_*` fields.
+
 **Combined pre-weight:** $\tilde{w}_{p,c} = w^{\text{prox}}_{p,c} \cdot
-w^{\text{vol}}_p$.
+w^{\text{vol}}_p \cdot w^{\text{score}}_{p,c}$.
 
 ### 4.3 Robust trimming (Tukey biweight)
 
@@ -352,6 +405,10 @@ for each chart c with official level L_c:
 | `fitting.max_deviation_low_at`  | $L_{\text{low}}$       | `12.0`    | Anchor where the cap equals $\Delta_{\min}$; must be less than $L_{\text{high}}$.      |
 | `fitting.max_deviation_high_at` | $L_{\text{high}}$      | `17.0`    | Anchor where the cap equals $\Delta_{\max}$; in between, $\Delta(L) = \Delta_{\min}\cdot(\Delta_{\max}/\Delta_{\min})^t$. |
 | `fitting.min_score`             | $s_{\min}$             | `500000`  | Minimum score admitted.                                                                |
+| `fitting.score_floor_at`        | $s_{\text{floor}}$     | `1000000` | Samples below this score get zero score-quality weight (business "didn't really pass" line); set to `0` to disable the score-quality weight. |
+| `fitting.score_good_at`         | $s_{\text{good}}$      | `1007500` | Anchor at which the score-quality weight reaches $w_{\text{good}}$ ("can play" threshold). |
+| `fitting.score_full_at`         | $s_{\text{full}}$      | `1009000` | Anchor at which the score-quality weight saturates to 1.0 ("high-score" threshold).    |
+| `fitting.score_good_weight`     | $w_{\text{good}}$      | `0.6`     | Weight at $s_{\text{good}}$; must lie in $(0, 1)$ when enabled.                        |
 | `fitting.tukey_k`               | $k$                    | `4.685`   | Biweight tuning constant.                                                              |
 | `fitting.chart_batch_size`      | —                      | `200`     | Charts processed per DB batch.                                                         |
 | `fitting.player_batch_size`     | —                      | `500`     | Users fetched per page.                                                                |

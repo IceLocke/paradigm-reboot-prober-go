@@ -62,6 +62,17 @@ fitting:
   max_deviation_low_at: 12.0 # level at which cap = max_deviation_low (e.g. 12)
   max_deviation_high_at: 17.0 # level at which cap = max_deviation (e.g. 17); log-interpolated between endpoints
   min_score: 500000         # discard samples below this score threshold
+  # Score-quality weighting: players who only barely passed a chart (score just over 1,000,000)
+  # are much less reliable signals than players who hit the community-pursued "高分" tier.
+  # The calculator multiplies each sample's pre-weight by a piecewise-linear ramp:
+  #   score  < score_floor_at      → weight factor = 0
+  #   score == score_good_at       → weight factor = score_good_weight  ("会打" threshold)
+  #   score ≥ score_full_at        → weight factor = 1.0                ("高分" threshold)
+  # Leave all four knobs at 0 to disable the feature entirely (uniform weighting, legacy behaviour).
+  score_floor_at: 1000000   # below this score, the sample contributes nothing (barely-passed discount)
+  score_good_at: 1007500    # "会打" threshold — the sample reaches score_good_weight here
+  score_full_at: 1009000    # "高分" threshold — the sample is fully trusted at or above this
+  score_good_weight: 0.6    # weight factor at score_good_at; must be in (0, 1)
   tukey_k: 4.685            # Tukey biweight tuning constant (outlier trimming)
   chart_batch_size: 200     # charts per DB batch (keep DB load bounded)
   player_batch_size: 500    # users fetched per page during skill collection
