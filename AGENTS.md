@@ -298,7 +298,7 @@ docker compose --profile fitting up -d
 COMPOSE_PROFILES=fitting docker compose up -d
 
 # Build Docker image only (produces both ./server and ./fitting inside the image)
-docker build -t prprober-app .
+docker build -t prp-app .
 ```
 
 The image is multi-stage and compiles **both** binaries (`./server` and `./fitting`). The `app` service uses the default `CMD ["./server"]`; the `fitting` service overrides it via `command: ["./fitting"]` and is gated behind the `fitting` Compose profile so `docker compose up` keeps its existing behaviour (db + app only) and the CI integration test remains unchanged.
