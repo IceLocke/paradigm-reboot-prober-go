@@ -18,9 +18,9 @@ import (
 // (--once) or the continuous mode driven by config.fitting.interval.
 //
 // This is also the default subcommand invoked when no subcommand keyword
-// is present on the command line, so `./fitting`, `./fitting --once`,
-// `go run cmd/fitting/main.go --config foo.yaml` all route here
-// unchanged from the pre-subcommand behaviour.
+// is present on the command line, so `./fitting`, `./fitting --once`, and
+// `go run ./cmd/fitting --config foo.yaml` all route here unchanged from
+// the pre-subcommand behaviour.
 func cmdRun(args []string) {
 	fs := flag.NewFlagSet("run", flag.ExitOnError)
 	configPath := fs.String("config", "config/config.yaml", "Path to config file")

@@ -22,8 +22,14 @@
 //
 // When no subcommand is given, `run` is assumed so that existing
 // invocations such as `./fitting`, `./fitting --once`, or
-// `go run cmd/fitting/main.go --once` continue to behave exactly as
+// `go run ./cmd/fitting --once` continue to behave exactly as
 // before the subcommand split.
+//
+// NOTE: `go run cmd/fitting/main.go …` (single-file path) no longer
+// compiles because this `main` package now spans multiple files
+// (main.go + run.go + analyze.go). Always use the package path
+// `./cmd/fitting` for `go run` / `go build`, and the same applies
+// inside Dockerfile build steps.
 package main
 
 import (

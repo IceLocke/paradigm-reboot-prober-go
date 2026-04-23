@@ -4,7 +4,7 @@ package main
 //
 // Usage:
 //
-//	go run cmd/fitting/main.go analyze -chart 51
+//	go run ./cmd/fitting analyze -chart 51
 //
 // It connects to the same database as the `run` subcommand, loads all
 // best_play_records for the given chart joined with the per-player skill
