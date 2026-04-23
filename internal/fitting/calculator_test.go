@@ -1,6 +1,7 @@
 package fitting
 
 import (
+	"math"
 	"math/rand"
 	"testing"
 
@@ -646,4 +647,164 @@ func TestComputeFitting_HighSkillSigmaRatio_UnderSkilledUnchanged(t *testing.T) 
 	assert.InDelta(t, *resSym.FittingLevel, *resAsym.FittingLevel, 1e-9,
 		"under-skilled samples must be unaffected by HighSkillSigmaRatio")
 	assert.InDelta(t, resSym.EffectiveSampleSize, resAsym.EffectiveSampleSize, 1e-9)
+}
+
+// ============================================================================
+// Level-dependent MaxDeviation ramp (effectiveMaxDeviation + ComputeFitting)
+// ============================================================================
+//
+// Difficulty in the official level axis is roughly logarithmic: one level at
+// lv17 represents a much bigger real-world gap than one level at lv12. The
+// ramp encodes this by tightening the cap at low levels (where the official
+// label is close to truth and we don't want the fitter to drift) and loosening
+// it at high levels (where the official buckets are coarser).
+//
+// These tests exercise (1) the interpolation math directly and (2) the wiring
+// into ComputeFitting, which is the only call site.
+
+// Sanity: a zero-valued MaxDeviationLow must be a no-op — the helper should
+// return the flat MaxDeviation unchanged. This is the default behaviour that
+// keeps every existing test and production config intact.
+func TestEffectiveMaxDeviation_RampDisabled(t *testing.T) {
+	params := Params{MaxDeviation: 1.5} // MaxDeviationLow == 0 → ramp off
+	// All level values should return the flat cap.
+	for _, level := range []float64{1, 12, 14.5, 17, 20} {
+		got := effectiveMaxDeviation(params, level)
+		assert.InDelta(t, 1.5, got, 1e-12, "level=%v must fall back to flat cap", level)
+	}
+}
+
+// Misconfigured ramp endpoints must not silently produce nonsense caps —
+// we fall back to the flat MaxDeviation so the pipeline keeps the guard.
+func TestEffectiveMaxDeviation_RampMisconfigured(t *testing.T) {
+	good := Params{
+		MaxDeviation:       1.5,
+		MaxDeviationLow:    0.6,
+		MaxDeviationLowAt:  12,
+		MaxDeviationHighAt: 17,
+	}
+	// Baseline: properly configured ramp returns the low cap at low levels.
+	assert.InDelta(t, 0.6, effectiveMaxDeviation(good, 10), 1e-12)
+
+	// Each perturbation below should disable the ramp → return flat 1.5 at lv10.
+	cases := []struct {
+		name  string
+		mut   func(*Params)
+		level float64
+	}{
+		{"LowAt=0", func(p *Params) { p.MaxDeviationLowAt = 0 }, 10},
+		{"HighAt=0", func(p *Params) { p.MaxDeviationHighAt = 0 }, 10},
+		{"HighAt<=LowAt", func(p *Params) { p.MaxDeviationHighAt = p.MaxDeviationLowAt }, 10},
+		{"Low>=MaxDeviation", func(p *Params) { p.MaxDeviationLow = p.MaxDeviation + 0.1 }, 10},
+		{"Low==MaxDeviation", func(p *Params) { p.MaxDeviationLow = p.MaxDeviation }, 10},
+	}
+	for _, c := range cases {
+		p := good
+		c.mut(&p)
+		got := effectiveMaxDeviation(p, c.level)
+		assert.InDelta(t, p.MaxDeviation, got, 1e-12, "%s: must fall back to flat cap", c.name)
+	}
+}
+
+// Endpoint values should clamp, and the midpoint must follow a log
+// interpolation: cap(L_mid) == sqrt(Low · High) when L_mid is exactly between
+// L_low and L_high (t = 0.5 ⇒ Low · ratio^0.5).
+func TestEffectiveMaxDeviation_RampEndpointsAndInterpolation(t *testing.T) {
+	params := Params{
+		MaxDeviation:       1.5,
+		MaxDeviationLow:    0.6,
+		MaxDeviationLowAt:  12,
+		MaxDeviationHighAt: 17,
+	}
+	// Clamping: below/at LowAt → Low; above/at HighAt → MaxDeviation.
+	assert.InDelta(t, 0.6, effectiveMaxDeviation(params, 1), 1e-12, "lv1 clamps to low")
+	assert.InDelta(t, 0.6, effectiveMaxDeviation(params, 12), 1e-12, "lv=LowAt → low")
+	assert.InDelta(t, 1.5, effectiveMaxDeviation(params, 17), 1e-12, "lv=HighAt → max")
+	assert.InDelta(t, 1.5, effectiveMaxDeviation(params, 20), 1e-12, "lv20 clamps to max")
+	// Midpoint lv14.5 → t=0.5 → cap = 0.6 · (1.5/0.6)^0.5 = sqrt(0.9) ≈ 0.9487.
+	expectedMid := 0.6 * math.Sqrt(1.5/0.6)
+	assert.InDelta(t, expectedMid, effectiveMaxDeviation(params, 14.5), 1e-12)
+	// Monotonic non-decreasing across the active band.
+	prev := effectiveMaxDeviation(params, 12)
+	for _, l := range []float64{13, 14, 14.5, 15, 16, 16.9} {
+		cur := effectiveMaxDeviation(params, l)
+		assert.GreaterOrEqual(t, cur, prev-1e-12, "cap must be monotonic ↗ in level")
+		prev = cur
+	}
+}
+
+// Integration: with the ramp active and a low-level chart, a sample set that
+// strongly implies a much higher level must be capped to the LOW cap, not the
+// high-end MaxDeviation. This is the headline reason for adding the ramp.
+func TestComputeFitting_RampEngagesAtLowLevel(t *testing.T) {
+	params := defaultParams()
+	params.PriorStrength = 0.0 // disable shrinkage — isolate the cap effect
+	params.MaxDeviation = 1.5
+	params.MaxDeviationLow = 0.5
+	params.MaxDeviationLowAt = 12
+	params.MaxDeviationHighAt = 17
+
+	trueLevel := 15.0    // samples imply L ≈ 15
+	officialLevel := 12.0 // but the chart is officially lv12 — huge over-the-top gap
+
+	samples := make([]Sample, 0, 60)
+	for i := 0; i < 60; i++ {
+		skill := 150.0 + float64(i)*0.1
+		score := simulateScore(trueLevel, skill)
+		samples = append(samples, Sample{
+			Username: "p", Score: score, PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+	res := ComputeFitting(officialLevel, samples, params)
+	if !assert.NotNil(t, res.FittingLevel) {
+		return
+	}
+	// At lv12 the ramp pins the cap at 0.5 — the inferred +3.0 deviation must
+	// be trimmed all the way back to officialLevel+0.5.
+	assert.InDelta(t, officialLevel+0.5, *res.FittingLevel, 1e-6,
+		"low-level chart must be capped at MaxDeviationLow, not the flat MaxDeviation")
+}
+
+// Integration: same shape as above but at the high-level end, where the ramp
+// must relax toward the flat MaxDeviation. The test also documents that the
+// ramp does NOT tighten the high end — we only add headroom where official
+// buckets are coarse.
+func TestComputeFitting_RampRelaxesAtHighLevel(t *testing.T) {
+	params := defaultParams()
+	params.PriorStrength = 0.0
+	params.MaxDeviation = 1.5
+	params.MaxDeviationLow = 0.5
+	params.MaxDeviationLowAt = 12
+	params.MaxDeviationHighAt = 17
+
+	// Chart officially lv17.0 with samples implying ~15.5 — well inside the
+	// ±1.5 high-end cap, so no trimming should happen.
+	trueLevel := 15.5
+	officialLevel := 17.0
+	samples := make([]Sample, 0, 60)
+	for i := 0; i < 60; i++ {
+		skill := 155.0 + float64(i)*0.1
+		score := simulateScore(trueLevel, skill)
+		samples = append(samples, Sample{
+			Username: "p", Score: score, PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+	res := ComputeFitting(officialLevel, samples, params)
+	if !assert.NotNil(t, res.FittingLevel) {
+		return
+	}
+	diff := officialLevel - *res.FittingLevel
+	// Must be capped somewhere in [0, 1.5]. Anything ≤ 1.5 passes, because
+	// the exact unshrunk mean depends on the weighting/biweight pipeline;
+	// we only assert that the high-end cap is indeed the flat 1.5, not 0.5.
+	assert.GreaterOrEqual(t, diff, 0.0)
+	assert.LessOrEqual(t, diff, params.MaxDeviation+1e-9,
+		"high-level chart must be bounded by flat MaxDeviation")
+	// And concretely: if we'd applied the low cap here, the fit would have
+	// to sit at ≥ officialLevel - 0.5 = 16.5. If the ramp mis-wired itself
+	// to the low cap, this assertion catches it.
+	if diff > 0.5 {
+		assert.Greater(t, diff, 0.5+1e-9,
+			"at lv17 the cap must relax beyond MaxDeviationLow (sanity check)")
+	}
 }

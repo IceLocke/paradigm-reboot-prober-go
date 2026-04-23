@@ -9,132 +9,57 @@
 //     dependency on internal/service or internal/repository (no HTTP
 //     handlers, no caches, no auth logic).
 //   - Runs on a configurable ticker interval (config.fitting.interval,
-//     typically hours) or once with the --once flag.
+//     typically hours) or once with the `run --once` flag.
 //   - Persists results into charts.fitting_level and a dedicated
 //     chart_statistics table for offline analysis.
+//
+// # Subcommands
+//
+// The binary dispatches on the first positional argument:
+//
+//	fitting run [flags]       continuous or one-shot calculation
+//	fitting analyze [flags]   read-only diagnostic for one chart
+//
+// When no subcommand is given, `run` is assumed so that existing
+// invocations such as `./fitting`, `./fitting --once`, or
+// `go run cmd/fitting/main.go --once` continue to behave exactly as
+// before the subcommand split.
 package main
 
 import (
-	"context"
-	"flag"
-	"log/slog"
-	"os/signal"
-	"syscall"
-	"time"
-
-	"paradigm-reboot-prober-go/config"
-	"paradigm-reboot-prober-go/internal/fitting"
-	"paradigm-reboot-prober-go/internal/logging"
-	"paradigm-reboot-prober-go/internal/util"
+	"fmt"
+	"os"
 )
 
 func main() {
-	configPath := flag.String("config", "config/config.yaml", "Path to config file")
-	once := flag.Bool("once", false, "Run the calculator once and exit (ignores the ticker loop)")
-	flag.Parse()
-
-	// 1. Shared config (same file as cmd/server).
-	config.LoadConfig(*configPath)
-
-	// 2. Shared structured logging.
-	logCloser, err := logging.Setup(
-		config.GlobalConfig.Logging.Output,
-		config.GlobalConfig.Logging.File,
-		config.GlobalConfig.Logging.Format,
-	)
-	if err != nil {
-		panic(err)
-	}
-	defer func() { _ = logCloser.Close() }()
-
-	// Attach a stable component attribute so fitting logs are easy to filter.
-	baseCtx := logging.AppendCtx(context.Background(),
-		slog.String("component", "fitting"),
-	)
-
-	// 3. Master switch: when disabled we still initialize the DB so
-	//    AutoMigrate keeps chart_statistics in sync with the schema, but we
-	//    skip all actual work.
-	if !config.GlobalConfig.Fitting.Enabled && !*once {
-		slog.InfoContext(baseCtx, "fitting disabled by config.fitting.enabled; exiting")
-		return
-	}
-
-	// 4. Open the shared DB (AutoMigrate applied, including chart_statistics).
-	util.InitDB()
-
-	// 5. Build the runner.
-	fp := config.GlobalConfig.Fitting
-	params := fitting.Params{
-		MinEffectiveSamples: fp.MinSamples,
-		ProximitySigma:      fp.ProximitySigma,
-		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
-		VolumeFullAt:        fp.VolumeFullAt,
-		PriorStrength:       fp.PriorStrength,
-		DeviationPenalty:    fp.DeviationPenalty,
-		MaxDeviation:        fp.MaxDeviation,
-		MinScore:            fp.MinScore,
-		TukeyK:              fp.TukeyK,
-		MinPlayerRecords:    fp.MinPlayerRecords,
-	}
-	cfg := fitting.RunnerConfig{
-		ChartBatchSize:  fp.ChartBatchSize,
-		PlayerBatchSize: fp.PlayerBatchSize,
-		BatchPause:      config.FittingBatchPauseDuration,
-	}
-	runner := fitting.NewRunner(util.DB, params, cfg)
-
-	// 6. --once: run a single pass and exit with status 0 on success.
-	if *once {
-		runCtx, cancel := signal.NotifyContext(baseCtx, syscall.SIGINT, syscall.SIGTERM)
-		defer cancel()
-		report, err := runner.Run(runCtx)
-		if err != nil {
-			slog.ErrorContext(runCtx, "fitting run failed",
-				"err", err,
-				"duration_ms", report.Duration.Milliseconds(),
-			)
-			panic(err)
-		}
-		return
-	}
-
-	// 7. Continuous mode: run once immediately, then every Fitting.Interval.
-	loopCtx, stop := signal.NotifyContext(baseCtx, syscall.SIGINT, syscall.SIGTERM)
-	defer stop()
-
-	interval := config.FittingIntervalDuration
-	slog.InfoContext(loopCtx, "fitting loop starting",
-		"interval", interval.String(),
-	)
-
-	// Immediate first run so there is no long initial idle delay after boot.
-	runOnce(loopCtx, runner)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-loopCtx.Done():
-			slog.InfoContext(loopCtx, "fitting loop shutting down")
+	// Subcommand dispatch. The first positional argument selects a
+	// subcommand; everything else is forwarded to that subcommand's own
+	// flag parser. Unknown first arguments (including flags like "--once")
+	// fall through to the default `run` subcommand — this preserves
+	// backward compatibility with docker-compose commands and existing
+	// shell scripts that predate the split.
+	if len(os.Args) >= 2 {
+		switch os.Args[1] {
+		case "run":
+			cmdRun(os.Args[2:])
 			return
-		case <-ticker.C:
-			runOnce(loopCtx, runner)
+		case "analyze":
+			cmdAnalyze(os.Args[2:])
+			return
+		case "-h", "--help", "help":
+			printUsage()
+			return
 		}
 	}
+	cmdRun(os.Args[1:])
 }
 
-// runOnce invokes one fitting pass and logs any error, never panicking in the
-// continuous loop — a single transient DB hiccup should not kill the
-// microservice.
-func runOnce(ctx context.Context, runner *fitting.Runner) {
-	report, err := runner.Run(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "fitting run failed",
-			"err", err,
-			"duration_ms", report.Duration.Milliseconds(),
-		)
-		return
-	}
+func printUsage() {
+	fmt.Fprintln(os.Stderr, "Usage: fitting [subcommand] [flags]")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Subcommands:")
+	fmt.Fprintln(os.Stderr, "  run      (default) run the fitting calculator in continuous or --once mode")
+	fmt.Fprintln(os.Stderr, "  analyze  read-only diagnostic for one chart (prints bucket breakdown + config sweep)")
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintln(os.Stderr, "Run `fitting <subcommand> --help` to see flags for each subcommand.")
 }

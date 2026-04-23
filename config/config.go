@@ -64,7 +64,10 @@ type Config struct {
 		VolumeFullAt        int     `yaml:"volume_full_at"`         // record count at which a player receives full volume weight (1.0)
 		PriorStrength       float64 `yaml:"prior_strength"`         // κ in Bayesian-style shrinkage toward the official level
 		DeviationPenalty    float64 `yaml:"deviation_penalty"`      // λ; extra prior weight when sample-mean deviates from official (0 disables)
-		MaxDeviation        float64 `yaml:"max_deviation"`          // |FittingLevel − Level| hard cap, in level units
+		MaxDeviation        float64 `yaml:"max_deviation"`          // |FittingLevel − Level| hard cap at high levels (in level units); also used as the flat cap when the ramp below is disabled
+		MaxDeviationLow     float64 `yaml:"max_deviation_low"`      // cap at or below MaxDeviationLowAt; ≤0 disables the level-dependent ramp (falls back to flat MaxDeviation)
+		MaxDeviationLowAt   float64 `yaml:"max_deviation_low_at"`   // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt
+		MaxDeviationHighAt  float64 `yaml:"max_deviation_high_at"`  // level at which cap = MaxDeviation; caps are log-interpolated between the two points
 		MinScore            int     `yaml:"min_score"`              // discard samples with score below this threshold
 		TukeyK              float64 `yaml:"tukey_k"`                // Tukey biweight tuning constant (usually 4.685)
 		ChartBatchSize      int     `yaml:"chart_batch_size"`       // number of charts processed per DB batch
@@ -119,6 +122,9 @@ func InitDefaults() {
 	GlobalConfig.Fitting.PriorStrength = 5.0
 	GlobalConfig.Fitting.DeviationPenalty = 2.0
 	GlobalConfig.Fitting.MaxDeviation = 1.5
+	GlobalConfig.Fitting.MaxDeviationLow = 0.6
+	GlobalConfig.Fitting.MaxDeviationLowAt = 12.0
+	GlobalConfig.Fitting.MaxDeviationHighAt = 17.0
 	GlobalConfig.Fitting.MinScore = 500000
 	GlobalConfig.Fitting.TukeyK = 4.685
 	GlobalConfig.Fitting.ChartBatchSize = 200
@@ -324,6 +330,26 @@ func LoadConfig(configPath string) {
 	}
 	if GlobalConfig.Fitting.MaxDeviation < 0 {
 		log.Fatalf("fitting.max_deviation must be ≥ 0, got %f", GlobalConfig.Fitting.MaxDeviation)
+	}
+	// Level-dependent cap ramp: only validated when enabled (MaxDeviationLow > 0). Consistency with
+	// effectiveMaxDeviation(): if any endpoint is misconfigured we fall back silently to the flat cap,
+	// but we still surface the most likely-to-be-wrong configurations as fatal at startup.
+	if GlobalConfig.Fitting.MaxDeviationLow < 0 {
+		log.Fatalf("fitting.max_deviation_low must be ≥ 0, got %f", GlobalConfig.Fitting.MaxDeviationLow)
+	}
+	if GlobalConfig.Fitting.MaxDeviationLow > 0 {
+		if GlobalConfig.Fitting.MaxDeviationLow > GlobalConfig.Fitting.MaxDeviation {
+			log.Fatalf("fitting.max_deviation_low (%f) must be ≤ fitting.max_deviation (%f)",
+				GlobalConfig.Fitting.MaxDeviationLow, GlobalConfig.Fitting.MaxDeviation)
+		}
+		if GlobalConfig.Fitting.MaxDeviationLowAt <= 0 {
+			log.Fatalf("fitting.max_deviation_low_at must be > 0 when fitting.max_deviation_low > 0, got %f",
+				GlobalConfig.Fitting.MaxDeviationLowAt)
+		}
+		if GlobalConfig.Fitting.MaxDeviationHighAt <= GlobalConfig.Fitting.MaxDeviationLowAt {
+			log.Fatalf("fitting.max_deviation_high_at (%f) must be > fitting.max_deviation_low_at (%f)",
+				GlobalConfig.Fitting.MaxDeviationHighAt, GlobalConfig.Fitting.MaxDeviationLowAt)
+		}
 	}
 	if GlobalConfig.Fitting.ChartBatchSize <= 0 {
 		log.Fatalf("fitting.chart_batch_size must be > 0, got %d", GlobalConfig.Fitting.ChartBatchSize)

@@ -1,22 +1,25 @@
-// Package main is a READ-ONLY diagnostic tool for the fitting calculator.
+package main
+
+// The `analyze` subcommand is a READ-ONLY diagnostic tool.
 //
 // Usage:
 //
-//	go run cmd/fittinganalyze/main.go -chart 51
+//	go run cmd/fitting/main.go analyze -chart 51
 //
-// It connects to the same database as cmd/fitting, loads all best_play_records
-// for the given chart joined with the per-player skill snapshot, and prints:
+// It connects to the same database as the `run` subcommand, loads all
+// best_play_records for the given chart joined with the per-player skill
+// snapshot, and prints:
 //
 //  1. A per-score-bucket breakdown of the sample set (count, avg skill,
 //     average inferred level) so you can see WHERE the bias lives.
 //  2. The output of fitting.ComputeFitting under several diagnostic Params
 //     configurations (status quo vs candidate fixes), side-by-side.
 //
-// This binary writes nothing back to the database. It is safe to run against
-// production. It is intentionally not registered in docker-compose or CI — it
-// exists to debug distribution problems uncovered during tuning and can be
-// deleted once the algorithm is stable.
-package main
+// The subcommand writes nothing back to the database. It is safe to run
+// against production. It is intentionally not driven by any scheduler — it
+// exists to debug distribution problems uncovered during tuning. If the
+// tool ever becomes obsolete, delete this file; none of its symbols are
+// referenced from the `run` subcommand.
 
 import (
 	"context"
@@ -32,10 +35,11 @@ import (
 	"paradigm-reboot-prober-go/internal/util"
 )
 
-func main() {
-	configPath := flag.String("config", "config/config.yaml", "Path to config file")
-	chartID := flag.Int("chart", 0, "Chart ID to analyze (required)")
-	flag.Parse()
+func cmdAnalyze(args []string) {
+	fs := flag.NewFlagSet("analyze", flag.ExitOnError)
+	configPath := fs.String("config", "config/config.yaml", "Path to config file")
+	chartID := fs.Int("chart", 0, "Chart ID to analyze (required)")
+	_ = fs.Parse(args)
 	if *chartID == 0 {
 		fmt.Fprintln(os.Stderr, "error: -chart is required")
 		os.Exit(2)
@@ -57,11 +61,11 @@ func main() {
 	fmt.Printf("=== chart %d | level=%.1f | difficulty=%s ===\n\n", chart.ID, chart.Level, chart.Difficulty)
 
 	// 2. Load samples and skills (inline queries — we don't need paging for a single chart).
-	samples := loadSamples(ctx, *chartID)
+	samples := analyzeLoadSamples(ctx, *chartID)
 	fmt.Printf("total raw samples: %d\n\n", len(samples))
 
 	// 3. Bucket breakdown: who's playing, what they're scoring, what their skill is.
-	printBuckets(chart.Level, samples)
+	analyzePrintBuckets(chart.Level, samples)
 
 	// 4. Run ComputeFitting under several configs.
 	type cfg struct {
@@ -69,35 +73,46 @@ func main() {
 		params fitting.Params
 		filter func(fitting.Sample) bool // optional pre-filter applied BEFORE ComputeFitting
 	}
+	// The "base" Params below are pulled from the loaded config (same values the
+	// `run` subcommand uses in production), so the diagnostic reflects the
+	// shipping algorithm. To probe knob changes, derive a Params from `base` and
+	// override just the field(s) under investigation.
+	fp := config.GlobalConfig.Fitting
 	base := fitting.Params{
-		MinEffectiveSamples: 8,
-		ProximitySigma:      20,
-		HighSkillSigmaRatio: 0.5,
-		VolumeFullAt:        50,
-		PriorStrength:       5,
-		DeviationPenalty:    2,
-		MaxDeviation:        1.5,
-		MinScore:            500000,
-		TukeyK:              4.685,
-		MinPlayerRecords:    20,
+		MinEffectiveSamples: fp.MinSamples,
+		ProximitySigma:      fp.ProximitySigma,
+		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
+		VolumeFullAt:        fp.VolumeFullAt,
+		PriorStrength:       fp.PriorStrength,
+		DeviationPenalty:    fp.DeviationPenalty,
+		MaxDeviation:        fp.MaxDeviation,
+		MaxDeviationLow:     fp.MaxDeviationLow,
+		MaxDeviationLowAt:   fp.MaxDeviationLowAt,
+		MaxDeviationHighAt:  fp.MaxDeviationHighAt,
+		MinScore:            fp.MinScore,
+		TukeyK:              fp.TukeyK,
+		MinPlayerRecords:    fp.MinPlayerRecords,
 	}
 	withRatio := func(p fitting.Params, r float64) fitting.Params { p.HighSkillSigmaRatio = r; return p }
+	flatCap := base // pre-ramp behaviour (flat ±MaxDeviation); useful for before/after comparison
+	flatCap.MaxDeviationLow = 0
 
 	configs := []cfg{
-		{"current (α=0.5)", base, nil},
+		{fmt.Sprintf("base (α=%.2f, ramp)", base.HighSkillSigmaRatio), base, nil},
+		{fmt.Sprintf("base (α=%.2f, flat cap)", base.HighSkillSigmaRatio), flatCap, nil},
 		{"α=0.3", withRatio(base, 0.3), nil},
 		{"α=0.2", withRatio(base, 0.2), nil},
 		{"α=0.15", withRatio(base, 0.15), nil},
 		{"α=0.1", withRatio(base, 0.1), nil},
-		{"score<1000000 only (α=0.5)", base, func(s fitting.Sample) bool { return s.Score < 1000000 }},
-		{"score<1005000 only (α=0.5)", base, func(s fitting.Sample) bool { return s.Score < 1005000 }},
+		{"score<1000000 only", base, func(s fitting.Sample) bool { return s.Score < 1000000 }},
+		{"score<1005000 only", base, func(s fitting.Sample) bool { return s.Score < 1005000 }},
 	}
 
 	fmt.Println("\n=== ComputeFitting results ===")
 	fmt.Println()
 	fmt.Printf("%-32s %-8s %-8s %-8s %-8s %-8s %-8s\n",
 		"config", "raw", "nEff", "wmed", "wmean", "sd", "fit")
-	fmt.Println(repeat("-", 84))
+	fmt.Println(analyzeRepeat("-", 84))
 	for _, c := range configs {
 		in := samples
 		if c.filter != nil {
@@ -120,10 +135,13 @@ func main() {
 	}
 }
 
-// loadSamples reads best_play_records + play_records for `chartID` and joins
-// with each player's top-50 average rating (same definition the runner uses).
-// Returns a ready-to-feed []fitting.Sample.
-func loadSamples(ctx context.Context, chartID int) []fitting.Sample {
+// analyzeLoadSamples reads best_play_records + play_records for `chartID`
+// and joins with each player's top-50 average rating (same definition the
+// runner uses). Returns a ready-to-feed []fitting.Sample.
+//
+// Prefixed `analyze*` so the symbol cannot collide with anything in the
+// sibling run.go file.
+func analyzeLoadSamples(ctx context.Context, chartID int) []fitting.Sample {
 	type row struct {
 		Username string
 		Score    int
@@ -229,11 +247,12 @@ func loadSamples(ctx context.Context, chartID int) []fitting.Sample {
 	return out
 }
 
-// printBuckets splits samples by score into canonical buckets and reports,
-// per bucket: count, avg player skill, avg inferred level, and avg (current
-// default) proximity weight with α=0.5. This is the single most useful view
-// for seeing WHY fitting is being pulled away from the official level.
-func printBuckets(official float64, samples []fitting.Sample) {
+// analyzePrintBuckets splits samples by score into canonical buckets and
+// reports, per bucket: count, avg player skill, avg inferred level, and
+// avg (current default) proximity weight with α=0.5. This is the single
+// most useful view for seeing WHY fitting is being pulled away from the
+// official level.
+func analyzePrintBuckets(official float64, samples []fitting.Sample) {
 	buckets := []struct {
 		label string
 		lo    int
@@ -253,7 +272,7 @@ func printBuckets(official float64, samples []fitting.Sample) {
 	fmt.Printf("=== per-score-bucket breakdown (official level = %.1f) ===\n\n", official)
 	fmt.Printf("%-20s %-6s %-10s %-10s %-12s\n",
 		"score bucket", "n", "avg_skill", "avg_infL", "avg_prox(α=0.5)")
-	fmt.Println(repeat("-", 62))
+	fmt.Println(analyzeRepeat("-", 62))
 
 	for _, b := range buckets {
 		var n int
@@ -285,7 +304,7 @@ func printBuckets(official float64, samples []fitting.Sample) {
 	}
 }
 
-func repeat(s string, n int) string {
+func analyzeRepeat(s string, n int) string {
 	out := make([]byte, 0, len(s)*n)
 	for i := 0; i < n; i++ {
 		out = append(out, s...)

@@ -31,7 +31,10 @@ type Params struct {
 	VolumeFullAt        int     // saturation point of the volume weight (records)
 	PriorStrength       float64 // κ in the Bayesian shrinkage toward the official level
 	DeviationPenalty    float64 // λ; extra prior weight when sample-mean deviates from official (0 disables)
-	MaxDeviation        float64 // hard cap on |FittingLevel − Level|
+	MaxDeviation        float64 // hard cap on |FittingLevel − Level| at high levels (also used as the flat cap when the ramp below is disabled)
+	MaxDeviationLow     float64 // cap at or below MaxDeviationLowAt; <=0 disables the level-dependent ramp (falls back to flat MaxDeviation)
+	MaxDeviationLowAt   float64 // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt for the ramp to be active
+	MaxDeviationHighAt  float64 // level at which cap = MaxDeviation; above this the cap stays at MaxDeviation (clamped)
 	MinScore            int     // discard samples with score below this
 	TukeyK              float64 // tuning constant for the Tukey biweight robustness step
 	MinPlayerRecords    int     // drop samples from players with fewer than this many best_play_records (0 = no filter)
@@ -221,15 +224,59 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 	}
 	kappaEff := params.PriorStrength * boost
 	shrunk := (nEff*mean + kappaEff*officialLevel) / (nEff + kappaEff)
-	if params.MaxDeviation > 0 {
-		if diff := shrunk - officialLevel; diff > params.MaxDeviation {
-			shrunk = officialLevel + params.MaxDeviation
-		} else if diff < -params.MaxDeviation {
-			shrunk = officialLevel - params.MaxDeviation
+	capVal := effectiveMaxDeviation(params, officialLevel)
+	if capVal > 0 {
+		if diff := shrunk - officialLevel; diff > capVal {
+			shrunk = officialLevel + capVal
+		} else if diff < -capVal {
+			shrunk = officialLevel - capVal
 		}
 	}
 	res.FittingLevel = &shrunk
 	return res
+}
+
+// effectiveMaxDeviation returns the hard cap on |FittingLevel − Level| to
+// apply at the given official level, honouring the optional level-dependent
+// ramp driven by Params.MaxDeviationLow / MaxDeviationLowAt /
+// MaxDeviationHighAt.
+//
+// Rationale: in this rhythm game (as in most rhythm games) the official
+// "定数" axis is logarithmic — going from 15 to 16 is a MUCH bigger
+// difficulty jump than going from 12 to 13. A flat cap like ±1.5 therefore
+// lets a low-level chart drift across several "real" difficulty tiers
+// before hitting the safety net, while being barely noticeable on a
+// high-level chart. The ramp encodes this: the cap grows exponentially
+// with level, so the permitted deviation is tight near the low end
+// (the algorithm must stay close to the official level) and gradually
+// loosens as we move up, where the official level is a coarser proxy.
+//
+// Interpolation is log-linear: with low / high caps c_low and c_high at
+// levels L_low and L_high, cap(L) = c_low · (c_high / c_low)^t where
+// t = (L − L_low) / (L_high − L_low), clamped to [c_low, c_high]. This is
+// the natural shape of an exponential ramp and is easy to read off the
+// endpoints — no hidden knobs.
+//
+// The ramp is deliberately opt-in: if MaxDeviationLow ≤ 0, or the
+// endpoints are misconfigured (non-positive LowAt/HighAt, HighAt ≤ LowAt,
+// or MaxDeviation ≤ MaxDeviationLow), we return the flat MaxDeviation so
+// existing callers and tests keep their original behaviour.
+func effectiveMaxDeviation(params Params, level float64) float64 {
+	if params.MaxDeviationLow <= 0 ||
+		params.MaxDeviationLowAt <= 0 ||
+		params.MaxDeviationHighAt <= 0 ||
+		params.MaxDeviationHighAt <= params.MaxDeviationLowAt ||
+		params.MaxDeviation <= params.MaxDeviationLow {
+		return params.MaxDeviation
+	}
+	if level <= params.MaxDeviationLowAt {
+		return params.MaxDeviationLow
+	}
+	if level >= params.MaxDeviationHighAt {
+		return params.MaxDeviation
+	}
+	t := (level - params.MaxDeviationLowAt) / (params.MaxDeviationHighAt - params.MaxDeviationLowAt)
+	return params.MaxDeviationLow * math.Pow(params.MaxDeviation/params.MaxDeviationLow, t)
 }
 
 // weightedMedian returns the value v such that the cumulative weight of

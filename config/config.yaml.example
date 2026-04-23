@@ -57,7 +57,10 @@ fitting:
   volume_full_at: 50        # a player at this record count receives full volume weight
   prior_strength: 5.0       # κ in Bayesian shrinkage toward the official level
   deviation_penalty: 2.0    # λ; scales extra prior weight with dev² and sample sparsity (0 disables)
-  max_deviation: 1.5        # hard cap on |fitting_level − level|
+  max_deviation: 1.5         # hard cap on |fitting_level − level| at or above max_deviation_high_at
+  max_deviation_low: 0.6     # cap at or below max_deviation_low_at; ≤0 disables the ramp (falls back to flat max_deviation)
+  max_deviation_low_at: 12.0 # level at which cap = max_deviation_low (e.g. 12)
+  max_deviation_high_at: 17.0 # level at which cap = max_deviation (e.g. 17); log-interpolated between endpoints
   min_score: 500000         # discard samples below this score threshold
   tukey_k: 4.685            # Tukey biweight tuning constant (outlier trimming)
   chart_batch_size: 200     # charts per DB batch (keep DB load bounded)

@@ -57,7 +57,9 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── server/
 │   │   └── main.go              # Application entry point, Swagger annotations
 │   ├── fitting/
-│   │   └── main.go              # Fitting-level microservice (separate binary)
+│   │   ├── main.go              # Subcommand dispatcher (default = `run`)
+│   │   ├── run.go               # `fitting run` subcommand: ticker / --once calculator loop
+│   │   └── analyze.go           # `fitting analyze` subcommand: read-only per-chart diagnostic
 │   └── migrate/
 │       ├── main.go              # Legacy → Go schema migration tool (PostgreSQL)
 │       └── verify/
@@ -320,15 +322,29 @@ See `legacy/MIGRATION.md` for the full step-by-step guide.
 
 ### Fitting-Level Microservice (cmd/fitting)
 
+The binary exposes two subcommands:
+
+| Subcommand | Purpose |
+|------------|---------|
+| `run` | Run the calculator in continuous mode (ticker) or one-shot (`--once`) mode. This is the **default** when no subcommand keyword is given, so existing invocations like `./fitting`, `./fitting --once`, or the Docker `command: ["./fitting", "-once"]` keep working unchanged. |
+| `analyze` | Read-only diagnostic for a single chart: prints the per-score-bucket breakdown and the result of `fitting.ComputeFitting` under several candidate `Params` configurations side-by-side. Writes nothing back to the DB; safe against production. |
+
 ```bash
 # Local: continuous mode (runs every fitting.interval, default 6h) until SIGINT/SIGTERM
-go run cmd/fitting/main.go -config config/config.yaml
+go run ./cmd/fitting -config config/config.yaml
+# equivalent to:
+go run ./cmd/fitting run -config config/config.yaml
 
 # Local: one-shot run (useful for cron, smoke tests, backfill)
-go run cmd/fitting/main.go -config config/config.yaml -once
+go run ./cmd/fitting --once
+# equivalent to:
+go run ./cmd/fitting run --once
+
+# Local: read-only diagnostic for chart 51
+go run ./cmd/fitting analyze -chart 51
 
 # Local: build standalone binary
-go build -o fitting ./cmd/fitting/main.go
+go build -o fitting ./cmd/fitting
 
 # Containerised: start alongside db + app via the `fitting` Compose profile
 docker compose --profile fitting up -d
@@ -337,7 +353,9 @@ docker compose --profile fitting up -d
 docker compose --profile fitting logs -f fitting
 ```
 
-Scheduling: the binary carries its **own internal `time.Ticker`** (period = `FITTING_INTERVAL`, default `6h`), so a single long-lived process is the full scheduler — **no host cron required**. For external scheduling (cron / systemd timer / k8s CronJob) override the service to `command: ["./fitting", "-once"]`, drop the `profiles` entry, set `restart: "no"`, and invoke via `docker compose run --rm fitting`; see the “Docker / docker-compose” subsection of `docs/fitting_level.en.md` / `docs/fitting_level.zh.md` for the exact snippet.
+Note that `go run cmd/fitting/main.go …` no longer compiles because the `main` package now spans multiple files (`main.go` + `run.go` + `analyze.go`). Use the package-level path `./cmd/fitting` instead.
+
+Scheduling: the binary carries its **own internal `time.Ticker`** (period = `FITTING_INTERVAL`, default `6h`), so a single long-lived process is the full scheduler — **no host cron required**. For external scheduling (cron / systemd timer / k8s CronJob) override the service to `command: ["./fitting", "-once"]` (backward-compatible default = `run`) or `command: ["./fitting", "run", "--once"]` (explicit), drop the `profiles` entry, set `restart: "no"`, and invoke via `docker compose run --rm fitting`; see the “Docker / docker-compose” subsection of `docs/fitting_level.en.md` / `docs/fitting_level.zh.md` for the exact snippet.
 
 The binary shares `config/config.yaml` and the DB schema with `cmd/server` but
 runs as a **separate process** — it never starts an HTTP listener, never
@@ -406,7 +424,7 @@ go test -v ./pkg/rating/...
 | `internal/middleware`     | Auth middleware (valid/invalid/expired/missing tokens)  |
 | `internal/model`         | Model validation and enum logic                        |
 | `internal/util`          | CSV generation, parsing (UTF-8, GBK encoding, BOM)     |
-| `internal/fitting`       | Rating inverter round-trip; calculator (noise-free, outlier-robust, shrinkage, deviation cap, sparse); runner end-to-end against in-memory SQLite |
+| `internal/fitting`       | Rating inverter round-trip; calculator (noise-free, outlier-robust, shrinkage, deviation cap incl. level-dependent ramp, sparse); runner end-to-end against in-memory SQLite |
 
 
 ## Linting
@@ -467,14 +485,17 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `fitting.volume_full_at`     | —               | `50`                              | Records count at which a player receives full volume weight (1.0)          |
 | `fitting.prior_strength`     | —               | `5.0`                             | κ in Bayesian shrinkage toward the official level                          |
 | `fitting.deviation_penalty`  | —               | `2.0`                             | λ; inflates κ by (1 + λ·dev²·nRef/nEff) when sample-mean strays from official (`0` disables) |
-| `fitting.max_deviation`      | —               | `1.5`                             | Hard cap on \|FittingLevel − Level\|                                       |
+| `fitting.max_deviation`      | —               | `1.5`                             | Hard cap on \|FittingLevel − Level\| at or above `max_deviation_high_at`; also the flat cap when the ramp is disabled |
+| `fitting.max_deviation_low`  | —               | `0.6`                             | Cap at or below `max_deviation_low_at`. ≤0 disables the level-dependent ramp (falls back to flat `max_deviation`) |
+| `fitting.max_deviation_low_at` | —             | `12.0`                            | Official level at which the cap equals `max_deviation_low`; must be < `max_deviation_high_at` when the ramp is enabled |
+| `fitting.max_deviation_high_at` | —            | `17.0`                            | Official level at which the cap equals `max_deviation`; between the two endpoints the cap follows a log interpolation `low · (high/low)^t` |
 | `fitting.min_score`          | —               | `500000`                          | Discard samples with score below this threshold                            |
 | `fitting.tukey_k`            | —               | `4.685`                           | Tukey biweight tuning constant                                             |
 | `fitting.chart_batch_size`   | —               | `200`                             | Charts processed per DB batch (keeps per-tx footprint small)                |
 | `fitting.player_batch_size`  | —               | `500`                             | Distinct users fetched per paginated skill-collection query                 |
 | `fitting.batch_pause`        | `FITTING_BATCH_PAUSE` | `50ms`                     | Sleep between chart batches to ease DB load (Go duration string)           |
 
-**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range, or if `logging.output` is not one of `stdout`/`stderr`/`file`, or if `logging.output=file` but `logging.file` is empty, or if `logging.format` is not `text` or `json`, or if `metrics.enabled=true` and any of `metrics.addr` is empty / `metrics.path` does not start with `/` / `metrics.addr` equals `server.port`, or if `fitting.interval`/`fitting.batch_pause` cannot be parsed as durations, or if `fitting.interval` is non-positive, or if `fitting.proximity_sigma`/`fitting.tukey_k` is non-positive, or if `fitting.prior_strength`/`fitting.max_deviation`/`fitting.deviation_penalty`/`fitting.high_skill_sigma_ratio` is negative, or if `fitting.chart_batch_size`/`fitting.player_batch_size` is non-positive.
+**Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range, or if `logging.output` is not one of `stdout`/`stderr`/`file`, or if `logging.output=file` but `logging.file` is empty, or if `logging.format` is not `text` or `json`, or if `metrics.enabled=true` and any of `metrics.addr` is empty / `metrics.path` does not start with `/` / `metrics.addr` equals `server.port`, or if `fitting.interval`/`fitting.batch_pause` cannot be parsed as durations, or if `fitting.interval` is non-positive, or if `fitting.proximity_sigma`/`fitting.tukey_k` is non-positive, or if `fitting.prior_strength`/`fitting.max_deviation`/`fitting.deviation_penalty`/`fitting.high_skill_sigma_ratio`/`fitting.max_deviation_low` is negative, or if `fitting.max_deviation_low > 0` and any of (`max_deviation_low > max_deviation`, `max_deviation_low_at ≤ 0`, `max_deviation_high_at ≤ max_deviation_low_at`), or if `fitting.chart_batch_size`/`fitting.player_batch_size` is non-positive.
 
 ## CI/CD Pipeline
 
