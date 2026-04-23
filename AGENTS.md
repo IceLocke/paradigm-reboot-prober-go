@@ -481,7 +481,7 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `fitting.min_samples`        | —               | `8.0`                             | Minimum effective sample size (`N_eff`) to publish `FittingLevel`         |
 | `fitting.min_player_records` | —               | `20`                              | Minimum total best records a player must have to contribute samples        |
 | `fitting.proximity_sigma`    | —               | `20.0`                            | Gaussian σ in rating units centered on 10×Level (proximity weight)        |
-| `fitting.high_skill_sigma_ratio` | —           | `0.5`                             | σ multiplier for skill > 10×Level (over-skill side); `1.0` = symmetric, samples beyond 2.5·σ are hard-dropped |
+| `fitting.high_skill_sigma_ratio` | —           | `0.3`                             | σ multiplier for skill > 10×Level (over-skill side); `1.0` = symmetric, samples beyond 2.5·σ are hard-dropped |
 | `fitting.volume_full_at`     | —               | `50`                              | Records count at which a player receives full volume weight (1.0)          |
 | `fitting.prior_strength`     | —               | `5.0`                             | κ in Bayesian shrinkage toward the official level                          |
 | `fitting.deviation_penalty`  | —               | `2.0`                             | λ; inflates κ by (1 + λ·dev²·nRef/nEff) when sample-mean strays from official (`0` disables) |

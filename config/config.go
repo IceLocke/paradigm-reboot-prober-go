@@ -117,7 +117,7 @@ func InitDefaults() {
 	GlobalConfig.Fitting.MinSamples = 8.0
 	GlobalConfig.Fitting.MinPlayerRecords = 20
 	GlobalConfig.Fitting.ProximitySigma = 20.0
-	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.5
+	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.3
 	GlobalConfig.Fitting.VolumeFullAt = 50
 	GlobalConfig.Fitting.PriorStrength = 5.0
 	GlobalConfig.Fitting.DeviationPenalty = 2.0
