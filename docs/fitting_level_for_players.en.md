@@ -50,7 +50,10 @@ Skipping the math, the probe service does exactly three things:
 1. **Weight by player skill.** Players whose skill sits close to the
    chart's difficulty give the most informative scores; players way
    above the chart (AP'ing it casually) or way below the chart (can't
-   clear it) are downweighted.
+   clear it) are downweighted. On the over-skilled side an extra
+   asymmetric discount kicks in — a top player casually AP'ing a lower-
+   level chart cannot really measure its difficulty, so that sample is
+   pushed down even harder.
 2. **Strip out suspicious samples.** A handful of scores that clearly
    deviate from the group (in either direction) are downweighted or
    discarded, so one or two top players — or one or two disastrous

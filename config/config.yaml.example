@@ -50,10 +50,12 @@ metrics:
 fitting:
   enabled: true             # master switch for the fitting-calculator microservice
   interval: "6h"            # run every interval (Go duration string, e.g. "6h", "30m")
-  min_samples: 8.0          # minimum effective sample size to publish fitting_level
+  min_samples: 5.0          # minimum effective sample size to publish fitting_level
   min_player_records: 20    # player needs ≥ this many best records to contribute
-  proximity_sigma: 20.0     # Gaussian σ in rating units (centered on 10×Level)
-  high_skill_sigma_ratio: 0.3 # σ multiplier for skill > 10×Level (over-skill side); 1.0 = symmetric, smaller = stronger discount on over-skilled players
+  skill_top_k: 50           # player skill proxy B_p = mean of top-K single-chart ratings (across ALL songs, b15-agnostic); 50 = legacy B50 behaviour, smaller K trades freshness for stability across seasons
+  sample_halflife_days: 0   # sample-age half-life in days for time-decay weight; 0 = disabled (all samples weighted equally regardless of play time)
+  proximity_sigma: 18.5     # Gaussian σ in rating units (centered on 10×Level)
+  high_skill_sigma_ratio: 0.2 # σ multiplier for skill > 10×Level (over-skill side); 1.0 = symmetric, smaller = stronger discount on over-skilled players
   volume_full_at: 50        # a player at this record count receives full volume weight
   prior_strength: 5.0       # κ in Bayesian shrinkage toward the official level
   deviation_penalty: 2.0    # λ; scales extra prior weight with dev² and sample sparsity (0 disables)
@@ -62,6 +64,20 @@ fitting:
   max_deviation_low_at: 12.0 # level at which cap = max_deviation_low (e.g. 12)
   max_deviation_high_at: 17.0 # level at which cap = max_deviation (e.g. 17); log-interpolated between endpoints
   min_score: 500000         # discard samples below this score threshold
+  # Score-quality weighting (OPT-IN, default off): players who only barely passed a chart (score just over 1,000,000)
+  # are much less reliable signals than players who hit the community-pursued "高分" tier.
+  # When enabled, the calculator multiplies each sample's pre-weight by a piecewise-linear ramp:
+  #   score  < score_floor_at      → weight factor = 0
+  #   score == score_good_at       → weight factor = score_good_weight  ("会打" threshold)
+  #   score ≥ score_full_at        → weight factor = 1.0                ("高分" threshold)
+  # NOTE: with α=0.2 (the current default) this feature over-corrects mid-level charts (lv11–13)
+  # toward negative bias on our prod DB, so it is shipped disabled. Populate all four knobs together
+  # to activate (e.g. floor=1000000, good=1007500, full=1009000, good_weight=0.6) after validating
+  # against your own data. Leave them at 0 to keep uniform weighting.
+  score_floor_at: 0         # below this score, the sample contributes nothing (barely-passed discount); 0 = disabled
+  score_good_at: 0          # "会打" threshold — the sample reaches score_good_weight here
+  score_full_at: 0          # "高分" threshold — the sample is fully trusted at or above this
+  score_good_weight: 0      # weight factor at score_good_at; must be in (0, 1) when enabled, else 0
   tukey_k: 4.685            # Tukey biweight tuning constant (outlier trimming)
   chart_batch_size: 200     # charts per DB batch (keep DB load bounded)
   player_batch_size: 500    # users fetched per page during skill collection

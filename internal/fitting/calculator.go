@@ -7,18 +7,31 @@ import (
 
 // Sample represents one (player, score) data point for a single chart.
 //
-// PlayerSkill is the player's float average B50 single-chart rating (i.e.
-// sum(top rating ints) / (K * 100), for the top K records where K ≤ 50). It
-// acts as the "target rating" fed to InverseLevel to obtain an implied level
-// for this (player, score) pair.
+// PlayerSkill is the player's float average single-chart rating, computed as
+// the mean of the player's top-K best_play_records ratings (K =
+// min(total best records, Params.SkillTopK)). It acts as the "target
+// rating" fed to InverseLevel to obtain an implied level for this
+// (player, score) pair. The B_p proxy is intentionally b15-agnostic: we
+// take the top-K across ALL songs rather than splitting into the B35/B15
+// season buckets used for the in-game B50 display, because a player's
+// true skill ceiling does not depend on which song packs they happen to
+// have purchased in the current season.
 //
 // PlayerRecords is the player's total best_play_records count — used by the
 // volume weight so that newcomers with very few records contribute less.
+//
+// AgeDays is the number of days between the server "now" at fetch time and
+// play_records.record_time (the client-supplied in-game play timestamp).
+// Populated by the runner before ComputeFitting. When Params.SampleHalflifeDays
+// > 0, a half-life decay factor exp(-ln2 · AgeDays / halflife) enters the
+// pre-weight, so stale records contribute less than fresh ones. AgeDays <= 0
+// is treated as "fresh" (decay factor = 1).
 type Sample struct {
 	Username      string
 	Score         int
 	PlayerSkill   float64
 	PlayerRecords int
+	AgeDays       float64
 }
 
 // Params bundles all tunable knobs exposed through config.fitting.*. See
@@ -26,6 +39,8 @@ type Sample struct {
 // the full derivation.
 type Params struct {
 	MinEffectiveSamples float64 // minimum N_eff to publish a FittingLevel
+	SkillTopK           int     // K in top-K player skill proxy (must be ≥ 1; historically 50)
+	SampleHalflifeDays  float64 // half-life in days for the sample-age decay weight; <=0 disables (no decay)
 	ProximitySigma      float64 // σ of the Gaussian proximity weight (skill ≤ 10·Level side), in rating units
 	HighSkillSigmaRatio float64 // σ multiplier for skill > 10·Level; <=0 or =1 means symmetric (disabled)
 	VolumeFullAt        int     // saturation point of the volume weight (records)
@@ -36,6 +51,10 @@ type Params struct {
 	MaxDeviationLowAt   float64 // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt for the ramp to be active
 	MaxDeviationHighAt  float64 // level at which cap = MaxDeviation; above this the cap stays at MaxDeviation (clamped)
 	MinScore            int     // discard samples with score below this
+	ScoreFloorAt        int     // score below this gets zero score-quality weight; <=0 disables the score-quality weight entirely
+	ScoreGoodAt         int     // score at which score-quality weight equals ScoreGoodWeight ("会打" threshold, typical 1007500)
+	ScoreFullAt         int     // score at which score-quality weight saturates to 1.0 ("高分" threshold, typical 1009000)
+	ScoreGoodWeight     float64 // score-quality weight at ScoreGoodAt; must be in (0, 1)
 	TukeyK              float64 // tuning constant for the Tukey biweight robustness step
 	MinPlayerRecords    int     // drop samples from players with fewer than this many best_play_records (0 = no filter)
 }
@@ -59,9 +78,12 @@ type Result struct {
 //  1. Per-sample inverse-rating: given (score, PlayerSkill), solve for the
 //     level that makes SingleRating match the player's typical B50 rating.
 //  2. Pre-weighting: each sample receives a composite weight equal to
-//     proximityWeight × volumeWeight. proximityWeight is a Gaussian centered
-//     on 10·Level (so players whose skill matches the chart's official level
-//     dominate); volumeWeight ramps linearly up to VolumeFullAt records.
+//     proximityWeight × volumeWeight × scoreQualityWeight. proximityWeight
+//     is a Gaussian centered on 10·Level (so players whose skill matches
+//     the chart's official level dominate); volumeWeight ramps linearly
+//     up to VolumeFullAt records; scoreQualityWeight encodes that only
+//     samples in or above the "会打" / "高分" score tiers are reliable
+//     signals about the chart.
 //  3. Robust trimming: compute the weighted median of inferred levels, the
 //     weighted MAD, then apply Tukey biweight attenuation so extreme
 //     residuals receive zero weight.
@@ -120,7 +142,27 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 		if params.VolumeFullAt > 0 && s.PlayerRecords < params.VolumeFullAt {
 			volume = float64(s.PlayerRecords) / float64(params.VolumeFullAt)
 		}
-		w := proximity * volume
+		// score-quality weight: the actual score a player achieved conveys how
+		// much of the chart they "really" have under control. Business domain
+		// knowledge from Paradigm: Reboot:
+		//   - score < 1,000,000: the player has not really "passed" the chart
+		//     (the rating curve's inversion is also numerically unstable below
+		//     1M) — give zero weight.
+		//   - score ≥ 1,007,500: the player "会打" (has a handle on) the chart;
+		//     samples here carry substantial weight.
+		//   - score ≥ 1,009,000: the commonly pursued "高分" tier; saturate the
+		//     weight to 1.0 — these are the most reliable samples.
+		scoreQ := scoreQualityWeight(s.Score, params)
+		// sample-age weight: exponential half-life decay on play-time. Players'
+		// behaviour drifts over time — charts get played by newer, better-tuned
+		// cohorts; older records are less representative of "how players of this
+		// skill band play this chart TODAY". When SampleHalflifeDays is set,
+		// each sample gets an extra factor exp(-ln2 · AgeDays / halflife), so a
+		// record that is one halflife old contributes half as much. Disabled
+		// (factor = 1) when SampleHalflifeDays ≤ 0 or AgeDays ≤ 0 (fresh sample /
+		// missing timestamp fallback).
+		ageW := sampleAgeWeight(s.AgeDays, params.SampleHalflifeDays)
+		w := proximity * volume * scoreQ * ageW
 		if w <= 0 || math.IsNaN(w) {
 			continue
 		}
@@ -277,6 +319,73 @@ func effectiveMaxDeviation(params Params, level float64) float64 {
 	}
 	t := (level - params.MaxDeviationLowAt) / (params.MaxDeviationHighAt - params.MaxDeviationLowAt)
 	return params.MaxDeviationLow * math.Pow(params.MaxDeviation/params.MaxDeviationLow, t)
+}
+
+// sampleAgeWeight returns exp(-ln2 · ageDays / halflifeDays) when both
+// halflifeDays > 0 and ageDays > 0, and 1.0 otherwise. The intent is that
+// fresh samples (AgeDays ≈ 0) always retain full weight while older samples
+// decay gracefully with the configured half-life.
+//
+// When halflifeDays ≤ 0 the feature is disabled and the factor is exactly
+// 1.0 for every sample, making this a zero-cost no-op.
+func sampleAgeWeight(ageDays, halflifeDays float64) float64 {
+	if halflifeDays <= 0 || ageDays <= 0 || math.IsNaN(ageDays) || math.IsInf(ageDays, 0) {
+		return 1.0
+	}
+	return math.Exp(-math.Ln2 * ageDays / halflifeDays)
+}
+
+// scoreQualityWeight converts a raw score into a weight factor in [0, 1]
+// reflecting "how confident are we that this (player, score) pair tells us
+// anything about the chart?". It encodes the gameplay-level reality that a
+// player who only barely scraped above the min_score threshold has not
+// really "played" the chart in any meaningful sense, while a player who
+// reached the community's "高分" / high-score tier has.
+//
+// The curve is a piecewise-linear ramp with three anchor points:
+//
+//	score < ScoreFloorAt    → weight = 0           ("<1M": throw away)
+//	score = ScoreGoodAt     → weight = ScoreGoodWeight  ("会打": e.g. 0.6)
+//	score ≥ ScoreFullAt     → weight = 1           ("高分": fully trusted)
+//
+// and linear interpolation in between. Multiplicatively combined with the
+// proximity and volume pre-weights, this acts as a third axis of sample
+// quality. A sample that is close to the chart's skill band AND played by
+// a veteran AND has a high score carries the full weight; missing any of
+// the three shrinks the contribution.
+//
+// The feature is deliberately opt-in: if the thresholds are misconfigured
+// (non-positive anchors, non-monotone ordering, or ScoreGoodWeight outside
+// (0, 1)) the function returns 1.0, so existing callers and tests that
+// leave these fields at their zero values retain the original uniform
+// weighting exactly.
+func scoreQualityWeight(score int, params Params) float64 {
+	if params.ScoreFloorAt <= 0 ||
+		params.ScoreGoodAt <= 0 ||
+		params.ScoreFullAt <= 0 ||
+		params.ScoreGoodAt <= params.ScoreFloorAt ||
+		params.ScoreFullAt <= params.ScoreGoodAt ||
+		params.ScoreGoodWeight <= 0 ||
+		params.ScoreGoodWeight >= 1 {
+		return 1.0
+	}
+	if score < params.ScoreFloorAt {
+		return 0.0
+	}
+	if score >= params.ScoreFullAt {
+		return 1.0
+	}
+	s := float64(score)
+	floor := float64(params.ScoreFloorAt)
+	good := float64(params.ScoreGoodAt)
+	full := float64(params.ScoreFullAt)
+	goodW := params.ScoreGoodWeight
+	if score < params.ScoreGoodAt {
+		// linear ramp 0 → goodW across [floor, good]
+		return goodW * (s - floor) / (good - floor)
+	}
+	// linear ramp goodW → 1 across [good, full)
+	return goodW + (1.0-goodW)*(s-good)/(full-good)
 }
 
 // weightedMedian returns the value v such that the cumulative weight of

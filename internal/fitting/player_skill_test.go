@@ -56,6 +56,7 @@ func seedRatedPlay(t *testing.T, db *gorm.DB, username string, chartID, ratingIn
 func newTestRunner(db *gorm.DB, cfg RunnerConfig) *Runner {
 	return NewRunner(db, Params{
 		MinEffectiveSamples: 3.0,
+		SkillTopK:           50, // legacy cap; keep existing test assertions stable
 		ProximitySigma:      20.0,
 		VolumeFullAt:        5,
 		PriorStrength:       1.0,
@@ -126,6 +127,44 @@ func TestCollectPlayerSkills_Top50Cap(t *testing.T) {
 	assert.InDelta(t, 104.45, s.AvgRating, 1e-6, "top-50 cap in effect")
 }
 
+// TestCollectPlayerSkills_ConfigurableTopK exercises the Params.SkillTopK knob:
+// the same seeded records, evaluated with K=5 vs K=60, must yield different
+// AvgRating values corresponding to the top-K subset. This is the "B<X>"
+// behaviour requested by the fitting microservice's configurable skill proxy.
+func TestCollectPlayerSkills_ConfigurableTopK(t *testing.T) {
+	db := setupTestDB(t)
+	charts := seedCharts(t, db, 10)
+	seedUser(t, db, "pro")
+	// 10 records with ratings 10000..10090, step 10.
+	for i, chartID := range charts {
+		seedRatedPlay(t, db, "pro", chartID, 10000+i*10, true)
+	}
+
+	// K = 5: take top 5 = ratings 10050, 10060, 10070, 10080, 10090.
+	// Mean = 10070 → /100 = 100.70
+	rK5 := NewRunner(db, Params{
+		MinEffectiveSamples: 3.0, SkillTopK: 5, ProximitySigma: 20.0,
+		MinScore: 500000, TukeyK: 4.685, MinPlayerRecords: 1,
+	}, RunnerConfig{PlayerBatchSize: 100})
+	sk5, err := rK5.collectPlayerSkills(context.Background())
+	assert.NoError(t, err)
+	assert.InDelta(t, 100.70, sk5["pro"].AvgRating, 1e-6, "K=5 picks top 5")
+	assert.Equal(t, 10, sk5["pro"].NumRecords, "NumRecords unchanged by K")
+
+	// K = 60 (larger than population): all 10 records contribute.
+	// Mean = 10045 → /100 = 100.45
+	rK60 := NewRunner(db, Params{
+		MinEffectiveSamples: 3.0, SkillTopK: 60, ProximitySigma: 20.0,
+		MinScore: 500000, TukeyK: 4.685, MinPlayerRecords: 1,
+	}, RunnerConfig{PlayerBatchSize: 100})
+	sk60, err := rK60.collectPlayerSkills(context.Background())
+	assert.NoError(t, err)
+	assert.InDelta(t, 100.45, sk60["pro"].AvgRating, 1e-6, "K exceeds record count → average over all")
+
+	assert.Greater(t, sk5["pro"].AvgRating, sk60["pro"].AvgRating,
+		"smaller K should yield a higher B_p (takes a more selective top slice)")
+}
+
 // TestCollectPlayerSkills_DefaultBatchSize exercises the `batch <= 0 → 500`
 // fallback when RunnerConfig.PlayerBatchSize is unset. Behaviour must be
 // identical to an explicitly-configured batch.
@@ -141,7 +180,7 @@ func TestCollectPlayerSkills_DefaultBatchSize(t *testing.T) {
 	r := &Runner{
 		db: db,
 		params: Params{
-			MinEffectiveSamples: 3, ProximitySigma: 20, VolumeFullAt: 5,
+			MinEffectiveSamples: 3, SkillTopK: 50, ProximitySigma: 20, VolumeFullAt: 5,
 			PriorStrength: 1, MaxDeviation: 1.5, MinScore: 500000, TukeyK: 4.685,
 			MinPlayerRecords: 1,
 		},
@@ -213,7 +252,7 @@ func TestFetchBestSamples_FilterByMinRecords(t *testing.T) {
 	seedRatedPlay(t, db, "rookie", chartID, 16500, true)
 
 	r := NewRunner(db, Params{
-		MinEffectiveSamples: 3, ProximitySigma: 20, VolumeFullAt: 5,
+		MinEffectiveSamples: 3, SkillTopK: 50, ProximitySigma: 20, VolumeFullAt: 5,
 		PriorStrength: 1, MaxDeviation: 1.5, MinScore: 500000, TukeyK: 4.685,
 		MinPlayerRecords: 10, // high bar — no player qualifies with 1 record
 	}, RunnerConfig{PlayerBatchSize: 10, ChartBatchSize: 10})
@@ -245,6 +284,74 @@ func TestFetchBestSamples_SkillMissing(t *testing.T) {
 	got, err := r.fetchBestSamples(context.Background(), []int{chartID}, map[string]PlayerSkill{})
 	assert.NoError(t, err)
 	assert.Empty(t, got[chartID], "samples whose player lacks a skill snapshot get dropped")
+}
+
+// TestFetchBestSamples_AgeDaysPopulated: the (username, score, record_time)
+// triple must flow end-to-end into Sample.AgeDays. We pin Runner.now to a
+// fixed clock and seed records at known ages (0d, 30d, 365d back) so the
+// arithmetic is deterministic. A zero/unset record_time collapses to
+// AgeDays=0 (the "fresh" fallback that keeps the decay pipeline safe when
+// legacy rows lack a timestamp).
+func TestFetchBestSamples_AgeDaysPopulated(t *testing.T) {
+	db := setupTestDB(t)
+	charts := seedCharts(t, db, 4) // one chart per age bucket (BPR is unique per chart)
+
+	fixedNow := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	seedUser(t, db, "fresh")
+	seedUser(t, db, "month")
+	seedUser(t, db, "year")
+	seedUser(t, db, "zero")
+
+	seedPlayWithTime(t, db, "fresh", charts[0], 16500, fixedNow)                          // 0d
+	seedPlayWithTime(t, db, "month", charts[1], 16500, fixedNow.AddDate(0, 0, -30))       // 30d
+	seedPlayWithTime(t, db, "year", charts[2], 16500, fixedNow.AddDate(-1, 0, 0))         // 365d
+	seedPlayWithTime(t, db, "zero", charts[3], 16500, time.Time{})                        // unset
+
+	r := newTestRunner(db, RunnerConfig{ChartBatchSize: 10})
+	r.nowFunc = func() time.Time { return fixedNow }
+
+	skills := map[string]PlayerSkill{
+		"fresh": {AvgRating: 165.0, NumRecords: 50},
+		"month": {AvgRating: 165.0, NumRecords: 50},
+		"year":  {AvgRating: 165.0, NumRecords: 50},
+		"zero":  {AvgRating: 165.0, NumRecords: 50},
+	}
+	got, err := r.fetchBestSamples(context.Background(), charts, skills)
+	assert.NoError(t, err)
+
+	byUser := map[string]float64{}
+	for _, chartID := range charts {
+		for _, s := range got[chartID] {
+			byUser[s.Username] = s.AgeDays
+		}
+	}
+	assert.InDelta(t, 0.0, byUser["fresh"], 1.0, "fresh record ≈ now")
+	assert.InDelta(t, 30.0, byUser["month"], 1.0, "month-old record ≈ 30 days")
+	assert.InDelta(t, 365.0, byUser["year"], 2.0, "year-old record ≈ 365 days")
+	assert.Equal(t, 0.0, byUser["zero"], "zero/unset record_time falls back to fresh (AgeDays=0)")
+}
+
+// seedPlayWithTime is like seedRatedPlay but lets callers pin record_time so
+// AgeDays in fetchBestSamples becomes deterministic. Always also creates the
+// corresponding BestPlayRecord (we never test age-decay plumbing for plays
+// that aren't "best", since those don't enter the fitting pipeline).
+func seedPlayWithTime(t *testing.T, db *gorm.DB, username string, chartID, ratingInt int, recordTime time.Time) int {
+	t.Helper()
+	score := 1_005_000
+	pr := model.PlayRecord{
+		PlayRecordBase: model.PlayRecordBase{ChartID: chartID, Score: &score},
+		Username:       username,
+		Rating:         ratingInt,
+		RecordTime:     recordTime,
+	}
+	if err := db.Create(&pr).Error; err != nil {
+		t.Fatalf("create play record: %v", err)
+	}
+	bpr := model.BestPlayRecord{Username: username, ChartID: chartID, PlayRecordID: pr.ID}
+	if err := db.Create(&bpr).Error; err != nil {
+		t.Fatalf("create best play record: %v", err)
+	}
+	return pr.ID
 }
 
 // seedCharts creates `n` charts under a single song and returns their IDs.

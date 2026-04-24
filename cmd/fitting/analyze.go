@@ -80,6 +80,8 @@ func cmdAnalyze(args []string) {
 	fp := config.GlobalConfig.Fitting
 	base := fitting.Params{
 		MinEffectiveSamples: fp.MinSamples,
+		SkillTopK:           fp.SkillTopK,
+		SampleHalflifeDays:  fp.SampleHalflifeDays,
 		ProximitySigma:      fp.ProximitySigma,
 		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
 		VolumeFullAt:        fp.VolumeFullAt,

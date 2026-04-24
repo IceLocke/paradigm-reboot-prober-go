@@ -131,7 +131,7 @@ $$
 \alpha\cdot\sigma_{\text{prox}}, & \Delta_p > 0,
 \end{cases}
 \qquad
-\alpha \in (0,1],\ \alpha = \text{high\_skill\_sigma\_ratio}\ (\text{default } 0.3).
+\alpha \in (0,1],\ \alpha = \text{high\_skill\_sigma\_ratio}\ (\text{default } 0.2).
 $$
 
 $$
@@ -144,10 +144,51 @@ critical for a robust Kish effective sample size $N^{\text{eff}}$: without a
 hard cutoff, a large mass of tiny-weight over-skilled samples could still
 inflate $\sum w$ enough to pass the `min_samples` gate.
 
-The default $\sigma_{\text{prox}} = 20$ corresponds to $\pm 2.0$ level
-units of "effective skill" on the under-skilled side and $\pm 0.6$ level
+The default $\sigma_{\text{prox}} = 18.5$ corresponds to $\pm 1.85$ level
+units of "effective skill" on the under-skilled side and $\pm 0.37$ level
 units on the over-skilled side, capturing the realistic audience band of a
 chart while heavily discounting over-skilled dabblers.
+
+**Where does $\alpha = 0.2$ come from?** An initial version used a symmetric
+Gaussian ($\alpha = 1$) and the middle-level bands (lv13–lv15.5) came out
+systematically $+0.5$ to $+0.8$ above the official level. Cross-sweeping on
+the production DB (1187 charts, 441\,069 best-play records) yields the
+following summary:
+
+| $\alpha$ | global $\mathrm{avg}(\hat\delta)$ | lv13 bias | lv15 bias | lv16 bias | worst band\|dev\| (n$\ge$5) |
+|------|--------|----------|----------|----------|----------|
+| 0.15 | $-0.020$ | $-0.186$ | $+0.107$ | $-0.078$ | $0.222$  |
+| 0.17 | $+0.007$ | $-0.150$ | $+0.142$ | $-0.068$ | $0.206$  |
+| **0.20** | **$+0.050$** | **$-0.089$** | **$+0.194$** | **$-0.054$** | **$0.194$** |
+| 0.22 | $+0.079$ | $-0.052$ | $+0.228$ | $-0.045$ | $0.228$  |
+| 0.30 (old) | $+0.196$ | $+0.134$ | $+0.350$ | $-0.018$ | $0.350$  |
+
+Tightening $\alpha$ below $0.2$ pushes lv11–lv13 too negative; loosening
+above $0.2$ lets the lv15+ positive bias creep back. The two directions
+meet at $\alpha = 0.20$, which minimises the **worst band-wise $|dev|$**
+(0.194). The global bias is closest to zero at $\alpha \approx 0.17$, but
+that comes at the cost of $-0.15$ to $-0.21$ in lv11–lv13. We optimise for
+the worst band (rather than the global average) because every band is user-
+facing.
+
+**σ fine-tune.** With $\alpha = 0.20$ fixed, a follow-up 2-D grid search
+over $\sigma_{\text{prox}}$ and `min_samples` on the production database
+(1187 charts) yielded:
+
+| $\sigma_{\text{prox}}$ | min_samples | n_pub | global avg | lv11 bias | lv15 bias | worst band\|dev\| |
+|-------|-------|--------|----------|-----------|-----------|-------------------|
+| 20.0  | 8     | 417    | $+0.050$ | $-0.192$  | $+0.194$  | $0.194$           |
+| 19.0  | 5     | 441    | $+0.037$ | $-0.168$  | $+0.177$  | $0.177$           |
+| **18.5** | **5** | **437** | **$+0.032$** | **$-0.170$** | **$+0.169$** | **$0.170$** |
+| 18.0  | 5     | 436    | $+0.025$ | $-0.194$  | $+0.160$  | $0.194$           |
+| 15.0  | 5     | 429    | $-0.006$ | $-0.198$  | $+0.116$  | $0.198$           |
+
+Dropping $\sigma$ from 20 to 18.5 further compresses the lv15+ positive
+bias without the reversal seen at $\sigma \le 18$, where lv11 snaps back to
+$-0.19$. Relaxing `min_samples` 8 $\to$ 5 adds $\approx 24$ published
+charts; MAD and bias are essentially unchanged because §4.4’s
+`DeviationPenalty` ($\lambda = 2$) already pulls small-sample charts toward
+the official level.
 
 **Volume weight.** Players with very few records have noisier $B_p$
 estimates. We apply a linear ramp that saturates at $V_{\text{full}} = 50$
@@ -157,8 +198,68 @@ $$
 w^{\text{vol}}_p = \min\!\left(1, \dfrac{n_p}{V_{\text{full}}}\right).
 $$
 
+**Score-quality weight (opt-in, disabled by default).** A sample from a
+player who only barely passed a chart (score just over 1{,}000{,}000) and a
+sample from the same player comfortably in the community "high-score"
+band ($\ge 1{,}009{,}000$) do not carry equal information. We map the raw
+score to an extra weight factor $w^{\text{score}}_{p,c} \in [0, 1]$ via a
+three-segment piecewise-linear ramp:
+
+$$
+w^{\text{score}}_{p,c} = \begin{cases}
+0, & s < s_{\text{floor}},\\[2pt]
+w_{\text{good}} \cdot \dfrac{s - s_{\text{floor}}}{s_{\text{good}} - s_{\text{floor}}}, & s_{\text{floor}} \le s < s_{\text{good}},\\[10pt]
+w_{\text{good}} + (1 - w_{\text{good}}) \cdot \dfrac{s - s_{\text{good}}}{s_{\text{full}} - s_{\text{good}}}, & s_{\text{good}} \le s < s_{\text{full}},\\[10pt]
+1, & s \ge s_{\text{full}}.
+\end{cases}
+$$
+
+Recommended anchors (if you opt in): $s_{\text{floor}} = 1{,}000{,}000$
+(the business-defined "didn't really pass" threshold), $s_{\text{good}} =
+1{,}007{,}500$ (the "can play" threshold), $s_{\text{full}} = 1{,}009{,}000$
+(the "high-score" threshold), $w_{\text{good}} = 0.6$. **All four knobs
+default to `0`**, in which case the factor degenerates to $1$ and this
+sub-section is equivalent to disabled. Any non-monotone or partial
+configuration (e.g. setting only some of the four) also degenerates to 1.
+
+**What problem does this solve?** About 24% of the raw best-record pool
+sits below 1{,}000{,}000 and another 40% sits in the 1{,}000{,}000–1{,}007{,}500
+"just scraped by" band. Giving every such sample the same weight as a
+stable high-score run introduces survivorship bias in the inferred
+$\hat{\delta}$ — we only see the players who “barely made it”, not the
+same-skill players who failed and never produced a best record. Damping
+these samples at the pre-weight stage discounts that bias.
+
+**Why is it disabled by default?** Under the previous $\alpha = 0.3$
+default, enabling this factor ($w_{\text{good}} = 0.6$) visibly improved
+the global average — global $\mathrm{avg}(\hat{\delta})$ fell from $+0.20$
+to $+0.08$ ($-59\%$), and the lv14–lv15 bands recovered. However, with
+the new $\alpha = 0.2$ default, $\alpha$ alone already compresses the mid/
+high-level positive bias (lv15 drops from $+0.35$ to $+0.19$); adding
+$w^{\text{score}}$ on top pushes lv11–lv13 into a much larger negative
+overcorrection (roughly $-0.3$). Production sweeps showed the single
+knob $\alpha = 0.2$ achieves worst band $|dev| = 0.194$, beating
+$(\alpha = 0.25, w_{\text{good}} = 0.9)$ at $0.29$. Both levers point in
+the same direction ("reduce over-trustful samples") and, on this DB,
+stacking them over-shoots.
+
+**Interaction with the InverseLevel math (why it is off by default on
+this DB).** Under the rating formula, for a fixed $B_p$, an AP sample
+(score = 1{,}010{,}000) inverts to $\hat{L} = B_p/10 - 1$, while a score =
+1{,}000{,}500 sample inverts to $\hat{L} \approx B_p/10 - 0.033$ — that is,
+**high-score samples inherently infer a lower level than low-score samples
+do, for the same $B_p$**. Up-weighting high-score samples therefore
+nudges the whole $\hat{L}_c$ distribution down, which is exactly why with
+$\alpha = 0.2$ already pulling lv15 from $+0.35$ to $+0.19$, enabling
+$w^{\text{score}}$ on top sends lv11–lv13 to around $-0.3$. The feature is
+still valuable in scenarios where $\alpha$ needs to be loose (e.g. a
+regional sub-DB where under-skilled samples dominate); code, tests, docs,
+and the config framework are all kept so it can be enabled explicitly. To
+opt in, populate all four knobs together (e.g. floor=$1{,}000{,}000$,
+good=$1{,}007{,}500$, full=$1{,}009{,}000$, good\_weight=$0.6$).
+
 **Combined pre-weight:** $\tilde{w}_{p,c} = w^{\text{prox}}_{p,c} \cdot
-w^{\text{vol}}_p$.
+w^{\text{vol}}_p \cdot w^{\text{score}}_{p,c}$.
 
 ### 4.3 Robust trimming (Tukey biweight)
 
@@ -340,10 +441,10 @@ for each chart c with official level L_c:
 |---------------------------------|------------------------|-----------|----------------------------------------------------------------------------------------|
 | `fitting.enabled`               | —                      | `true`    | Master switch for the microservice.                                                    |
 | `fitting.interval`              | —                      | `6h`      | Ticker period (Go duration).                                                           |
-| `fitting.min_samples`           | min_samples            | `8.0`     | $N^{\text{eff}}$ below this → abstain.                                                 |
+| `fitting.min_samples`           | min_samples            | `5.0`     | $N^{\text{eff}}$ below this → abstain.                                                 |
 | `fitting.min_player_records`    | —                      | `20`      | Exclude players with fewer best records.                                               |
-| `fitting.proximity_sigma`       | $\sigma_{\text{prox}}$ | `20.0`    | Gaussian bandwidth around $10L_c$.                                                     |
-| `fitting.high_skill_sigma_ratio`| $\alpha$               | `0.3`     | $\sigma$ multiplier on the over-skilled side (asymmetric Gaussian). `1.0` = symmetric, smaller = stronger discount on over-skilled players. Samples outside $2.5\cdot\sigma$ are dropped. |
+| `fitting.proximity_sigma`       | $\sigma_{\text{prox}}$ | `18.5`    | Gaussian bandwidth around $10L_c$.                                                     |
+| `fitting.high_skill_sigma_ratio`| $\alpha$               | `0.2`     | $\sigma$ multiplier on the over-skilled side (asymmetric Gaussian). `1.0` = symmetric, smaller = stronger discount on over-skilled players. Samples outside $2.5\cdot\sigma$ are dropped. `0.2` minimises worst band $|dev|$ on prod. |
 | `fitting.volume_full_at`        | $V_{\text{full}}$      | `50`      | Volume weight saturation point.                                                        |
 | `fitting.prior_strength`        | $\kappa$               | `5.0`     | Baseline shrinkage strength toward $L_c$.                                              |
 | `fitting.deviation_penalty`     | $\lambda$              | `2.0`     | Deviation penalty; sets $\kappa_{\text{eff}} = \kappa(1+\lambda\cdot\text{dev}^2\cdot n_{\text{ref}}/N^{\text{eff}})$. `0` reverts to static $\kappa$. |
@@ -352,6 +453,10 @@ for each chart c with official level L_c:
 | `fitting.max_deviation_low_at`  | $L_{\text{low}}$       | `12.0`    | Anchor where the cap equals $\Delta_{\min}$; must be less than $L_{\text{high}}$.      |
 | `fitting.max_deviation_high_at` | $L_{\text{high}}$      | `17.0`    | Anchor where the cap equals $\Delta_{\max}$; in between, $\Delta(L) = \Delta_{\min}\cdot(\Delta_{\max}/\Delta_{\min})^t$. |
 | `fitting.min_score`             | $s_{\min}$             | `500000`  | Minimum score admitted.                                                                |
+| `fitting.score_floor_at`        | $s_{\text{floor}}$     | `0`       | Score-quality weight (opt-in, disabled by default). Samples below this score get zero score-quality weight (business "didn't really pass" line); set to `0` to disable the score-quality weight. |
+| `fitting.score_good_at`         | $s_{\text{good}}$      | `0`       | Anchor at which the score-quality weight reaches $w_{\text{good}}$ ("can play" threshold); recommended `1007500` when enabled. |
+| `fitting.score_full_at`         | $s_{\text{full}}$      | `0`       | Anchor at which the score-quality weight saturates to 1.0 ("high-score" threshold); recommended `1009000` when enabled. |
+| `fitting.score_good_weight`     | $w_{\text{good}}$      | `0`       | Weight at $s_{\text{good}}$; must lie in $(0, 1)$ when enabled (typical `0.6`).        |
 | `fitting.tukey_k`               | $k$                    | `4.685`   | Biweight tuning constant.                                                              |
 | `fitting.chart_batch_size`      | —                      | `200`     | Charts processed per DB batch.                                                         |
 | `fitting.player_batch_size`     | —                      | `500`     | Users fetched per page.                                                                |

@@ -1,6 +1,7 @@
 package fitting
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -807,4 +808,303 @@ func TestComputeFitting_RampRelaxesAtHighLevel(t *testing.T) {
 		assert.Greater(t, diff, 0.5+1e-9,
 			"at lv17 the cap must relax beyond MaxDeviationLow (sanity check)")
 	}
+}
+
+
+// --- score-quality weighting -----------------------------------------------
+
+// Unit-test the piecewise-linear ramp directly. Shape:
+//
+//	score < 1,000,000 → 0
+//	score = 1,007,500 → 0.6  (ScoreGoodWeight)
+//	score = 1,009,000 → 1.0
+//	score > 1,009,000 → 1.0
+func TestScoreQualityWeight_PiecewiseShape(t *testing.T) {
+	p := Params{
+		ScoreFloorAt:    1_000_000,
+		ScoreGoodAt:     1_007_500,
+		ScoreFullAt:     1_009_000,
+		ScoreGoodWeight: 0.6,
+	}
+	cases := []struct {
+		score int
+		want  float64
+		desc  string
+	}{
+		{500_000, 0.0, "well below floor"},
+		{999_999, 0.0, "just below floor"},
+		{1_000_000, 0.0, "exactly at floor"},
+		{1_003_750, 0.3, "midway between floor and good → half of goodWeight"},
+		{1_007_500, 0.6, "exactly at good threshold"},
+		{1_008_250, 0.8, "midway between good and full"},
+		{1_009_000, 1.0, "exactly at full threshold"},
+		{1_010_000, 1.0, "above full"},
+	}
+	for _, c := range cases {
+		got := scoreQualityWeight(c.score, p)
+		assert.InDelta(t, c.want, got, 1e-9, "score=%d (%s)", c.score, c.desc)
+	}
+}
+
+// Misconfigured or zero-valued params must disable the feature entirely
+// (return 1.0), preserving the behaviour assumed by every pre-existing test.
+func TestScoreQualityWeight_DisabledOnMisconfig(t *testing.T) {
+	// all zero → disabled
+	assert.Equal(t, 1.0, scoreQualityWeight(0, Params{}))
+	assert.Equal(t, 1.0, scoreQualityWeight(1_005_000, Params{}))
+	// non-monotone anchors → disabled
+	bad := Params{ScoreFloorAt: 1_009_000, ScoreGoodAt: 1_007_500, ScoreFullAt: 1_009_500, ScoreGoodWeight: 0.5}
+	assert.Equal(t, 1.0, scoreQualityWeight(1_005_000, bad))
+	// ScoreGoodWeight out of range → disabled
+	badW := Params{ScoreFloorAt: 1_000_000, ScoreGoodAt: 1_007_500, ScoreFullAt: 1_009_000, ScoreGoodWeight: 1.2}
+	assert.Equal(t, 1.0, scoreQualityWeight(1_005_000, badW))
+	zeroW := Params{ScoreFloorAt: 1_000_000, ScoreGoodAt: 1_007_500, ScoreFullAt: 1_009_000, ScoreGoodWeight: 0.0}
+	assert.Equal(t, 1.0, scoreQualityWeight(1_005_000, zeroW))
+}
+
+// Integration: when score-quality weighting is enabled, a swarm of
+// barely-passed low-score samples that collectively mis-imply a chart's
+// level should be down-weighted relative to a smaller pool of high-score
+// samples, pulling the fitted level back toward the high-score-implied one.
+//
+// Setup: a chart whose true level is 15.0.
+//   - Group L ("barely passed"): 50 samples. Scores in
+//     [1,000,500, 1,003,500] — just above the 1M floor. Each sample's
+//     PlayerSkill is set so that the (score, skill) pair inverts to
+//     level ≈ 16.0 — i.e. group L collectively insists the chart is
+//     one whole level harder than it really is.
+//   - Group H ("high score"): 20 samples. Scores in [1,009,500, 1,010,000]
+//     (the "高分" band, full weight). PlayerSkill set so each sample
+//     inverts to level = 15.0 (the truth).
+//
+// Without score-quality weighting the larger group L dominates the weighted
+// median and the fit lands near 16.0. With score-quality weighting each L
+// sample is down-weighted to ≤ ~0.24× (1M → 0, 1,003,500 → ~0.28 of the
+// 0.6 plateau), while H samples stay at full weight, so the fit must move
+// materially toward 15.0.
+func TestComputeFitting_ScoreQualityWeight_FavoursHighScoreSamples(t *testing.T) {
+	trueLevel := 15.0
+	misLevel := 16.0 // level implied by group-L (score, skill) pairs
+	officialLevel := 15.0
+
+	samples := make([]Sample, 0, 70)
+	// Group L: 50 barely-passed samples implying level 16.0.
+	for i := 0; i < 50; i++ {
+		score := 1_000_500 + i*60 // 1_000_500 .. 1_003_440
+		skill := float64(rating.SingleRating(misLevel, score)) / 100.0
+		samples = append(samples, Sample{
+			Username: "L", Score: score, PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+	// Group H: 20 high-score samples implying the true level 15.0. Force the
+	// score into the ≥ ScoreFullAt band so score-quality weight is exactly 1.
+	for i := 0; i < 20; i++ {
+		score := 1_009_500 + i*25 // 1_009_500 .. 1_009_975
+		if score > 1_010_000 {
+			score = 1_010_000
+		}
+		skill := float64(rating.SingleRating(trueLevel, score)) / 100.0
+		samples = append(samples, Sample{
+			Username: "H", Score: score, PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+
+	// Case A: score-quality weighting DISABLED (old behaviour). Disable the
+	// deviation penalty too so we isolate the effect of the pre-weight
+	// rather than also having the prior pull the answer back toward
+	// officialLevel.
+	paramsOff := defaultParams()
+	paramsOff.PriorStrength = 0
+	paramsOff.DeviationPenalty = 0
+	resOff := ComputeFitting(officialLevel, samples, paramsOff)
+	if !assert.NotNil(t, resOff.FittingLevel) {
+		return
+	}
+
+	// Case B: score-quality weighting ENABLED with the prod defaults.
+	paramsOn := paramsOff
+	paramsOn.ScoreFloorAt = 1_000_000
+	paramsOn.ScoreGoodAt = 1_007_500
+	paramsOn.ScoreFullAt = 1_009_000
+	paramsOn.ScoreGoodWeight = 0.6
+	resOn := ComputeFitting(officialLevel, samples, paramsOn)
+	if !assert.NotNil(t, resOn.FittingLevel) {
+		return
+	}
+
+	// Sanity: without the weight, group L's 16.0 must dominate, so the fit
+	// should sit closer to 16.0 than to 15.0. With the weight the fit must
+	// move toward 15.0 by at least 0.2 level units — a conservative floor
+	// that still leaves plenty of room for the Tukey biweight / shrinkage
+	// stages to intervene.
+	assert.Greater(t, *resOff.FittingLevel, 15.5,
+		"sanity: without score weighting, 50 barely-passed samples implying 16.0 must dominate (got %.3f)",
+		*resOff.FittingLevel)
+	assert.Greater(t, *resOff.FittingLevel-*resOn.FittingLevel, 0.2,
+		"score-quality weighting must pull fit toward high-score-implied level "+
+			"(off: %.3f, on: %.3f, true: %.1f)",
+		*resOff.FittingLevel, *resOn.FittingLevel, trueLevel)
+}
+
+// When every sample is ≥ ScoreFullAt, score-quality weighting must be a no-op
+// regardless of whether it's configured on or off: the pre-weight multiplier
+// is 1.0 for every sample in both cases.
+func TestComputeFitting_ScoreQualityWeight_NoOpWhenAllHighScore(t *testing.T) {
+	trueLevel := 16.0
+	officialLevel := 16.0
+	samples := make([]Sample, 0, 40)
+	for i := 0; i < 40; i++ {
+		// skill slightly above true level → score lands ≥ 1_009_000
+		skill := 160.0 + 7.0 + float64(i)*0.05 // 167 .. 168.95, well inside the "高分" regime
+		score := simulateScore(trueLevel, skill)
+		if score < 1_009_000 {
+			// defensive: bump into the 高分 band if the bisect lands just below
+			score = 1_009_500 + i*10
+			skill = float64(rating.SingleRating(trueLevel, score)) / 100.0
+		}
+		samples = append(samples, Sample{
+			Username: "p", Score: score, PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+	paramsOff := defaultParams()
+	paramsOff.PriorStrength = 0
+	paramsOn := paramsOff
+	paramsOn.ScoreFloorAt = 1_000_000
+	paramsOn.ScoreGoodAt = 1_007_500
+	paramsOn.ScoreFullAt = 1_009_000
+	paramsOn.ScoreGoodWeight = 0.6
+
+	resOff := ComputeFitting(officialLevel, samples, paramsOff)
+	resOn := ComputeFitting(officialLevel, samples, paramsOn)
+	if !assert.NotNil(t, resOff.FittingLevel) || !assert.NotNil(t, resOn.FittingLevel) {
+		return
+	}
+	// Both fits must agree to within numerical noise: score-quality is 1 for
+	// every sample, so the inner weighted median / biweight pipeline sees
+	// exactly the same input in both runs.
+	assert.InDelta(t, *resOff.FittingLevel, *resOn.FittingLevel, 1e-6,
+		"score-quality weighting must be a no-op when every sample is ≥ ScoreFullAt")
+}
+
+
+// --- sample-age decay ------------------------------------------------------
+
+// sampleAgeWeight must return 1.0 whenever the feature is disabled (halflife
+// <=0), the sample is fresh (age <=0), or the inputs are NaN/Inf. At exactly
+// one half-life the decay factor is 0.5 by construction.
+func TestSampleAgeWeight_PiecewiseShape(t *testing.T) {
+	// Disabled forms.
+	assert.Equal(t, 1.0, sampleAgeWeight(0, 0), "both zero → disabled")
+	assert.Equal(t, 1.0, sampleAgeWeight(100, 0), "halflife=0 → disabled (no decay)")
+	assert.Equal(t, 1.0, sampleAgeWeight(100, -30), "negative halflife → disabled")
+	assert.Equal(t, 1.0, sampleAgeWeight(-5, 180), "negative age → treat as fresh")
+	assert.Equal(t, 1.0, sampleAgeWeight(0, 180), "zero age → fresh")
+
+	// Half-life semantics: age=H → weight = 0.5; age=2H → 0.25; age=H/2 → 1/√2.
+	assert.InDelta(t, 1.0, sampleAgeWeight(0, 365), 1e-12)
+	assert.InDelta(t, 0.5, sampleAgeWeight(365, 365), 1e-12, "one halflife → 1/2")
+	assert.InDelta(t, 0.25, sampleAgeWeight(730, 365), 1e-12, "two halflives → 1/4")
+	assert.InDelta(t, 1.0/math.Sqrt2, sampleAgeWeight(182.5, 365), 1e-12, "halflife/2 → 1/√2")
+
+	// Invalid/exceptional inputs collapse to 1.0 to keep the pipeline safe.
+	assert.Equal(t, 1.0, sampleAgeWeight(math.NaN(), 365))
+	assert.Equal(t, 1.0, sampleAgeWeight(math.Inf(1), 365))
+}
+
+// Integration: a chart at official level 15.0. Two cohorts of equal size at
+// the same 10·Level proximity band (skill ≈ 150), but different score
+// → different implied levels:
+//   - "new" samples (AgeDays=0): implied level ∈ [14.8, 15.2] — tight,
+//     consistent with truth,
+//   - "old" samples (AgeDays=360): implied level ∈ [15.6, 16.0] — biased
+//     0.8 above truth.
+//
+// Spreading each cohort over a 0.4-wide window avoids the MAD=0 pitfall that
+// would otherwise trigger Tukey's zero-weight branch on a perfectly bimodal
+// sample set. The combined distribution has median ≈ 15.4, MAD ≈ 0.4, and
+// Tukey scale 4.685·0.4 = 1.87, comfortably covering every sample.
+//
+// With decay OFF the weighted mean sits near 15.4. With decay ON at
+// halflife=180d the old cohort's weight drops to ≈25%, so the fit moves
+// noticeably toward the fresh 15.0 cohort.
+func TestComputeFitting_SampleAgeDecay_PullsTowardFresh(t *testing.T) {
+	officialLevel := 15.0
+	rng := rand.New(rand.NewSource(42))
+	var samples []Sample
+	for i := 0; i < 20; i++ {
+		implied := 14.8 + 0.4*rng.Float64() // [14.8, 15.2]
+		skill := 150.0                      // 10·officialLevel — proximity = 1
+		samples = append(samples, Sample{
+			Username:    fmt.Sprintf("new%02d", i),
+			Score:       simulateScore(implied, skill),
+			PlayerSkill: skill, PlayerRecords: 50,
+			AgeDays: 0,
+		})
+	}
+	for i := 0; i < 20; i++ {
+		implied := 15.6 + 0.4*rng.Float64() // [15.6, 16.0]
+		skill := 150.0
+		samples = append(samples, Sample{
+			Username:    fmt.Sprintf("old%02d", i),
+			Score:       simulateScore(implied, skill),
+			PlayerSkill: skill, PlayerRecords: 50,
+			AgeDays: 360,
+		})
+	}
+
+	paramsOff := defaultParams()
+	paramsOff.PriorStrength = 0         // isolate the weighted-mean mechanism
+	paramsOff.HighSkillSigmaRatio = 1.0 // symmetric σ — both cohorts treated equally
+	paramsOff.ProximitySigma = 50.0     // wide — keep both cohorts comfortably inside
+	paramsOn := paramsOff
+	paramsOn.SampleHalflifeDays = 180.0
+
+	resOff := ComputeFitting(officialLevel, samples, paramsOff)
+	resOn := ComputeFitting(officialLevel, samples, paramsOn)
+	if !assert.NotNil(t, resOff.FittingLevel) || !assert.NotNil(t, resOn.FittingLevel) {
+		return
+	}
+
+	// Decay off: balanced cohorts → fit lands in (15.2, 15.8).
+	assert.Greater(t, *resOff.FittingLevel, 15.2, "decay off: old cohort still pulls fit up")
+	assert.Less(t, *resOff.FittingLevel, 15.8)
+
+	// Decay on: the old cohort is reweighted by ≈ 0.25, so the fit drops markedly.
+	assert.Less(t, *resOn.FittingLevel, *resOff.FittingLevel,
+		"age decay must pull the weighted mean toward the fresher cohort")
+	assert.Greater(t, *resOff.FittingLevel-*resOn.FittingLevel, 0.15,
+		"expected ≥0.15 level move from enabling halflife=180d on 2-halflife-old cohort")
+}
+
+// When SampleHalflifeDays=0 (disabled), filling AgeDays on samples must be a
+// pure no-op versus the same samples with AgeDays=0. Anchors the "zero-cost
+// fallback" contract for the shipped default.
+func TestComputeFitting_SampleAgeDecay_DisabledIsNoOp(t *testing.T) {
+	trueLevel := 15.0
+	officialLevel := 15.0
+	base := make([]Sample, 0, 30)
+	for i := 0; i < 30; i++ {
+		skill := 150.0 + float64(i)*0.2
+		score := simulateScore(trueLevel, skill)
+		base = append(base, Sample{
+			Username: fmt.Sprintf("p%02d", i), Score: score,
+			PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+	withAges := make([]Sample, len(base))
+	copy(withAges, base)
+	for i := range withAges {
+		withAges[i].AgeDays = float64(30 + i*10) // arbitrary ages
+	}
+
+	params := defaultParams()
+	params.SampleHalflifeDays = 0 // disabled
+
+	res1 := ComputeFitting(officialLevel, base, params)
+	res2 := ComputeFitting(officialLevel, withAges, params)
+	if !assert.NotNil(t, res1.FittingLevel) || !assert.NotNil(t, res2.FittingLevel) {
+		return
+	}
+	assert.InDelta(t, *res1.FittingLevel, *res2.FittingLevel, 1e-9,
+		"SampleHalflifeDays=0 must make AgeDays irrelevant")
 }

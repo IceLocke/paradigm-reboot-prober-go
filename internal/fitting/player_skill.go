@@ -11,8 +11,12 @@ import (
 
 // PlayerSkill is the memoised per-player skill snapshot that drives the
 // proximity and volume weights in ComputeFitting. AvgRating is the mean of a
-// player's top-K single-chart ratings (K = min(total best records, 50)),
-// expressed as a float rating (not the int×100 form stored in DB).
+// player's top-K single-chart ratings (K = min(total best records,
+// Params.SkillTopK)), expressed as a float rating (not the int×100 form
+// stored in DB). The top-K is taken across the player's whole best_play_records
+// pool — i.e. it is b15-agnostic, **not** the B35+B15 "season" B50 the probe
+// server computes for display — because a chart fitter cares about players'
+// true skill ceiling, not about which song packs they happen to own this season.
 type PlayerSkill struct {
 	AvgRating  float64 // mean of top-K ratings / 100
 	NumRecords int     // total best_play_records count
@@ -71,16 +75,20 @@ func (r *Runner) collectPlayerSkills(ctx context.Context) (map[string]PlayerSkil
 		}
 
 		// 3. Linear group-by-user and accumulate skill.
+		topK := r.params.SkillTopK
+		if topK < 1 {
+			topK = 50 // defensive fallback; config validation should keep us out of here
+		}
 		curUser := ""
-		topRatings := make([]int, 0, 64)
+		topRatings := make([]int, 0, topK)
 		totalCount := 0
 		flush := func() {
 			if curUser == "" {
 				return
 			}
 			k := topRatings
-			if len(k) > 50 {
-				k = k[:50]
+			if len(k) > topK {
+				k = k[:topK]
 			}
 			sum := 0
 			for _, v := range k {
@@ -103,8 +111,8 @@ func (r *Runner) collectPlayerSkills(ctx context.Context) (map[string]PlayerSkil
 				totalCount = 0
 			}
 			totalCount++
-			// topRatings keeps only the top 50 (rows are already sorted DESC).
-			if len(topRatings) < 50 {
+			// topRatings keeps only the top-K (rows are already sorted DESC by rating).
+			if len(topRatings) < topK {
 				topRatings = append(topRatings, row.Rating)
 			}
 		}
@@ -147,22 +155,25 @@ type chartRow struct {
 	Level float64
 }
 
-// fetchBestSamples pulls (username, score) for every best record on the given
-// charts, joined in memory with the player-skill map.
+// fetchBestSamples pulls (username, score, record_time) for every best record on the
+// given charts, joined in memory with the player-skill map. RecordTime is
+// translated into Sample.AgeDays (days since now) so the calculator can
+// apply the optional sample-age decay weight.
 func (r *Runner) fetchBestSamples(
 	ctx context.Context,
 	chartIDs []int,
 	skills map[string]PlayerSkill,
 ) (map[int][]Sample, error) {
 	type row struct {
-		ChartID  int
-		Username string
-		Score    int
+		ChartID    int
+		Username   string
+		Score      int
+		RecordTime time.Time
 	}
 	var rows []row
 	if err := r.db.WithContext(ctx).
 		Table("best_play_records").
-		Select("best_play_records.chart_id AS chart_id, best_play_records.username AS username, play_records.score AS score").
+		Select("best_play_records.chart_id AS chart_id, best_play_records.username AS username, play_records.score AS score, play_records.record_time AS record_time").
 		Joins("JOIN play_records ON play_records.id = best_play_records.play_record_id").
 		Where("best_play_records.chart_id IN ?", chartIDs).
 		Where("best_play_records.deleted_at IS NULL").
@@ -171,6 +182,7 @@ func (r *Runner) fetchBestSamples(
 		return nil, err
 	}
 
+	now := r.now()
 	minRecords := r.params.MinPlayerRecords
 	out := make(map[int][]Sample, len(chartIDs))
 	for _, row := range rows {
@@ -181,11 +193,20 @@ func (r *Runner) fetchBestSamples(
 		if minRecords > 0 && skill.NumRecords < minRecords {
 			continue
 		}
+		ageDays := 0.0
+		if !row.RecordTime.IsZero() {
+			ageDays = now.Sub(row.RecordTime).Hours() / 24.0
+			if ageDays < 0 {
+				// Future-dated record_time (e.g. client clock skew). Treat as fresh.
+				ageDays = 0
+			}
+		}
 		out[row.ChartID] = append(out[row.ChartID], Sample{
 			Username:      row.Username,
 			Score:         row.Score,
 			PlayerSkill:   skill.AvgRating,
 			PlayerRecords: skill.NumRecords,
+			AgeDays:       ageDays,
 		})
 	}
 	return out, nil
