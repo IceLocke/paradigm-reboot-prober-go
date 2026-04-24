@@ -24,9 +24,10 @@ type RunnerConfig struct {
 // table. Exposed as a reusable type so that the cmd/fitting binary can use
 // it from both a ticker loop and a one-shot execution (`--once`).
 type Runner struct {
-	db     *gorm.DB
-	params Params
-	cfg    RunnerConfig
+	db      *gorm.DB
+	params  Params
+	cfg     RunnerConfig
+	nowFunc func() time.Time // injectable "now" for testing sample-age decay; defaults to time.Now
 }
 
 // NewRunner constructs a runner. `db` is expected to already have the shared
@@ -38,7 +39,16 @@ func NewRunner(db *gorm.DB, params Params, cfg RunnerConfig) *Runner {
 	if cfg.PlayerBatchSize <= 0 {
 		cfg.PlayerBatchSize = 500
 	}
-	return &Runner{db: db, params: params, cfg: cfg}
+	return &Runner{db: db, params: params, cfg: cfg, nowFunc: time.Now}
+}
+
+// now returns the runner's reference time. Uses nowFunc when set, otherwise
+// falls back to time.Now so a zero-valued Runner still works (defensive).
+func (r *Runner) now() time.Time {
+	if r.nowFunc != nil {
+		return r.nowFunc()
+	}
+	return time.Now()
 }
 
 // RunReport summarizes one execution, useful for logging and tests.

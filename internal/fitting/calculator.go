@@ -7,18 +7,31 @@ import (
 
 // Sample represents one (player, score) data point for a single chart.
 //
-// PlayerSkill is the player's float average B50 single-chart rating (i.e.
-// sum(top rating ints) / (K * 100), for the top K records where K ≤ 50). It
-// acts as the "target rating" fed to InverseLevel to obtain an implied level
-// for this (player, score) pair.
+// PlayerSkill is the player's float average single-chart rating, computed as
+// the mean of the player's top-K best_play_records ratings (K =
+// min(total best records, Params.SkillTopK)). It acts as the "target
+// rating" fed to InverseLevel to obtain an implied level for this
+// (player, score) pair. The B_p proxy is intentionally b15-agnostic: we
+// take the top-K across ALL songs rather than splitting into the B35/B15
+// season buckets used for the in-game B50 display, because a player's
+// true skill ceiling does not depend on which song packs they happen to
+// have purchased in the current season.
 //
 // PlayerRecords is the player's total best_play_records count — used by the
 // volume weight so that newcomers with very few records contribute less.
+//
+// AgeDays is the number of days between the server "now" at fetch time and
+// play_records.record_time (the client-supplied in-game play timestamp).
+// Populated by the runner before ComputeFitting. When Params.SampleHalflifeDays
+// > 0, a half-life decay factor exp(-ln2 · AgeDays / halflife) enters the
+// pre-weight, so stale records contribute less than fresh ones. AgeDays <= 0
+// is treated as "fresh" (decay factor = 1).
 type Sample struct {
 	Username      string
 	Score         int
 	PlayerSkill   float64
 	PlayerRecords int
+	AgeDays       float64
 }
 
 // Params bundles all tunable knobs exposed through config.fitting.*. See
@@ -26,6 +39,8 @@ type Sample struct {
 // the full derivation.
 type Params struct {
 	MinEffectiveSamples float64 // minimum N_eff to publish a FittingLevel
+	SkillTopK           int     // K in top-K player skill proxy (must be ≥ 1; historically 50)
+	SampleHalflifeDays  float64 // half-life in days for the sample-age decay weight; <=0 disables (no decay)
 	ProximitySigma      float64 // σ of the Gaussian proximity weight (skill ≤ 10·Level side), in rating units
 	HighSkillSigmaRatio float64 // σ multiplier for skill > 10·Level; <=0 or =1 means symmetric (disabled)
 	VolumeFullAt        int     // saturation point of the volume weight (records)
@@ -138,7 +153,16 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 		//   - score ≥ 1,009,000: the commonly pursued "高分" tier; saturate the
 		//     weight to 1.0 — these are the most reliable samples.
 		scoreQ := scoreQualityWeight(s.Score, params)
-		w := proximity * volume * scoreQ
+		// sample-age weight: exponential half-life decay on play-time. Players'
+		// behaviour drifts over time — charts get played by newer, better-tuned
+		// cohorts; older records are less representative of "how players of this
+		// skill band play this chart TODAY". When SampleHalflifeDays is set,
+		// each sample gets an extra factor exp(-ln2 · AgeDays / halflife), so a
+		// record that is one halflife old contributes half as much. Disabled
+		// (factor = 1) when SampleHalflifeDays ≤ 0 or AgeDays ≤ 0 (fresh sample /
+		// missing timestamp fallback).
+		ageW := sampleAgeWeight(s.AgeDays, params.SampleHalflifeDays)
+		w := proximity * volume * scoreQ * ageW
 		if w <= 0 || math.IsNaN(w) {
 			continue
 		}
@@ -295,6 +319,20 @@ func effectiveMaxDeviation(params Params, level float64) float64 {
 	}
 	t := (level - params.MaxDeviationLowAt) / (params.MaxDeviationHighAt - params.MaxDeviationLowAt)
 	return params.MaxDeviationLow * math.Pow(params.MaxDeviation/params.MaxDeviationLow, t)
+}
+
+// sampleAgeWeight returns exp(-ln2 · ageDays / halflifeDays) when both
+// halflifeDays > 0 and ageDays > 0, and 1.0 otherwise. The intent is that
+// fresh samples (AgeDays ≈ 0) always retain full weight while older samples
+// decay gracefully with the configured half-life.
+//
+// When halflifeDays ≤ 0 the feature is disabled and the factor is exactly
+// 1.0 for every sample, making this a zero-cost no-op.
+func sampleAgeWeight(ageDays, halflifeDays float64) float64 {
+	if halflifeDays <= 0 || ageDays <= 0 || math.IsNaN(ageDays) || math.IsInf(ageDays, 0) {
+		return 1.0
+	}
+	return math.Exp(-math.Ln2 * ageDays / halflifeDays)
 }
 
 // scoreQualityWeight converts a raw score into a weight factor in [0, 1]

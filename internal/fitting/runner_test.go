@@ -127,6 +127,7 @@ func TestRunner_EndToEnd(t *testing.T) {
 	cfg := config.GlobalConfig.Fitting
 	params := Params{
 		MinEffectiveSamples: 3.0,
+		SkillTopK:           50,
 		ProximitySigma:      cfg.ProximitySigma,
 		VolumeFullAt:        5, // test data has few records per player
 		PriorStrength:       1.0,
@@ -195,6 +196,7 @@ func TestRunner_InsufficientSamples(t *testing.T) {
 
 	runner := NewRunner(db, Params{
 		MinEffectiveSamples: 3.0,
+		SkillTopK:           50,
 		ProximitySigma:      20.0,
 		VolumeFullAt:        50,
 		PriorStrength:       5.0,
@@ -257,6 +259,7 @@ func TestRunner_PersistUpdatesExistingStat(t *testing.T) {
 
 	params := Params{
 		MinEffectiveSamples: 2.0,
+		SkillTopK:           50,
 		ProximitySigma:      15.0,
 		VolumeFullAt:        3,
 		PriorStrength:       1.0,

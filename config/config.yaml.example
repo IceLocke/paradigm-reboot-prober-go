@@ -52,6 +52,8 @@ fitting:
   interval: "6h"            # run every interval (Go duration string, e.g. "6h", "30m")
   min_samples: 5.0          # minimum effective sample size to publish fitting_level
   min_player_records: 20    # player needs ≥ this many best records to contribute
+  skill_top_k: 50           # player skill proxy B_p = mean of top-K single-chart ratings (across ALL songs, b15-agnostic); 50 = legacy B50 behaviour, smaller K trades freshness for stability across seasons
+  sample_halflife_days: 0   # sample-age half-life in days for time-decay weight; 0 = disabled (all samples weighted equally regardless of play time)
   proximity_sigma: 18.5     # Gaussian σ in rating units (centered on 10×Level)
   high_skill_sigma_ratio: 0.2 # σ multiplier for skill > 10×Level (over-skill side); 1.0 = symmetric, smaller = stronger discount on over-skilled players
   volume_full_at: 50        # a player at this record count receives full volume weight

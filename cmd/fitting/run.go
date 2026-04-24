@@ -61,6 +61,8 @@ func cmdRun(args []string) {
 	fp := config.GlobalConfig.Fitting
 	params := fitting.Params{
 		MinEffectiveSamples: fp.MinSamples,
+		SkillTopK:           fp.SkillTopK,
+		SampleHalflifeDays:  fp.SampleHalflifeDays,
 		ProximitySigma:      fp.ProximitySigma,
 		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
 		VolumeFullAt:        fp.VolumeFullAt,

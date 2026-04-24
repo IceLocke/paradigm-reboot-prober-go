@@ -1,6 +1,7 @@
 package fitting
 
 import (
+	"fmt"
 	"math"
 	"math/rand"
 	"testing"
@@ -983,4 +984,127 @@ func TestComputeFitting_ScoreQualityWeight_NoOpWhenAllHighScore(t *testing.T) {
 	// exactly the same input in both runs.
 	assert.InDelta(t, *resOff.FittingLevel, *resOn.FittingLevel, 1e-6,
 		"score-quality weighting must be a no-op when every sample is ≥ ScoreFullAt")
+}
+
+
+// --- sample-age decay ------------------------------------------------------
+
+// sampleAgeWeight must return 1.0 whenever the feature is disabled (halflife
+// <=0), the sample is fresh (age <=0), or the inputs are NaN/Inf. At exactly
+// one half-life the decay factor is 0.5 by construction.
+func TestSampleAgeWeight_PiecewiseShape(t *testing.T) {
+	// Disabled forms.
+	assert.Equal(t, 1.0, sampleAgeWeight(0, 0), "both zero → disabled")
+	assert.Equal(t, 1.0, sampleAgeWeight(100, 0), "halflife=0 → disabled (no decay)")
+	assert.Equal(t, 1.0, sampleAgeWeight(100, -30), "negative halflife → disabled")
+	assert.Equal(t, 1.0, sampleAgeWeight(-5, 180), "negative age → treat as fresh")
+	assert.Equal(t, 1.0, sampleAgeWeight(0, 180), "zero age → fresh")
+
+	// Half-life semantics: age=H → weight = 0.5; age=2H → 0.25; age=H/2 → 1/√2.
+	assert.InDelta(t, 1.0, sampleAgeWeight(0, 365), 1e-12)
+	assert.InDelta(t, 0.5, sampleAgeWeight(365, 365), 1e-12, "one halflife → 1/2")
+	assert.InDelta(t, 0.25, sampleAgeWeight(730, 365), 1e-12, "two halflives → 1/4")
+	assert.InDelta(t, 1.0/math.Sqrt2, sampleAgeWeight(182.5, 365), 1e-12, "halflife/2 → 1/√2")
+
+	// Invalid/exceptional inputs collapse to 1.0 to keep the pipeline safe.
+	assert.Equal(t, 1.0, sampleAgeWeight(math.NaN(), 365))
+	assert.Equal(t, 1.0, sampleAgeWeight(math.Inf(1), 365))
+}
+
+// Integration: a chart at official level 15.0. Two cohorts of equal size at
+// the same 10·Level proximity band (skill ≈ 150), but different score
+// → different implied levels:
+//   - "new" samples (AgeDays=0): implied level ∈ [14.8, 15.2] — tight,
+//     consistent with truth,
+//   - "old" samples (AgeDays=360): implied level ∈ [15.6, 16.0] — biased
+//     0.8 above truth.
+//
+// Spreading each cohort over a 0.4-wide window avoids the MAD=0 pitfall that
+// would otherwise trigger Tukey's zero-weight branch on a perfectly bimodal
+// sample set. The combined distribution has median ≈ 15.4, MAD ≈ 0.4, and
+// Tukey scale 4.685·0.4 = 1.87, comfortably covering every sample.
+//
+// With decay OFF the weighted mean sits near 15.4. With decay ON at
+// halflife=180d the old cohort's weight drops to ≈25%, so the fit moves
+// noticeably toward the fresh 15.0 cohort.
+func TestComputeFitting_SampleAgeDecay_PullsTowardFresh(t *testing.T) {
+	officialLevel := 15.0
+	rng := rand.New(rand.NewSource(42))
+	var samples []Sample
+	for i := 0; i < 20; i++ {
+		implied := 14.8 + 0.4*rng.Float64() // [14.8, 15.2]
+		skill := 150.0                      // 10·officialLevel — proximity = 1
+		samples = append(samples, Sample{
+			Username:    fmt.Sprintf("new%02d", i),
+			Score:       simulateScore(implied, skill),
+			PlayerSkill: skill, PlayerRecords: 50,
+			AgeDays: 0,
+		})
+	}
+	for i := 0; i < 20; i++ {
+		implied := 15.6 + 0.4*rng.Float64() // [15.6, 16.0]
+		skill := 150.0
+		samples = append(samples, Sample{
+			Username:    fmt.Sprintf("old%02d", i),
+			Score:       simulateScore(implied, skill),
+			PlayerSkill: skill, PlayerRecords: 50,
+			AgeDays: 360,
+		})
+	}
+
+	paramsOff := defaultParams()
+	paramsOff.PriorStrength = 0         // isolate the weighted-mean mechanism
+	paramsOff.HighSkillSigmaRatio = 1.0 // symmetric σ — both cohorts treated equally
+	paramsOff.ProximitySigma = 50.0     // wide — keep both cohorts comfortably inside
+	paramsOn := paramsOff
+	paramsOn.SampleHalflifeDays = 180.0
+
+	resOff := ComputeFitting(officialLevel, samples, paramsOff)
+	resOn := ComputeFitting(officialLevel, samples, paramsOn)
+	if !assert.NotNil(t, resOff.FittingLevel) || !assert.NotNil(t, resOn.FittingLevel) {
+		return
+	}
+
+	// Decay off: balanced cohorts → fit lands in (15.2, 15.8).
+	assert.Greater(t, *resOff.FittingLevel, 15.2, "decay off: old cohort still pulls fit up")
+	assert.Less(t, *resOff.FittingLevel, 15.8)
+
+	// Decay on: the old cohort is reweighted by ≈ 0.25, so the fit drops markedly.
+	assert.Less(t, *resOn.FittingLevel, *resOff.FittingLevel,
+		"age decay must pull the weighted mean toward the fresher cohort")
+	assert.Greater(t, *resOff.FittingLevel-*resOn.FittingLevel, 0.15,
+		"expected ≥0.15 level move from enabling halflife=180d on 2-halflife-old cohort")
+}
+
+// When SampleHalflifeDays=0 (disabled), filling AgeDays on samples must be a
+// pure no-op versus the same samples with AgeDays=0. Anchors the "zero-cost
+// fallback" contract for the shipped default.
+func TestComputeFitting_SampleAgeDecay_DisabledIsNoOp(t *testing.T) {
+	trueLevel := 15.0
+	officialLevel := 15.0
+	base := make([]Sample, 0, 30)
+	for i := 0; i < 30; i++ {
+		skill := 150.0 + float64(i)*0.2
+		score := simulateScore(trueLevel, skill)
+		base = append(base, Sample{
+			Username: fmt.Sprintf("p%02d", i), Score: score,
+			PlayerSkill: skill, PlayerRecords: 50,
+		})
+	}
+	withAges := make([]Sample, len(base))
+	copy(withAges, base)
+	for i := range withAges {
+		withAges[i].AgeDays = float64(30 + i*10) // arbitrary ages
+	}
+
+	params := defaultParams()
+	params.SampleHalflifeDays = 0 // disabled
+
+	res1 := ComputeFitting(officialLevel, base, params)
+	res2 := ComputeFitting(officialLevel, withAges, params)
+	if !assert.NotNil(t, res1.FittingLevel) || !assert.NotNil(t, res2.FittingLevel) {
+		return
+	}
+	assert.InDelta(t, *res1.FittingLevel, *res2.FittingLevel, 1e-9,
+		"SampleHalflifeDays=0 must make AgeDays irrelevant")
 }
