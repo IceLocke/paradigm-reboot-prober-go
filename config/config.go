@@ -118,9 +118,9 @@ func InitDefaults() {
 	GlobalConfig.Metrics.ExcludePaths = []string{"/healthz"}
 	GlobalConfig.Fitting.Enabled = true
 	GlobalConfig.Fitting.Interval = "6h"
-	GlobalConfig.Fitting.MinSamples = 8.0
+	GlobalConfig.Fitting.MinSamples = 5.0
 	GlobalConfig.Fitting.MinPlayerRecords = 20
-	GlobalConfig.Fitting.ProximitySigma = 20.0
+	GlobalConfig.Fitting.ProximitySigma = 18.5
 	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.2
 	GlobalConfig.Fitting.VolumeFullAt = 50
 	GlobalConfig.Fitting.PriorStrength = 5.0

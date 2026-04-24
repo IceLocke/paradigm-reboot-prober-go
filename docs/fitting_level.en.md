@@ -144,8 +144,8 @@ critical for a robust Kish effective sample size $N^{\text{eff}}$: without a
 hard cutoff, a large mass of tiny-weight over-skilled samples could still
 inflate $\sum w$ enough to pass the `min_samples` gate.
 
-The default $\sigma_{\text{prox}} = 20$ corresponds to $\pm 2.0$ level
-units of "effective skill" on the under-skilled side and $\pm 0.6$ level
+The default $\sigma_{\text{prox}} = 18.5$ corresponds to $\pm 1.85$ level
+units of "effective skill" on the under-skilled side and $\pm 0.37$ level
 units on the over-skilled side, capturing the realistic audience band of a
 chart while heavily discounting over-skilled dabblers.
 
@@ -170,6 +170,25 @@ meet at $\alpha = 0.20$, which minimises the **worst band-wise $|dev|$**
 that comes at the cost of $-0.15$ to $-0.21$ in lv11–lv13. We optimise for
 the worst band (rather than the global average) because every band is user-
 facing.
+
+**σ fine-tune.** With $\alpha = 0.20$ fixed, a follow-up 2-D grid search
+over $\sigma_{\text{prox}}$ and `min_samples` on the production database
+(1187 charts) yielded:
+
+| $\sigma_{\text{prox}}$ | min_samples | n_pub | global avg | lv11 bias | lv15 bias | worst band\|dev\| |
+|-------|-------|--------|----------|-----------|-----------|-------------------|
+| 20.0  | 8     | 417    | $+0.050$ | $-0.192$  | $+0.194$  | $0.194$           |
+| 19.0  | 5     | 441    | $+0.037$ | $-0.168$  | $+0.177$  | $0.177$           |
+| **18.5** | **5** | **437** | **$+0.032$** | **$-0.170$** | **$+0.169$** | **$0.170$** |
+| 18.0  | 5     | 436    | $+0.025$ | $-0.194$  | $+0.160$  | $0.194$           |
+| 15.0  | 5     | 429    | $-0.006$ | $-0.198$  | $+0.116$  | $0.198$           |
+
+Dropping $\sigma$ from 20 to 18.5 further compresses the lv15+ positive
+bias without the reversal seen at $\sigma \le 18$, where lv11 snaps back to
+$-0.19$. Relaxing `min_samples` 8 $\to$ 5 adds $\approx 24$ published
+charts; MAD and bias are essentially unchanged because §4.4’s
+`DeviationPenalty` ($\lambda = 2$) already pulls small-sample charts toward
+the official level.
 
 **Volume weight.** Players with very few records have noisier $B_p$
 estimates. We apply a linear ramp that saturates at $V_{\text{full}} = 50$
@@ -422,9 +441,9 @@ for each chart c with official level L_c:
 |---------------------------------|------------------------|-----------|----------------------------------------------------------------------------------------|
 | `fitting.enabled`               | —                      | `true`    | Master switch for the microservice.                                                    |
 | `fitting.interval`              | —                      | `6h`      | Ticker period (Go duration).                                                           |
-| `fitting.min_samples`           | min_samples            | `8.0`     | $N^{\text{eff}}$ below this → abstain.                                                 |
+| `fitting.min_samples`           | min_samples            | `5.0`     | $N^{\text{eff}}$ below this → abstain.                                                 |
 | `fitting.min_player_records`    | —                      | `20`      | Exclude players with fewer best records.                                               |
-| `fitting.proximity_sigma`       | $\sigma_{\text{prox}}$ | `20.0`    | Gaussian bandwidth around $10L_c$.                                                     |
+| `fitting.proximity_sigma`       | $\sigma_{\text{prox}}$ | `18.5`    | Gaussian bandwidth around $10L_c$.                                                     |
 | `fitting.high_skill_sigma_ratio`| $\alpha$               | `0.2`     | $\sigma$ multiplier on the over-skilled side (asymmetric Gaussian). `1.0` = symmetric, smaller = stronger discount on over-skilled players. Samples outside $2.5\cdot\sigma$ are dropped. `0.2` minimises worst band $|dev|$ on prod. |
 | `fitting.volume_full_at`        | $V_{\text{full}}$      | `50`      | Volume weight saturation point.                                                        |
 | `fitting.prior_strength`        | $\kappa$               | `5.0`     | Baseline shrinkage strength toward $L_c$.                                              |
