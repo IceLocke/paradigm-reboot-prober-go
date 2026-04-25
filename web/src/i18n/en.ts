@@ -90,6 +90,12 @@ const en = {
     avg_rating: 'Avg Rating',
     total_rating: 'Total Rating',
     scope: 'Scope',
+    export_mode: 'Export Mode',
+    b50_standard: 'Standard B50',
+    b50_overflow: 'B50 + Overflow',
+    b50_global: 'Global B50',
+    overflow: 'Overflow',
+    my_score: 'My Score',
   },
   message: {
     welcome: 'Welcome, {username}!',

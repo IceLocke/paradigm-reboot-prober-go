@@ -5,11 +5,10 @@
       <div class="page-actions">
         <IconButton
           :title="t('common.export_image')"
-          :disabled="exporting || allRecords.length === 0"
-          @click="exportImage"
+          :disabled="allRecords.length === 0"
+          @click="showExportModal = true"
         >
-          <ImageDown v-if="!exporting" :size="18" />
-          <Loader v-else class="spin" :size="18" />
+          <ImageDown :size="18" />
         </IconButton>
         <IconButton
           :icon="RefreshCw"
@@ -80,7 +79,7 @@
     </div>
   </div>
 
-  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" :username="userStore.username" />
   <QuickUploadModal
     v-model:show="showQuickUpload"
     :title="uploadTarget.title"
@@ -90,15 +89,24 @@
     :cover="uploadTarget.cover"
     @success="loadData"
   />
+  <B50ExportModal
+    v-model:show="showExportModal"
+    :username="USE_MOCK ? 'demo_user' : userStore.username"
+    :nickname="userStore.profile?.nickname || nickname"
+    :rating="b50Rating"
+    :b15-records="b15Records"
+    :b35-records="b35Records"
+    :b15-avg="b15Rating"
+    :b35-avg="b35Rating"
+  />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, h } from 'vue'
-import { saveAs } from 'file-saver'
 import { useI18n } from 'vue-i18n'
 import { NDataTable } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
-import { ImageDown, Loader, RefreshCw, Plus, Upload } from '@lucide/vue';
+import { ImageDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import VChart from 'vue-echarts'
 import { use } from 'echarts/core'
 import { ScatterChart } from 'echarts/charts'
@@ -113,13 +121,13 @@ import { getRecords } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockB50 } from '@/api/mock'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
-import { renderB50Image } from '@/utils/b50Canvas'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import IconButton from '@/components/ui/IconButton.vue'
 import StatCard from '@/components/business/StatCard.vue'
 import DifficultyBadge from '@/components/business/DifficultyBadge.vue'
 import SongDetailModal from '@/components/business/SongDetailModal.vue'
 import QuickUploadModal from '@/components/business/QuickUploadModal.vue'
+import B50ExportModal from '@/components/business/B50ExportModal.vue'
 import VersionAnnounceBanner from '@/components/business/VersionAnnounceBanner.vue'
 
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
@@ -132,8 +140,9 @@ const allRecords = ref<PlayRecordInfo[]>([])
 const nickname = ref('')
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
-const exporting = ref(false)
+
 const showQuickUpload = ref(false)
+const showExportModal = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0, cover: '' })
 
 const b35Records = computed(() =>
@@ -357,28 +366,6 @@ const refreshData = async () => {
   if (ok) toastSuccess('message.refresh_record_success')
 }
 
-const exportImage = async () => {
-  if (exporting.value || allRecords.value.length === 0) return
-  exporting.value = true
-  try {
-    const blob = await renderB50Image({
-      b15Records: b15Records.value,
-      b35Records: b35Records.value,
-      username: USE_MOCK ? 'demo_user' : userStore.username,
-      nickname: userStore.profile?.nickname || nickname.value,
-      rating: b50Rating.value,
-      b15Avg: b15Rating.value,
-      b35Avg: b35Rating.value,
-    })
-    saveAs(blob, `b50_${Date.now()}.jpg`)
-    toastSuccess('message.export_image_success')
-  } catch (err: unknown) {
-    toastError('message.export_image_failed', err)
-  } finally {
-    exporting.value = false
-  }
-}
-
 watch(() => userStore.logged_in, (loggedIn) => {
   if (loggedIn) loadData()
 })
@@ -458,11 +445,4 @@ onMounted(loadData)
   :deep(.action-btn:hover) { background: rgba(255,255,255,0.06); color: var(--text-primary); }
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.spin {
-  animation: spin 1s linear infinite;
-}
 </style>

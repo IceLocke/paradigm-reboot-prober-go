@@ -59,6 +59,10 @@
                 <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" />
                 <span class="chart-designer">{{ chart.level_design }}</span>
                 <span v-if="chart.notes" class="chart-notes mono">{{ chart.notes }} {{ t('term.notes') }}</span>
+                <div v-if="getRecord(chart.id)" class="chart-record">
+                  <span class="mono">{{ getRecord(chart.id)!.score.toLocaleString() }}</span>
+                  <span class="mono record-rating">{{ (getRecord(chart.id)!.rating / 100).toFixed(2) }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -72,13 +76,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { NSpin, NModal } from 'naive-ui'
-import type { Song } from '@/api/types'
+import type { Song, PlayRecordInfo } from '@/api/types'
 import DifficultyBadge from './DifficultyBadge.vue'
 import { useBreakpoint } from '@/composables/useBreakpoint'
 import { sortByDifficulty } from '@/utils/difficulty'
+import { getSongRecords } from '@/api/record'
 
 const { t } = useI18n()
 const { isMobile } = useBreakpoint()
@@ -86,9 +91,40 @@ const { isMobile } = useBreakpoint()
 const show = defineModel<boolean>('show', { required: true })
 const props = defineProps<{
   song: Song | null
+  username?: string
 }>()
 
+const songRecords = ref<PlayRecordInfo[]>([])
+const loadingRecords = ref(false)
+
 const sortedCharts = computed(() => sortByDifficulty(props.song?.charts ?? []))
+
+const recordMap = computed(() => {
+  const map = new Map<number, PlayRecordInfo>()
+  for (const r of songRecords.value) {
+    if (r.chart.id) map.set(r.chart.id, r)
+  }
+  return map
+})
+
+const getRecord = (chartId: number) => recordMap.value.get(chartId) ?? null
+
+watch(() => props.song, async (song) => {
+  songRecords.value = []
+  if (!song || !props.username) {
+    return
+  }
+  loadingRecords.value = true
+  try {
+    const addr = String(song.id)
+    const res = await getSongRecords(props.username, addr, 'best')
+    songRecords.value = res.data.records
+  } catch {
+    songRecords.value = []
+  } finally {
+    loadingRecords.value = false
+  }
+})
 
 const modalStyle = computed(() =>
   (isMobile.value
@@ -179,6 +215,7 @@ const coverUrl = computed(() => {
   padding: var(--space-2) var(--space-3);
   background: var(--bg-secondary);
   border-radius: 6px;
+  flex-wrap: wrap;
 }
 .chart-designer {
   font-size: var(--text-sm);
@@ -188,6 +225,23 @@ const coverUrl = computed(() => {
 .chart-notes {
   font-size: var(--text-xs);
   color: var(--text-muted);
+}
+.chart-record {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+.record-rating {
+  color: var(--accent);
+  font-weight: 600;
+}
+@media (max-width: 479px) {
+  .chart-record {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 .loading-state {
   display: flex;

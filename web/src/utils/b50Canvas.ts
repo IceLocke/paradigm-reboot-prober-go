@@ -1,20 +1,24 @@
 /**
  * B50 image canvas renderer.
- * Generates a B50 best records image using Canvas 2D API.
+ * Generates a Best Records image using Canvas 2D API.
  */
 import type { PlayRecordInfo } from '@/api/types'
 import { coverUrl as coverFullUrl, coverThumbUrl } from '@/utils/cover'
 
 // ─── Render Options ────────────────────────────────────────────
 
+export interface B50Section {
+  label: string
+  avg: number
+  records: PlayRecordInfo[]
+}
+
 export interface B50RenderOptions {
-  b15Records: PlayRecordInfo[]
-  b35Records: PlayRecordInfo[]
+  sections: B50Section[]
   username: string
   nickname: string
-  rating: number   // Player overall rating (avg B50, already /100)
-  b15Avg: number   // B15 avg rating (already /100)
-  b35Avg: number   // B35 avg rating (already /100)
+  rating: number
+  title?: string
 }
 
 // ─── Layout Constants ──────────────────────────────────────────
@@ -250,7 +254,7 @@ function drawHeader(
   ctx.fillStyle = '#ffffff'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'top'
-  ctx.fillText('Paradigm: Reboot Best Records', leftX, y)
+  ctx.fillText(options.title || 'Paradigm: Reboot Best Records', leftX, y)
 
   // Left: date/time
   ctx.font = `16px ${FONT_SANS}`
@@ -455,24 +459,23 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
     document.fonts.load(`16px ${FONT_MONO}`),
   ])
 
-  const { b15Records, b35Records } = options
+  const { sections } = options
 
   // ── Calculate total canvas height ──
-  const b15BlockH = gridBlockHeight(b15Records.length)
-  const b35BlockH = gridBlockHeight(b35Records.length)
+  let contentHeight = 0
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i]
+    contentHeight += SECTION_TITLE_HEIGHT + GAP_AFTER_SECTION_TITLE + gridBlockHeight(section.records.length)
+    if (i < sections.length - 1) {
+      contentHeight += GAP_BETWEEN_SECTIONS
+    }
+  }
 
   const canvasHeight =
     PADDING_TOP +
     HEADER_HEIGHT +
     GAP_AFTER_HEADER +
-    SECTION_TITLE_HEIGHT +
-    GAP_AFTER_SECTION_TITLE +
-    b15BlockH +
-    GAP_BETWEEN_SECTIONS +
-    SECTION_TITLE_HEIGHT +
-    GAP_AFTER_SECTION_TITLE +
-    b35BlockH +
-    GAP_BETWEEN_SECTIONS +
+    contentHeight +
     FOOTER_HEIGHT +
     PADDING_BOTTOM
 
@@ -483,7 +486,7 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
   const ctx = canvas.getContext('2d')!
 
   // ── Preload cover images ──
-  const allRecords = [...b15Records, ...b35Records]
+  const allRecords = sections.flatMap((s) => s.records)
   const imageMap = await preloadImages(allRecords)
 
   // ── Background (fixed image) ──
@@ -495,21 +498,20 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
   drawHeader(ctx, curY, options)
   curY += HEADER_HEIGHT + GAP_AFTER_HEADER
 
-  // ── Best 15 section ──
-  const b15TitleY = curY + SECTION_TITLE_HEIGHT / 2
-  drawSectionTitle(ctx, b15TitleY, 'Best 15', options.b15Avg)
-  curY += SECTION_TITLE_HEIGHT + GAP_AFTER_SECTION_TITLE
+  // ── Sections ──
+  for (let i = 0; i < sections.length; i++) {
+    const section = sections[i]
+    const titleY = curY + SECTION_TITLE_HEIGHT / 2
+    drawSectionTitle(ctx, titleY, section.label, section.avg)
+    curY += SECTION_TITLE_HEIGHT + GAP_AFTER_SECTION_TITLE
 
-  drawCardGrid(ctx, curY, b15Records, imageMap)
-  curY += b15BlockH + GAP_BETWEEN_SECTIONS
+    drawCardGrid(ctx, curY, section.records, imageMap)
+    curY += gridBlockHeight(section.records.length)
 
-  // ── Best 35 section ──
-  const b35TitleY = curY + SECTION_TITLE_HEIGHT / 2
-  drawSectionTitle(ctx, b35TitleY, 'Best 35', options.b35Avg)
-  curY += SECTION_TITLE_HEIGHT + GAP_AFTER_SECTION_TITLE
-
-  drawCardGrid(ctx, curY, b35Records, imageMap)
-  curY += b35BlockH + GAP_BETWEEN_SECTIONS
+    if (i < sections.length - 1) {
+      curY += GAP_BETWEEN_SECTIONS
+    }
+  }
 
   // ── Footer ──
   drawFooter(ctx, curY)

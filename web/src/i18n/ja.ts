@@ -88,6 +88,12 @@ const ja = {
     avg_rating: '平均レーティング',
     total_rating: '合計レーティング',
     scope: '範囲',
+    export_mode: 'エクスポートモード',
+    b50_standard: '標準 B50',
+    b50_overflow: 'B50 + オーバーフロー',
+    b50_global: 'グローバル B50',
+    overflow: 'オーバーフロー',
+    my_score: 'マイスコア',
   },
   message: {
     welcome: 'ようこそ、{username}！',
