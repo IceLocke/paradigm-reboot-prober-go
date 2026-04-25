@@ -11,6 +11,8 @@ export interface B50Section {
   label: string
   avg: number
   records: PlayRecordInfo[]
+  /** Records with index >= cutoff are rendered dimmed (overflow/floor). */
+  cutoff?: number
 }
 
 export interface B50RenderOptions {
@@ -315,6 +317,7 @@ function drawRecordCard(
   record: PlayRecordInfo,
   rank: number,
   coverImage: HTMLImageElement | null,
+  isOverflow = false,
 ) {
   // ── Card shadow (drawn before clip so it's visible outside) ──
   ctx.save()
@@ -412,6 +415,12 @@ function drawRecordCard(
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
 
+  // Dim overflow (floor) cards so the B50 boundary is visually obvious
+  if (isOverflow) {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.38)'
+    ctx.fillRect(x, y, w, h)
+  }
+
   ctx.restore()
 }
 
@@ -430,6 +439,7 @@ function drawCardGrid(
   startY: number,
   records: PlayRecordInfo[],
   imageMap: Map<string, HTMLImageElement>,
+  cutoff?: number,
 ) {
   records.forEach((record, i) => {
     const col = i % COLS
@@ -437,7 +447,8 @@ function drawCardGrid(
     const cx = PADDING_X + col * (CARD_WIDTH + CARD_GAP)
     const cy = startY + row * (CARD_HEIGHT + CARD_GAP)
     const img = imageMap.get(record.chart.cover) ?? null
-    drawRecordCard(ctx, cx, cy, CARD_WIDTH, CARD_HEIGHT, record, i + 1, img)
+    const isOverflow = cutoff != null && i >= cutoff
+    drawRecordCard(ctx, cx, cy, CARD_WIDTH, CARD_HEIGHT, record, i + 1, img, isOverflow)
   })
 }
 
@@ -505,7 +516,7 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
     drawSectionTitle(ctx, titleY, section.label, section.avg)
     curY += SECTION_TITLE_HEIGHT + GAP_AFTER_SECTION_TITLE
 
-    drawCardGrid(ctx, curY, section.records, imageMap)
+    drawCardGrid(ctx, curY, section.records, imageMap, section.cutoff)
     curY += gridBlockHeight(section.records.length)
 
     if (i < sections.length - 1) {

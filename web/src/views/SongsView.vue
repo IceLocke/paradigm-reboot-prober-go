@@ -107,7 +107,7 @@
   </div>
 
   <!-- Modals -->
-  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" :username="userStore.username" />
   <QuickUploadModal
     v-model:show="showQuickUpload"
     :title="uploadTarget.title"
@@ -126,6 +126,7 @@ import { Search, RefreshCw, LayoutGrid, List } from '@lucide/vue'
 
 import { toastSuccess, toastError } from '@/utils/toast'
 
+import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
 import { getAllCharts, getSingleSongInfo } from '@/api/song'
 import { USE_MOCK, getMockCharts } from '@/api/mock'
@@ -144,6 +145,7 @@ const SongGridView = defineAsyncComponent(() => import('@/components/business/So
 const SongTableView = defineAsyncComponent(() => import('@/components/business/SongTableView.vue'))
 
 const { t } = useI18n()
+const userStore = useUserStore()
 const appStore = useAppStore()
 
 // --- Composables ---

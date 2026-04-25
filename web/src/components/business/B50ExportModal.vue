@@ -90,10 +90,8 @@ const handleExport = async () => {
       const b15 = records.filter((r) => r.chart.b15)
       const b35 = records.filter((r) => !r.chart.b15)
       sections = [
-        { label: 'Best 15', avg: avgRating(b15.slice(0, 15)), records: b15.slice(0, 15) },
-        { label: 'Best 35', avg: avgRating(b35.slice(0, 35)), records: b35.slice(0, 35) },
-        { label: 'Overflow (B15)', avg: avgRating(b15.slice(15)), records: b15.slice(15) },
-        { label: 'Overflow (B35)', avg: avgRating(b35.slice(35)), records: b35.slice(35) },
+        { label: 'Best 15', avg: avgRating(b15.slice(0, 15)), records: b15, cutoff: 15 },
+        { label: 'Best 35', avg: avgRating(b35.slice(0, 35)), records: b35, cutoff: 35 },
       ]
     } else {
       if (USE_MOCK) {

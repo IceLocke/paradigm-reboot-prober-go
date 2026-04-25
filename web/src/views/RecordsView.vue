@@ -79,7 +79,7 @@
   </div>
 
   <!-- Modals -->
-  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" />
+  <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" :username="userStore.username" />
   <CsvImportModal v-model:show="showCsvImport" @success="loadRecords" />
   <QuickUploadModal
     v-model:show="showQuickUpload"
