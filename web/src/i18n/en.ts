@@ -96,6 +96,7 @@ const en = {
     b50_global: 'Global B50',
     overflow: 'Overflow',
     my_score: 'My Score',
+    best_score: 'Best Score',
   },
   message: {
     welcome: 'Welcome, {username}!',

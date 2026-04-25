@@ -96,6 +96,7 @@ const zh = {
     b50_global: '全局 B50',
     overflow: '下溢',
     my_score: '我的成绩',
+    best_score: '最佳成绩',
   },
   message: {
     welcome: '欢迎，{username}！',

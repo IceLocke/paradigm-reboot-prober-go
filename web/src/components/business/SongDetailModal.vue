@@ -56,10 +56,13 @@
             <span class="info-label">{{ t('term.difficulty') }}</span>
             <div class="charts-list">
               <div v-for="chart in sortedCharts" :key="chart.id" class="chart-row">
-                <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" />
-                <span class="chart-designer">{{ chart.level_design }}</span>
-                <span v-if="chart.notes" class="chart-notes mono">{{ chart.notes }} {{ t('term.notes') }}</span>
+                <div class="chart-row-meta">
+                  <DifficultyBadge :difficulty="chart.difficulty" :level="chart.level" />
+                  <span class="chart-designer">{{ chart.level_design }}</span>
+                  <span v-if="chart.notes" class="chart-notes mono">{{ chart.notes }} {{ t('term.notes') }}</span>
+                </div>
                 <div v-if="getRecord(chart.id)" class="chart-record">
+                  <span class="record-label">{{ t('term.best_score') }}</span>
                   <span class="mono">{{ getRecord(chart.id)!.score.toLocaleString() }}</span>
                   <span class="mono record-rating">{{ (getRecord(chart.id)!.rating / 100).toFixed(2) }}</span>
                 </div>
@@ -210,37 +213,55 @@ const coverUrl = computed(() => {
 }
 .chart-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
   background: var(--bg-secondary);
   border-radius: 6px;
+}
+.chart-row-meta {
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
 }
 .chart-designer {
   font-size: var(--text-sm);
   color: var(--text-secondary);
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
 }
 .chart-notes {
   font-size: var(--text-xs);
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 .chart-record {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   font-size: var(--text-sm);
   color: var(--text-primary);
+}
+.record-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-right: auto;
 }
 .record-rating {
   color: var(--accent);
   font-weight: 600;
 }
 @media (max-width: 479px) {
-  .chart-record {
-    width: 100%;
-    justify-content: flex-end;
+  .chart-designer {
+    flex-basis: 100%;
   }
 }
 .loading-state {
