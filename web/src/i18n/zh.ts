@@ -90,6 +90,13 @@ const zh = {
     avg_rating: '平均 Rating',
     total_rating: '总 Rating',
     scope: '范围',
+    export_mode: '导出模式',
+    b50_standard: '标准 B50',
+    b50_overflow: 'B50 + 下溢',
+    b50_global: '全局 B50',
+    overflow: '下溢',
+    my_score: '我的成绩',
+    best_score: '最佳成绩',
   },
   message: {
     welcome: '欢迎，{username}！',

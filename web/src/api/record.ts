@@ -14,7 +14,8 @@ export const getRecords = (
   pageIndex: number = 1,
   sortBy: string = 'rating',
   order: string = 'desc',
-  filter?: RecordFilterParams
+  filter?: RecordFilterParams,
+  underflow?: number,
 ) => {
   const params: Record<string, unknown> = {
     scope,
@@ -23,6 +24,7 @@ export const getRecords = (
     sort_by: sortBy,
     order,
   }
+  if (underflow != null) params.underflow = underflow
   if (filter?.minLevel != null) params.min_level = filter.minLevel
   if (filter?.maxLevel != null) params.max_level = filter.maxLevel
   if (filter?.difficulties && filter.difficulties.length > 0) {
@@ -42,4 +44,10 @@ export const uploadRecords = (username: string, data: BatchCreatePlayRecordReque
 
 export const getAllChartsWithScores = (username: string) => {
   return client.get<AllChartsResponse>(`/records/${username}`, { params: { scope: 'all-charts' } })
+}
+
+export const getSongRecords = (username: string, songAddr: string, scope: string = 'best') => {
+  return client.get<PlayRecordResponse>(`/records/${username}/song/${songAddr}`, {
+    params: { scope },
+  })
 }

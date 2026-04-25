@@ -126,27 +126,13 @@ defineEmits<{
 
 .level-cards {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-  padding-bottom: var(--space-1);
   flex: 1;
   min-width: 0;
 }
-.level-cards::-webkit-scrollbar {
-  height: 4px;
-}
-.level-cards::-webkit-scrollbar-track {
-  background: transparent;
-}
-.level-cards::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 2px;
-}
 
-/* Cards in level rows should have fixed width */
+/* Cards in level rows keep a fixed width and wrap to a new line. */
 .level-cards :deep(.song-grid-card) {
   flex-shrink: 0;
   width: 130px;
