@@ -487,6 +487,7 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
     HEADER_HEIGHT +
     GAP_AFTER_HEADER +
     contentHeight +
+    PADDING_BOTTOM +
     FOOTER_HEIGHT +
     PADDING_BOTTOM
 
@@ -525,6 +526,7 @@ export async function renderB50Image(options: B50RenderOptions): Promise<Blob> {
   }
 
   // ── Footer ──
+  curY += PADDING_BOTTOM
   drawFooter(ctx, curY)
 
   // ── Export as JPEG blob ──
