@@ -215,6 +215,23 @@ const ja = {
     content_2: '当サイトは击弦网络（Tuner Games）およびゲームの開発・配信・販売に関わる企業とは一切関係ありません。インターネット上の公開リソースを使用しており、著作権はそれぞれの権利者に帰属します。当サイトは公式サーバーのユーザーデータにアクセスする機能を含んでいません。',
     github: 'GitHub で見る',
   },
+  health: {
+    title: 'サービスステータス',
+    subtitle: 'バックエンド API のヘルスチェック',
+    endpoint: 'エンドポイント',
+    http_status: 'HTTP ステータス',
+    latency: 'レイテンシ',
+    checked_at: 'チェック時刻',
+    response: 'レスポンス',
+    error: 'エラー',
+    empty_body: '（空のレスポンス）',
+    status: {
+      checking: 'チェック中...',
+      healthy: '正常',
+      unhealthy: '異常',
+      unreachable: '接続不可',
+    },
+  },
 }
 
 export default ja

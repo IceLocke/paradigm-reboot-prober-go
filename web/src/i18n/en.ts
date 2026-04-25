@@ -218,6 +218,23 @@ const en = {
     content_2: 'This website has no affiliation with Tuner Games or any related companies. It uses publicly available resources, and all copyrights belong to their respective owners. This website does not access official server user data.',
     github: 'View on GitHub',
   },
+  health: {
+    title: 'Service Status',
+    subtitle: 'Live health check of the backend API',
+    endpoint: 'Endpoint',
+    http_status: 'HTTP Status',
+    latency: 'Latency',
+    checked_at: 'Checked at',
+    response: 'Response',
+    error: 'Error',
+    empty_body: '(empty body)',
+    status: {
+      checking: 'Checking...',
+      healthy: 'Healthy',
+      unhealthy: 'Unhealthy',
+      unreachable: 'Unreachable',
+    },
+  },
 }
 
 export default en
