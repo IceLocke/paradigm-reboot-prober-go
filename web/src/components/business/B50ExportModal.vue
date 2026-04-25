@@ -98,7 +98,7 @@ const handleExport = async () => {
         toastError('message.export_image_failed')
         return
       }
-      const res = await getRecords(props.username, 'all', 50, 1, 'rating', 'desc')
+      const res = await getRecords(props.username, 'best', 50, 1, 'rating', 'desc')
       const records = res.data.records
       sections = [
         { label: 'Best 50', avg: avgRating(records), records: records.slice(0, 50) },
