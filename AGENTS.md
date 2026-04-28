@@ -378,6 +378,17 @@ Swagger UI is available at: `http://localhost:8080/swagger/index.html`
 
 **Important**: After modifying any Swagger annotations (godoc comments on controller methods or in `cmd/server/main.go`), you MUST run `swag init -g cmd/server/main.go` and commit the regenerated files in `docs/`. The CI pipeline checks for Swagger doc consistency and will fail if they are out of date.
 
+#### Frontend Type Generation (`pnpm generate:api`)
+
+Any backend change that alters the API contract — new endpoints, modified response schemas, added/removed HTTP status codes, or changed `x-nullable` annotations — must be followed by regenerating the frontend's TypeScript types from the updated Swagger document.
+
+```bash
+cd web
+pnpm generate:api   # swagger2openapi → postprocess → openapi-typescript
+```
+
+This updates `web/src/api/openapi3.json` and `web/src/api/generated.d.ts`. Both files **must be committed** alongside the backend changes. The frontend build (`pnpm build`) relies on these generated types; leaving them out of date will cause TypeScript errors or silent contract mismatches.
+
 #### Nullable JSON fields (`*T` without `omitempty`)
 
 When a Go struct field is a pointer without `omitempty` — e.g. `FittingLevel *float64 \`json:"fitting_level"\`` — the backend serializes `nil` as JSON `null` rather than omitting the key. To reflect this in the OpenAPI contract, add the `extensions:"x-nullable=true"` struct tag:

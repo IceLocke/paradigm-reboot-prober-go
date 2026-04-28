@@ -334,6 +334,15 @@ export interface paths {
                         "application/json": components["schemas"]["model.ChartInfo"][];
                     };
                 };
+                /** @description Not Modified */
+                304: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": string;
+                    };
+                };
                 /** @description Internal Server Error */
                 500: {
                     headers: {
