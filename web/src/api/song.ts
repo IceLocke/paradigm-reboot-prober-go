@@ -1,8 +1,10 @@
 import client from './client'
 import type { ChartInfo, Song, CreateSongRequest, UpdateSongRequest } from './types'
 
-export const getAllCharts = () => {
-  return client.get<ChartInfo[]>('/songs')
+export const getAllCharts = (etag?: string) => {
+  return client.get<ChartInfo[]>('/songs', {
+    headers: etag ? { 'If-None-Match': etag } : undefined,
+  })
 }
 
 export const getSingleSongInfo = (songId: number, src: string = 'prp') => {

@@ -90,10 +90,27 @@ const loadCharts = async () => {
     appStore.charts = getMockCharts()
     return
   }
+
+  // Stale-while-revalidate: show cached data immediately, then refresh in background
+  const hasCache = appStore.charts !== null && appStore.chartsETag !== null
+
   try {
-    const res = await getAllCharts()
+    const res = await getAllCharts(appStore.chartsETag ?? undefined)
+
+    if (res.status === 304) {
+      // Cache still valid — nothing to do
+      return
+    }
+
+    // 200 OK — update store and cache
     appStore.charts = res.data
-  } catch { /* handled */ }
+    appStore.chartsETag = res.headers.etag ?? null
+  } catch {
+    // On network error, keep stale cache so the UI stays usable
+    if (!hasCache) {
+      appStore.charts = null
+    }
+  }
 }
 
 onMounted(() => {

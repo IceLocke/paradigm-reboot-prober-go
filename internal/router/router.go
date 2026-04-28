@@ -45,8 +45,8 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 	r.Use(cors.New(cors.Config{
 		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Content-Encoding"},
-		ExposeHeaders:    []string{"Content-Length", "Content-Encoding"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization", "Content-Encoding", "If-None-Match"},
+		ExposeHeaders:    []string{"Content-Length", "Content-Encoding", "ETag"},
 		AllowCredentials: false,
 	}))
 

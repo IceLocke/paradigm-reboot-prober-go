@@ -387,6 +387,12 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "304": {
+                        "description": "Not Modified",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {

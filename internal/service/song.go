@@ -3,6 +3,8 @@ package service
 import (
 	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -50,12 +52,7 @@ func NewSongService(songRepo *repository.SongRepository) *SongService {
 	return &SongService{songRepo: songRepo}
 }
 
-func (s *SongService) GetAllCharts(ctx context.Context) ([]model.ChartInfo, error) {
-	songs, err := s.songRepo.GetAllSongs()
-	if err != nil {
-		return nil, err
-	}
-
+func buildChartInfos(songs []model.Song) []model.ChartInfo {
 	var charts []model.ChartInfo
 	for _, song := range songs {
 		for _, chart := range song.Charts {
@@ -81,8 +78,40 @@ func (s *SongService) GetAllCharts(ctx context.Context) ([]model.ChartInfo, erro
 		}
 		return cmp.Compare(b.Difficulty.Order(), a.Difficulty.Order())
 	})
+	return charts
+}
 
-	return charts, nil
+func computeSongsETag(songs []model.Song) string {
+	h := sha256.New()
+	_ = binary.Write(h, binary.BigEndian, uint64(len(songs)))
+	for _, s := range songs {
+		_ = binary.Write(h, binary.BigEndian, uint64(s.ID))
+		_ = binary.Write(h, binary.BigEndian, s.UpdatedAt.UnixNano())
+		_ = binary.Write(h, binary.BigEndian, uint64(len(s.Charts)))
+		for _, c := range s.Charts {
+			_ = binary.Write(h, binary.BigEndian, uint64(c.ID))
+			_ = binary.Write(h, binary.BigEndian, c.UpdatedAt.UnixNano())
+		}
+	}
+	return fmt.Sprintf(`"%x"`, h.Sum(nil)[:8])
+}
+
+func (s *SongService) GetAllCharts(ctx context.Context) ([]model.ChartInfo, error) {
+	songs, err := s.songRepo.GetAllSongs()
+	if err != nil {
+		return nil, err
+	}
+	return buildChartInfos(songs), nil
+}
+
+func (s *SongService) GetAllChartsWithETag(ctx context.Context) ([]model.ChartInfo, string, error) {
+	songs, err := s.songRepo.GetAllSongs()
+	if err != nil {
+		return nil, "", err
+	}
+	charts := buildChartInfos(songs)
+	etag := computeSongsETag(songs)
+	return charts, etag, nil
 }
 
 // ResolveSongID parses a song_addr (numeric ID or wiki_id) and returns the song_id.
