@@ -1,10 +1,27 @@
 import { fileURLToPath, URL } from 'node:url'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
+import type { Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+
+/** Copies src/sw.js into the build output root as an unprocessed asset. */
+function copyServiceWorker(): Plugin {
+  return {
+    name: 'copy-service-worker',
+    writeBundle(_options, _bundle) {
+      const swSrc = readFileSync(new URL('./src/sw.js', import.meta.url), 'utf-8')
+      const outDir = resolve(__dirname, 'dist')
+      mkdirSync(outDir, { recursive: true })
+      writeFileSync(resolve(outDir, 'sw.js'), swSrc, 'utf-8')
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
     vue(),
+    copyServiceWorker(),
   ],
   resolve: {
     alias: {

@@ -19,3 +19,10 @@ app.use(pinia)
 app.use(router)
 app.use(i18n)
 app.mount('#app')
+
+// Register service worker for image caching in production
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {
+    // Silently ignore registration failures
+  })
+}
