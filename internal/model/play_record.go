@@ -98,9 +98,10 @@ type RecordFilter struct {
 	MinLevel     *float64
 	MaxLevel     *float64
 	Difficulties []Difficulty
+	B15          *bool
 }
 
 // IsEmpty returns true if the filter has no active conditions
 func (f RecordFilter) IsEmpty() bool {
-	return f.MinLevel == nil && f.MaxLevel == nil && len(f.Difficulties) == 0
+	return f.MinLevel == nil && f.MaxLevel == nil && len(f.Difficulties) == 0 && f.B15 == nil
 }

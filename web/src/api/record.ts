@@ -5,6 +5,7 @@ export interface RecordFilterParams {
   minLevel?: number | null
   maxLevel?: number | null
   difficulties?: Difficulty[]
+  b15?: boolean | null
 }
 
 export const getRecords = (
@@ -29,6 +30,9 @@ export const getRecords = (
   if (filter?.maxLevel != null) params.max_level = filter.maxLevel
   if (filter?.difficulties && filter.difficulties.length > 0) {
     params.difficulty = filter.difficulties
+  }
+  if (filter?.b15 != null) {
+    params.b15 = filter.b15
   }
   return client.get<PlayRecordResponse>(`/records/${username}`, {
     params,

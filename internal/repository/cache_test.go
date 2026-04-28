@@ -715,6 +715,24 @@ func TestFilterCacheKey(t *testing.T) {
 		assert.Equal(t, "min3.00_max12.00_diff:detected,massive", key)
 	})
 
+	t.Run("B15 filter", func(t *testing.T) {
+		fTrue := model.RecordFilter{B15: boolPtr(true)}
+		assert.Equal(t, "b15:true", filterCacheKey(fTrue))
+
+		fFalse := model.RecordFilter{B15: boolPtr(false)}
+		assert.Equal(t, "b15:false", filterCacheKey(fFalse))
+	})
+
+	t.Run("Combined filter with B15", func(t *testing.T) {
+		f := model.RecordFilter{
+			MinLevel:     float64Ptr(13.0),
+			B15:          boolPtr(true),
+			Difficulties: []model.Difficulty{model.DifficultyMassive},
+		}
+		key := filterCacheKey(f)
+		assert.Equal(t, "min13.00_diff:massive_b15:true", key)
+	})
+
 	t.Run("Same filter produces same key regardless of difficulty order", func(t *testing.T) {
 		f1 := model.RecordFilter{
 			Difficulties: []model.Difficulty{model.DifficultyMassive, model.DifficultyDetected},

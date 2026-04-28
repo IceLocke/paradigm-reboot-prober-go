@@ -191,10 +191,10 @@ func TestRecordController_RecordFilter(t *testing.T) {
 	type recordCheck func(t *testing.T, resp model.PlayRecordResponse)
 
 	recordTests := []struct {
-		name       string
-		url        string
-		wantTotal  int
-		checkFn    recordCheck // optional per-record validation
+		name      string
+		url       string
+		wantTotal int
+		checkFn   recordCheck // optional per-record validation
 	}{
 		{
 			"min_level=13.0", "/records/filteruser?scope=best&min_level=13.0", 3,
@@ -246,6 +246,31 @@ func TestRecordController_RecordFilter(t *testing.T) {
 				}
 			},
 		},
+		{
+			"b15=true new season", "/records/filteruser?scope=best&b15=true", 2,
+			func(t *testing.T, resp model.PlayRecordResponse) {
+				for _, rec := range resp.Records {
+					assert.True(t, rec.Chart.B15)
+				}
+			},
+		},
+		{
+			"b15=false old season", "/records/filteruser?scope=best&b15=false", 3,
+			func(t *testing.T, resp model.PlayRecordResponse) {
+				for _, rec := range resp.Records {
+					assert.False(t, rec.Chart.B15)
+				}
+			},
+		},
+		{
+			"combined b15+difficulty", "/records/filteruser?scope=best&b15=true&difficulty=massive", 1,
+			func(t *testing.T, resp model.PlayRecordResponse) {
+				for _, rec := range resp.Records {
+					assert.True(t, rec.Chart.B15)
+					assert.Equal(t, model.DifficultyMassive, rec.Chart.Difficulty)
+				}
+			},
+		},
 	}
 
 	for _, tt := range recordTests {
@@ -285,6 +310,7 @@ func TestRecordController_RecordFilter(t *testing.T) {
 		{"invalid difficulty", "/records/filteruser?scope=best&difficulty=invalid_diff", "invalid difficulty"},
 		{"invalid min_level", "/records/filteruser?scope=best&min_level=abc", "invalid min_level"},
 		{"invalid max_level", "/records/filteruser?scope=best&max_level=xyz", "invalid max_level"},
+		{"invalid b15", "/records/filteruser?scope=best&b15=maybe", "invalid b15"},
 	}
 
 	for _, tt := range errorTests {

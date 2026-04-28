@@ -23,6 +23,20 @@
           @click="toggleDiff(d.key)"
         >{{ d.label }}</button>
       </div>
+      <div class="season-toggle">
+        <button
+          :class="['season-toggle-btn', { active: seasonFilter === 'all' }]"
+          @click="toggleSeason('all')"
+        >{{ t('common.all') }}</button>
+        <button
+          :class="['season-toggle-btn', { active: seasonFilter === 'new' }]"
+          @click="toggleSeason('new')"
+        >{{ t('term.current') }}</button>
+        <button
+          :class="['season-toggle-btn', { active: seasonFilter === 'old' }]"
+          @click="toggleSeason('old')"
+        >{{ t('term.past') }}</button>
+      </div>
       <BaseTabs v-model="scope" :tabs="scopeTabs" />
       <div class="level-filter-group">
         <n-select
@@ -134,6 +148,7 @@ const sortState = ref<DataTableSortState | null>(null)
 
 // Filter state
 const diffFilter = ref<string[]>([])
+const seasonFilter = ref<'all' | 'new' | 'old'>('all')
 const levelMin = ref<number | null>(null)
 const levelMax = ref<number | null>(null)
 
@@ -189,6 +204,12 @@ const toggleDiff = (key: string) => {
   loadRecords()
 }
 
+const toggleSeason = (key: 'all' | 'new' | 'old') => {
+  seasonFilter.value = key
+  pageIndex.value = 1
+  loadRecords()
+}
+
 const onFilterChange = () => {
   pageIndex.value = 1
   loadRecords()
@@ -199,6 +220,9 @@ const buildFilter = (): RecordFilterParams => {
   if (levelMin.value != null && !isNaN(levelMin.value)) f.minLevel = levelMin.value
   if (levelMax.value != null && !isNaN(levelMax.value)) f.maxLevel = levelMax.value
   if (diffFilter.value.length > 0) f.difficulties = diffFilter.value as Difficulty[]
+  if (seasonFilter.value !== 'all') {
+    f.b15 = seasonFilter.value === 'new'
+  }
   return f
 }
 
@@ -498,6 +522,43 @@ onMounted(loadRecords)
   .diff-toggle-btn:hover { color: var(--text-secondary); }
 }
 .diff-toggle-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+/* Season toggle */
+.season-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.season-toggle::-webkit-scrollbar { display: none; }
+
+.season-toggle-btn {
+  padding: 7px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color var(--transition-base), background var(--transition-base);
+  white-space: nowrap;
+  min-height: 44px;
+  font-family: inherit;
+}
+@media (hover: hover) {
+  .season-toggle-btn:hover { color: var(--text-secondary); }
+}
+.season-toggle-btn.active {
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }

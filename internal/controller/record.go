@@ -90,6 +90,14 @@ func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
 		filter.Difficulties = append(filter.Difficulties, model.Difficulty(d))
 	}
 
+	if b15Str := c.Query("b15"); b15Str != "" {
+		v, err := strconv.ParseBool(b15Str)
+		if err != nil {
+			return filter, errors.New("invalid b15 parameter, expected true or false")
+		}
+		filter.B15 = &v
+	}
+
 	return filter, nil
 }
 
@@ -108,6 +116,7 @@ func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
 // @Param min_level query number false "Minimum chart level (inclusive)"
 // @Param max_level query number false "Maximum chart level (inclusive)"
 // @Param difficulty query []string false "Filter by difficulty (detected, invaded, massive, reboot)" collectionFormat(multi)
+// @Param b15 query boolean false "Filter by season: true = new (B15), false = old (B35)"
 // @Success 200 {object} model.PlayRecordResponse "b50/best/all scope"
 // @Success 200 {object} model.AllChartsResponse "all-charts scope"
 // @Failure 400 {object} model.Response

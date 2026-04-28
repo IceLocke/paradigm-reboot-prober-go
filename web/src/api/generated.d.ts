@@ -36,6 +36,8 @@ export interface paths {
                     max_level?: number;
                     /** @description Filter by difficulty (detected, invaded, massive, reboot) */
                     difficulty?: string[];
+                    /** @description Filter by season: true = new (B15), false = old (B35) */
+                    b15?: boolean;
                 };
                 header?: never;
                 path: {
