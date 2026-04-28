@@ -105,6 +105,12 @@ const docTemplate = `{
                         "description": "Filter by difficulty (detected, invaded, massive, reboot)",
                         "name": "difficulty",
                         "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by season: true = new (B15), false = old (B35)",
+                        "name": "b15",
+                        "in": "query"
                     }
                 ],
                 "responses": {

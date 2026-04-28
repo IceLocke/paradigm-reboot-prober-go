@@ -336,6 +336,9 @@ func TestRecordRepository_RecordFilter(t *testing.T) {
 		{"Single difficulty", model.RecordFilter{Difficulties: []model.Difficulty{model.DifficultyMassive}}, 2, 2, 1, 1, 2},
 		{"Multiple difficulties", model.RecordFilter{Difficulties: []model.Difficulty{model.DifficultyMassive, model.DifficultyReboot}}, 3, 3, 1, 2, 3},
 		{"Combined level+difficulty", model.RecordFilter{MinLevel: float64Ptr(13.0), Difficulties: []model.Difficulty{model.DifficultyMassive}}, 2, 2, 1, 1, 2},
+		{"B15 true (new season)", model.RecordFilter{B15: boolPtr(true)}, 2, 2, 0, 2, 2},
+		{"B15 false (old season)", model.RecordFilter{B15: boolPtr(false)}, 3, 3, 3, 0, 3},
+		{"B15 true + difficulty", model.RecordFilter{B15: boolPtr(true), Difficulties: []model.Difficulty{model.DifficultyMassive}}, 1, 1, 0, 1, 1},
 		{"No matches", model.RecordFilter{MinLevel: float64Ptr(20.0)}, 0, 0, 0, 0, 0},
 	}
 

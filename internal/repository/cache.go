@@ -107,5 +107,12 @@ func filterCacheKey(f model.RecordFilter) string {
 		sort.Strings(diffs)
 		parts = append(parts, "diff:"+strings.Join(diffs, ","))
 	}
+	if f.B15 != nil {
+		if *f.B15 {
+			parts = append(parts, "b15:true")
+		} else {
+			parts = append(parts, "b15:false")
+		}
+	}
 	return strings.Join(parts, "_")
 }

@@ -39,8 +39,8 @@ func NewRecordRepository(db *gorm.DB) *RecordRepository {
 	}
 }
 
-// applyRecordFilter applies optional level range and difficulty filters to a GORM query
-// that has Chart joined via Joins("Chart").
+// applyRecordFilter applies optional level range, difficulty, and season (B15) filters
+// to a GORM query that has Chart and Chart.Song joined.
 func applyRecordFilter(query *gorm.DB, filter model.RecordFilter) *gorm.DB {
 	if filter.MinLevel != nil {
 		query = query.Where(`"Chart".level >= ?`, *filter.MinLevel)
@@ -51,11 +51,14 @@ func applyRecordFilter(query *gorm.DB, filter model.RecordFilter) *gorm.DB {
 	if len(filter.Difficulties) > 0 {
 		query = query.Where(`"Chart".difficulty IN ?`, filter.Difficulties)
 	}
+	if filter.B15 != nil {
+		query = query.Where(`"Chart__Song".b15 = ?`, *filter.B15)
+	}
 	return query
 }
 
-// applyCountFilter applies optional level range and difficulty filters to a count query,
-// joining the charts table only when the filter is active.
+// applyCountFilter applies optional level range, difficulty, and season (B15) filters
+// to a count query, joining the charts and songs tables only when needed.
 func applyCountFilter(query *gorm.DB, filter model.RecordFilter, chartIDColumn string) *gorm.DB {
 	if filter.IsEmpty() {
 		return query
@@ -69,6 +72,10 @@ func applyCountFilter(query *gorm.DB, filter model.RecordFilter, chartIDColumn s
 	}
 	if len(filter.Difficulties) > 0 {
 		query = query.Where("charts.difficulty IN ?", filter.Difficulties)
+	}
+	if filter.B15 != nil {
+		query = query.Joins("JOIN songs ON songs.id = charts.song_id").
+			Where("songs.b15 = ?", *filter.B15)
 	}
 	return query
 }
@@ -271,7 +278,7 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter mo
 		Joins("LEFT JOIN best_play_records ON play_records.id = best_play_records.play_record_id").
 		Where("play_records.id IS NULL OR best_play_records.play_record_id IS NOT NULL")
 
-	// Apply filters directly on charts table
+	// Apply filters directly on charts / songs tables
 	if filter.MinLevel != nil {
 		query = query.Where("charts.level >= ?", *filter.MinLevel)
 	}
@@ -280,6 +287,9 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter mo
 	}
 	if len(filter.Difficulties) > 0 {
 		query = query.Where("charts.difficulty IN ?", filter.Difficulties)
+	}
+	if filter.B15 != nil {
+		query = query.Where("songs.b15 = ?", *filter.B15)
 	}
 
 	err := query.Scan(&results).Error
