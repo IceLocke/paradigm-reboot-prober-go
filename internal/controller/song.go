@@ -27,14 +27,23 @@ func NewSongController(songService *service.SongService) *SongController {
 // @Tags song
 // @Produce json
 // @Success 200 {array} model.ChartInfo
+// @Success 304 {string} string "Not Modified"
 // @Failure 500 {object} model.Response
 // @Router /songs [get]
 func (ctrl *SongController) GetAllCharts(c *gin.Context) {
-	charts, err := ctrl.songService.GetAllCharts(c.Request.Context())
+	charts, etag, err := ctrl.songService.GetAllChartsWithETag(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 		return
 	}
+
+	if c.GetHeader("If-None-Match") == etag {
+		c.Status(http.StatusNotModified)
+		return
+	}
+
+	c.Header("ETag", etag)
+	c.Header("Cache-Control", "public, max-age=3600")
 	c.JSON(http.StatusOK, charts)
 }
 

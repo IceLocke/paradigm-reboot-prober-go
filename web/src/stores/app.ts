@@ -12,6 +12,7 @@ interface UploadItem {
 
 interface AppState {
   charts: ChartInfo[] | null
+  chartsETag: string | null
   uploadList: UploadItem[]
   sidebarOpen: boolean
   dismissedVersion: string
@@ -22,6 +23,7 @@ interface AppState {
 export const useAppStore = defineStore('appStore', {
   state: (): AppState => ({
     charts: null,
+    chartsETag: null,
     uploadList: [],
     sidebarOpen: false,
     dismissedVersion: '',
@@ -29,6 +31,6 @@ export const useAppStore = defineStore('appStore', {
     b50ChartIds: null,
   }),
   persist: {
-    paths: ['dismissedVersion', 'songsViewMode'],
+    paths: ['dismissedVersion', 'songsViewMode', 'charts', 'chartsETag'],
   },
 })

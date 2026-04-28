@@ -37,6 +37,21 @@ func TestSongController(t *testing.T) {
 		// Note: GetAllCharts returns []model.ChartInfo, not []model.Song
 		// But for simplicity in test, we just check if it's not empty
 		assert.NotEmpty(t, w.Body.String())
+		assert.NotEmpty(t, w.Header().Get("ETag"))
+		assert.Equal(t, "public, max-age=3600", w.Header().Get("Cache-Control"))
+	})
+
+	t.Run("GetAllCharts 304 Not Modified", func(t *testing.T) {
+		// First request to get the ETag
+		w1 := performRequest(r, "GET", "/songs", nil, nil)
+		assert.Equal(t, http.StatusOK, w1.Code)
+		etag := w1.Header().Get("ETag")
+		assert.NotEmpty(t, etag)
+
+		// Second request with matching If-None-Match
+		w2 := performRequest(r, "GET", "/songs", nil, map[string]string{"If-None-Match": etag})
+		assert.Equal(t, http.StatusNotModified, w2.Code)
+		assert.Empty(t, w2.Body.String())
 	})
 
 	t.Run("GetSingleSongInfo Success", func(t *testing.T) {
