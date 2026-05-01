@@ -10,11 +10,14 @@ import { computed } from 'vue'
 
 const props = defineProps<{
   label: string
-  value: number
+  value: number | string
   precision?: number
 }>()
 
 const displayValue = computed(() => {
+  if (typeof props.value === 'string') {
+    return props.value
+  }
   const p = props.precision ?? 2
   return props.value.toFixed(p)
 })
