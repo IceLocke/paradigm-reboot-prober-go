@@ -43,6 +43,7 @@ import { USE_MOCK } from '@/api/mock'
 import { renderB50Image, type B50Section } from '@/utils/b50Canvas'
 import type { PlayRecordInfo } from '@/api/types'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { formatAvgRating } from '@/utils/rating'
 
 const { t } = useI18n()
 
@@ -51,19 +52,20 @@ const show = defineModel<boolean>('show', { required: true })
 const props = defineProps<{
   username: string
   nickname: string
-  rating: number
+  rating: string
   b15Records: PlayRecordInfo[]
   b35Records: PlayRecordInfo[]
-  b15Avg: number
-  b35Avg: number
+  b15Avg: string
+  b35Avg: string
 }>()
 
 const mode = ref<'standard' | 'overflow' | 'global'>('standard')
 const exporting = ref(false)
 
-function avgRating(records: PlayRecordInfo[]): number {
-  if (records.length === 0) return 0
-  return records.reduce((s, r) => s + r.rating, 0) / (records.length * 100)
+function avgRating(records: PlayRecordInfo[]): string {
+  if (records.length === 0) return formatAvgRating(0, 1)
+  const sum = records.reduce((s, r) => s + r.rating, 0)
+  return formatAvgRating(sum, records.length)
 }
 
 const handleExport = async () => {

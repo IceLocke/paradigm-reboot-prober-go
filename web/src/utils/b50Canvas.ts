@@ -4,12 +4,13 @@
  */
 import type { PlayRecordInfo } from '@/api/types'
 import { coverUrl as coverFullUrl, coverThumbUrl } from '@/utils/cover'
+import { formatRating } from '@/utils/rating'
 
 // ─── Render Options ────────────────────────────────────────────
 
 export interface B50Section {
   label: string
-  avg: number
+  avg: string
   records: PlayRecordInfo[]
   /** Records with index >= cutoff are rendered dimmed (overflow/floor). */
   cutoff?: number
@@ -19,7 +20,7 @@ export interface B50RenderOptions {
   sections: B50Section[]
   username: string
   nickname: string
-  rating: number
+  rating: string
   title?: string
 }
 
@@ -272,16 +273,16 @@ function drawHeader(
   // Right: rating
   ctx.font = `20px ${FONT_MONO}`
   ctx.fillStyle = '#ffffff'
-  ctx.fillText(`Rating: ${options.rating.toFixed(4)}`, rightX, y + 38)
+  ctx.fillText(`Rating: ${options.rating}`, rightX, y + 38)
 }
 
 function drawSectionTitle(
   ctx: CanvasRenderingContext2D,
   centerY: number,
   label: string,
-  avg: number,
+  avg: string,
 ) {
-  const text = `${label} / Avg. ${avg.toFixed(4)}`
+  const text = `${label} / Avg. ${avg}`
   const centerX = CANVAS_WIDTH / 2
 
   ctx.font = `18px ${FONT_SANS}`
@@ -391,7 +392,7 @@ function drawRecordCard(
   // Bottom left: level > rating
   ctx.shadowBlur = 2
   ctx.shadowOffsetY = 1
-  const ratingVal = (record.rating / 100).toFixed(2)
+  const ratingVal = formatRating(record.rating)
   const levelVal = record.chart.level.toFixed(1)
   ctx.font = `bold 14px ${FONT_MONO}`
   ctx.fillStyle = '#ffffff'

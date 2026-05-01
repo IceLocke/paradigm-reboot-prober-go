@@ -114,6 +114,7 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
 import { toastSuccess, toastError } from '@/utils/toast'
+import { formatAvgRating, formatRating } from '@/utils/rating'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
@@ -155,17 +156,17 @@ const b15Records = computed(() =>
 
 const b50Rating = computed(() => {
   const sum = allRecords.value.reduce((s, r) => s + r.rating, 0)
-  return sum / 5000 // integer sum / (100 * 50), precision = 0.0002
+  return formatAvgRating(sum, 50)
 })
 
 const b35Rating = computed(() => {
   const sum = b35Records.value.reduce((s, r) => s + r.rating, 0)
-  return sum / 3500
+  return formatAvgRating(sum, 35)
 })
 
 const b15Rating = computed(() => {
   const sum = b15Records.value.reduce((s, r) => s + r.rating, 0)
-  return sum / 1500
+  return formatAvgRating(sum, 15)
 })
 
 const onAddToCart = (record: PlayRecordInfo) => {
@@ -263,7 +264,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     width: 80,
     sorter: (a, b) => a.rating - b.rating,
     render(row) {
-      return h('span', { class: 'mono' }, (row.rating / 100).toFixed(2))
+      return h('span', { class: 'mono' }, formatRating(row.rating))
     },
   },
   {
