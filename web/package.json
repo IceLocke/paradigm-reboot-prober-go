@@ -1,7 +1,7 @@
 {
   "name": "paradigm-reboot-prober",
   "private": true,
-  "version": "1.0.0",
+  "version": "0.2.3",
   "type": "module",
   "scripts": {
     "prepare": "cd .. && sh scripts/setup-submodules.sh",
