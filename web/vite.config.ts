@@ -2,8 +2,10 @@ import { fileURLToPath, URL } from 'node:url'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
+import { cloudflare } from "@cloudflare/vite-plugin";
 import type { Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+
 
 /** Copies src/sw.js into the build output root as an unprocessed asset. */
 function copyServiceWorker(): Plugin {
@@ -22,6 +24,7 @@ export default defineConfig({
   plugins: [
     vue(),
     copyServiceWorker(),
+    cloudflare()
   ],
   resolve: {
     alias: {

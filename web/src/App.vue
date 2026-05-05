@@ -1,6 +1,4 @@
 <template>
-  <Analytics/>
-  <SpeedInsights />
   <n-config-provider :theme="darkTheme" :theme-overrides="themeOverrides">
     <div :class="['app-layout', { 'app-layout--desktop': isDesktop }]">
       <AppHeader
@@ -39,8 +37,6 @@ import { getMyInfo } from '@/api/user'
 import { getAllCharts } from '@/api/song'
 import { USE_MOCK, getMockCharts, getMockUser } from '@/api/mock'
 import { useBreakpoint } from '@/composables/useBreakpoint'
-import { SpeedInsights } from '@vercel/speed-insights/vue';
-import { Analytics } from "@vercel/analytics/vue"
 
 import AppHeader from '@/components/layout/AppHeader.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
