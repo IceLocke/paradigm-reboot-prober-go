@@ -4,6 +4,7 @@
     preset="card"
     :title="song?.title ?? ''"
     :style="modalStyle"
+    class="song-detail-modal"
     content-style="display: flex; flex-direction: column; overflow: hidden;"
     :bordered="false"
     @update:show="$emit('update:show', $event)"
@@ -132,7 +133,7 @@ watch(() => props.song, async (song) => {
 const modalStyle = computed(() =>
   (isMobile.value
     ? 'width: 95vw; max-width: 90vw;'
-    : 'width: 700px; max-width: 90vw;') +
+    : 'min-width: 700px; width: auto; max-width: 90vw;') +
   'max-height: 90vh;'
 )
 
@@ -156,6 +157,11 @@ const coverUrl = computed(() => {
 }
 @media (max-width: 639px) {
   .detail-grid { flex-direction: column; gap: var(--space-4); }
+  .chart-row-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
 }
 .cover-section {
   flex-shrink: 0;
@@ -259,11 +265,7 @@ const coverUrl = computed(() => {
   color: var(--accent);
   font-weight: 600;
 }
-@media (max-width: 479px) {
-  .chart-designer {
-    flex-basis: 100%;
-  }
-}
+
 .loading-state {
   display: flex;
   justify-content: center;
