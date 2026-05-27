@@ -83,6 +83,23 @@ func (ctrl *SongController) GetSingleSongInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, song)
 }
 
+// GetAllSongs godoc
+// @Summary Get all songs with metadata
+// @Description Retrieve a list of all songs with their charts and metadata
+// @Tags song
+// @Produce json
+// @Success 200 {array} model.Song
+// @Failure 500 {object} model.Response
+// @Router /songs-meta [get]
+func (ctrl *SongController) GetAllSongs(c *gin.Context) {
+	songs, err := ctrl.songService.GetAllSongs(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, songs)
+}
+
 // CreateSong godoc
 // @Summary Create a new song
 // @Description Create a new song with its charts (Admin only)

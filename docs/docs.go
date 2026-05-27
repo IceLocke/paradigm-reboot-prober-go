@@ -454,6 +454,35 @@ const docTemplate = `{
                 }
             }
         },
+        "/songs-meta": {
+            "get": {
+                "description": "Retrieve a list of all songs with their charts and metadata",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "song"
+                ],
+                "summary": "Get all songs with metadata",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/model.Song"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/model.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/songs/{song_id}": {
             "get": {
                 "description": "Retrieve detailed information about a single song by ID",

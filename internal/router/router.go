@@ -86,6 +86,7 @@ func SetupRouter(db *gorm.DB) *gin.Engine {
 		v2.POST("/user/login", middleware.RateLimitMiddleware(LoginEndpointRequestPerMinute, time.Minute), userCtrl.Login)
 		v2.POST("/user/refresh", userCtrl.RefreshToken)
 		v2.GET("/songs", songCtrl.GetAllCharts)
+		v2.GET("/songs-meta", songCtrl.GetAllSongs)
 		v2.GET("/songs/:song_id", songCtrl.GetSingleSongInfo)
 
 		// Routes with optional auth
