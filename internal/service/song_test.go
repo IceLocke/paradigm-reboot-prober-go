@@ -60,6 +60,15 @@ func TestSongService(t *testing.T) {
 		assert.Equal(t, "Test Song", charts[0].Title)
 	})
 
+	t.Run("GetAllSongs", func(t *testing.T) {
+		songs, err := songService.GetAllSongs(ctx)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, songs)
+		assert.Equal(t, "Test Song", songs[0].Title)
+		assert.Len(t, songs[0].Charts, 1)
+		assert.Equal(t, model.DifficultyMassive, songs[0].Charts[0].Difficulty)
+	})
+
 	t.Run("UpdateSong", func(t *testing.T) {
 		song, _ := songService.GetSingleSongByWikiID(ctx, "test_song")
 		req := &request.UpdateSongRequest{
