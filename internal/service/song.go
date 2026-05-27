@@ -114,6 +114,10 @@ func (s *SongService) GetAllChartsWithETag(ctx context.Context) ([]model.ChartIn
 	return charts, etag, nil
 }
 
+func (s *SongService) GetAllSongs(ctx context.Context) ([]model.Song, error) {
+	return s.songRepo.GetAllSongs()
+}
+
 // ResolveSongID parses a song_addr (numeric ID or wiki_id) and returns the song_id.
 // Returns an error if the song doesn't exist.
 func (s *SongService) ResolveSongID(ctx context.Context, songAddr string) (int, error) {

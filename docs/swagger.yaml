@@ -902,6 +902,25 @@ paths:
       summary: Update an existing song
       tags:
       - song
+  /songs-meta:
+    get:
+      description: Retrieve a list of all songs with their charts and metadata
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/model.Song'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.Response'
+      summary: Get all songs with metadata
+      tags:
+      - song
   /songs/{song_id}:
     get:
       description: Retrieve detailed information about a single song by ID
