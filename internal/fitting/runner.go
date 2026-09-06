@@ -16,9 +16,7 @@ import (
 // RunnerConfig bundles the non-Params runtime knobs (things that change
 // *how* the run iterates the DB rather than *what* fitting values come out).
 type RunnerConfig struct {
-	ChartBatchSize int
-	// Deprecated: player skills are aggregated by one database query. Retained
-	// so older callers and configuration files remain source-compatible.
+	ChartBatchSize  int
 	PlayerBatchSize int
 	BatchPause      time.Duration
 }
@@ -38,6 +36,9 @@ type Runner struct {
 func NewRunner(db *gorm.DB, params Params, cfg RunnerConfig) *Runner {
 	if cfg.ChartBatchSize <= 0 {
 		cfg.ChartBatchSize = 200
+	}
+	if cfg.PlayerBatchSize <= 0 {
+		cfg.PlayerBatchSize = 500
 	}
 	return &Runner{db: db, params: params, cfg: cfg, nowFunc: time.Now}
 }
@@ -77,6 +78,7 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 	report.Started = time.Now()
 	slog.InfoContext(ctx, "fitting run starting",
 		"chart_batch_size", r.cfg.ChartBatchSize,
+		"player_batch_size", r.cfg.PlayerBatchSize,
 		"batch_pause_ms", r.cfg.BatchPause.Milliseconds(),
 	)
 	defer func() {

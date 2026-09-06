@@ -77,7 +77,7 @@ type Config struct {
 		ScoreGoodWeight     float64 `yaml:"score_good_weight"`      // score-quality weight at ScoreGoodAt; must be in (0, 1)
 		TukeyK              float64 `yaml:"tukey_k"`                // Tukey biweight tuning constant (usually 4.685)
 		ChartBatchSize      int     `yaml:"chart_batch_size"`       // number of charts processed per DB batch
-		PlayerBatchSize     int     `yaml:"player_batch_size"`      // deprecated compatibility setting; player skills now aggregate in one DB query
+		PlayerBatchSize     int     `yaml:"player_batch_size"`      // number of users fetched per page during skill collection
 		BatchPause          string  `yaml:"batch_pause"`            // Go duration string; sleep between chart batches to ease DB load
 	} `yaml:"fitting"`
 }

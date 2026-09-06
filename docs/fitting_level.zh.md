@@ -330,7 +330,7 @@ $$
 | `fitting.score_good_weight`   | $w_{\text{good}}$     | `0`       | 在 $s_{\text{good}}$ 处的权重值;启用时须在 $(0, 1)$ 内(典型值 `0.6`)。 |
 | `fitting.tukey_k`             | $k$                    | `4.685`   | Tukey 双权调节常数。                                       |
 | `fitting.chart_batch_size`    | —                      | `200`     | 每个数据库批次处理的谱面数(控制单次事务规模)。           |
-| `fitting.player_batch_size`   | —                      | `500`     | 兼容旧配置的废弃项;玩家实力现在由单条数据库聚合查询计算。 |
+| `fitting.player_batch_size`   | —                      | `500`     | 玩家实力分页时每页用户数(键集分页)。                     |
 | `fitting.batch_pause`         | —                      | `50ms`    | 批次之间的暂停时间,用来缓解数据库压力(Go duration)。     |
 
 ## 7. 数据库写入与表结构
@@ -347,8 +347,8 @@ $$
 
 为把对在线查分服务的影响降到最低,我们遵循以下策略:
 
-- 玩家实力由数据库端窗口函数一次完成排名与聚合,只向 Go 返回每位玩家一行的紧凑
-  结果,不再传输全部最佳成绩 rating。
+- 玩家实力以 distinct `username` 为键做**键集分页**(每批 `player_batch_size`),
+  不使用 OFFSET 扫描。
 - 谱面按固定批 `chart_batch_size` 处理,批次间插入 `batch_pause` 短暂休眠。
 - 每批谱面使用一个短事务落库:`charts.fitting_level` 由一条 `CASE` 更新,
   `chart_statistics` 由一条带冲突处理的批量 upsert 写入。

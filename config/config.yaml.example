@@ -80,5 +80,5 @@ fitting:
   score_good_weight: 0      # weight factor at score_good_at; must be in (0, 1) when enabled, else 0
   tukey_k: 4.685            # Tukey biweight tuning constant (outlier trimming)
   chart_batch_size: 200     # charts per DB batch (keep DB load bounded)
-  player_batch_size: 500    # deprecated compatibility setting; ignored by the single-query player-skill aggregation
+  player_batch_size: 500    # users fetched per page during skill collection
   batch_pause: "50ms"       # sleep between chart batches to ease DB load

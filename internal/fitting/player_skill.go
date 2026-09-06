@@ -22,60 +22,111 @@ type PlayerSkill struct {
 	NumRecords int     // total best_play_records count
 }
 
-// collectPlayerSkills builds a username → PlayerSkill map in one database
-// aggregation. A window query ranks each player's records and counts their
-// total pool, then the outer GROUP BY averages only the top-K ratings.
+// collectPlayerSkills builds a username → PlayerSkill map by streaming the
+// entire best_play_records table once, grouped per user in pages. Pagination
+// is keyset-based on username so we never OFFSET over huge tables.
 //
 // We bypass repository caching on purpose: this is the fitting microservice's
-// responsibility, not the probe's. Keeping the ranking in the database also
-// avoids transferring every best-record rating to Go during a cold start; the
-// result set contains only one compact row per player.
+// responsibility, not the probe's, and caching a 50k-entry map would blow the
+// cache TTLs and invalidate logic for the main service.
 func (r *Runner) collectPlayerSkills(ctx context.Context) (map[string]PlayerSkill, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
+	skills := make(map[string]PlayerSkill)
+	batch := r.cfg.PlayerBatchSize
+	if batch <= 0 {
+		batch = 500
 	}
-	topK := r.params.SkillTopK
-	if topK < 1 {
-		topK = 50 // defensive fallback; config validation should keep us out of here
-	}
+	lastUsername := ""
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		// 1. Grab the next page of distinct usernames.
+		var usernames []string
+		q := r.db.WithContext(ctx).
+			Model(&model.BestPlayRecord{}).
+			Distinct("username").
+			Where("username > ?", lastUsername).
+			Order("username ASC").
+			Limit(batch)
+		if err := q.Pluck("username", &usernames).Error; err != nil {
+			return nil, fmt.Errorf("fetch usernames page: %w", err)
+		}
+		if len(usernames) == 0 {
+			break
+		}
 
-	// Both supported databases (PostgreSQL and SQLite) implement these window
-	// functions. The explicit deleted_at predicates mirror GORM's soft-delete
-	// scope because the query deliberately uses Table rather than Model.
-	ranked := r.db.WithContext(ctx).
-		Table("play_records").
-		Select(`play_records.username AS username,
-			play_records.rating AS rating,
-			ROW_NUMBER() OVER (
-				PARTITION BY play_records.username
-				ORDER BY play_records.rating DESC, play_records.id ASC
-			) AS rating_rank,
-			COUNT(*) OVER (PARTITION BY play_records.username) AS total_count`).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
-		Where("play_records.deleted_at IS NULL").
-		Where("best_play_records.deleted_at IS NULL")
+		// 2. Fetch (username, rating) for this page of users, sorted so we can
+		//    group them in a single linear pass.
+		type ratingRow struct {
+			Username string
+			Rating   int
+		}
+		var rows []ratingRow
+		if err := r.db.WithContext(ctx).
+			Table("play_records").
+			Select("play_records.username AS username, play_records.rating AS rating").
+			Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
+			Where("play_records.username IN ?", usernames).
+			Where("play_records.deleted_at IS NULL").
+			Where("best_play_records.deleted_at IS NULL").
+			Order("play_records.username ASC, play_records.rating DESC").
+			Scan(&rows).Error; err != nil {
+			return nil, fmt.Errorf("fetch ratings batch: %w", err)
+		}
 
-	type skillRow struct {
-		Username   string
-		AvgRating  float64
-		NumRecords int
-	}
-	var rows []skillRow
-	if err := r.db.WithContext(ctx).
-		Table("(?) AS ranked", ranked).
-		Select(`username,
-			AVG(CASE WHEN rating_rank <= ? THEN rating END) / 100.0 AS avg_rating,
-			MAX(total_count) AS num_records`, topK).
-		Group("username").
-		Scan(&rows).Error; err != nil {
-		return nil, fmt.Errorf("aggregate player skills: %w", err)
-	}
+		// 3. Linear group-by-user and accumulate skill.
+		topK := r.params.SkillTopK
+		if topK < 1 {
+			topK = 50 // defensive fallback; config validation should keep us out of here
+		}
+		curUser := ""
+		topRatings := make([]int, 0, topK)
+		totalCount := 0
+		flush := func() {
+			if curUser == "" {
+				return
+			}
+			k := topRatings
+			if len(k) > topK {
+				k = k[:topK]
+			}
+			sum := 0
+			for _, v := range k {
+				sum += v
+			}
+			avg := 0.0
+			if len(k) > 0 {
+				avg = float64(sum) / float64(len(k)) / 100.0
+			}
+			skills[curUser] = PlayerSkill{
+				AvgRating:  avg,
+				NumRecords: totalCount,
+			}
+		}
+		for _, row := range rows {
+			if row.Username != curUser {
+				flush()
+				curUser = row.Username
+				topRatings = topRatings[:0]
+				totalCount = 0
+			}
+			totalCount++
+			// topRatings keeps only the top-K (rows are already sorted DESC by rating).
+			if len(topRatings) < topK {
+				topRatings = append(topRatings, row.Rating)
+			}
+		}
+		flush()
 
-	skills := make(map[string]PlayerSkill, len(rows))
-	for _, row := range rows {
-		skills[row.Username] = PlayerSkill{
-			AvgRating:  row.AvgRating,
-			NumRecords: row.NumRecords,
+		lastUsername = usernames[len(usernames)-1]
+
+		// Brief pause to ease DB pressure. Skipped when BatchPause is 0.
+		if r.cfg.BatchPause > 0 {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(r.cfg.BatchPause):
+			}
 		}
 	}
 	return skills, nil

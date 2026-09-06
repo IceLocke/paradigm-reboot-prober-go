@@ -67,9 +67,10 @@ func newTestRunner(db *gorm.DB, cfg RunnerConfig) *Runner {
 	}, cfg)
 }
 
-// TestCollectPlayerSkills_AggregatesEveryUser verifies that the database-side
-// aggregation visits every user exactly once and produces the right averages.
-func TestCollectPlayerSkills_AggregatesEveryUser(t *testing.T) {
+// TestCollectPlayerSkills_MultiPage verifies that with PlayerBatchSize smaller
+// than the total number of users, keyset pagination still visits every user
+// exactly once and produces the right per-user skill averages.
+func TestCollectPlayerSkills_MultiPage(t *testing.T) {
 	db := setupTestDB(t)
 	// Need N charts because best_play_records is UNIQUE(username, chart_id).
 	charts := seedCharts(t, db, 3)
@@ -86,7 +87,7 @@ func TestCollectPlayerSkills_AggregatesEveryUser(t *testing.T) {
 		}
 	}
 
-	r := newTestRunner(db, RunnerConfig{PlayerBatchSize: 4}) // deprecated value is harmless
+	r := newTestRunner(db, RunnerConfig{PlayerBatchSize: 4}) // forces 3 pages
 	skills, err := r.collectPlayerSkills(context.Background())
 	assert.NoError(t, err)
 	assert.Len(t, skills, users, "every user must be visited exactly once")
@@ -164,14 +165,18 @@ func TestCollectPlayerSkills_ConfigurableTopK(t *testing.T) {
 		"smaller K should yield a higher B_p (takes a more selective top slice)")
 }
 
-// TestCollectPlayerSkills_IgnoresDeprecatedBatchSize keeps old RunnerConfig
-// values source-compatible while the implementation uses one query.
-func TestCollectPlayerSkills_IgnoresDeprecatedBatchSize(t *testing.T) {
+// TestCollectPlayerSkills_DefaultBatchSize exercises the `batch <= 0 → 500`
+// fallback when RunnerConfig.PlayerBatchSize is unset. Behaviour must be
+// identical to an explicitly-configured batch.
+func TestCollectPlayerSkills_DefaultBatchSize(t *testing.T) {
 	db := setupTestDB(t)
 	chartID := seedSingleChart(t, db)
 	seedUser(t, db, "solo")
 	seedRatedPlay(t, db, "solo", chartID, 16500, true)
 
+	// NewRunner sets PlayerBatchSize default (500) when cfg value ≤ 0, which
+	// means collectPlayerSkills never hits its own fallback branch. Bypass the
+	// constructor to drive that branch explicitly.
 	r := &Runner{
 		db: db,
 		params: Params{
@@ -179,7 +184,7 @@ func TestCollectPlayerSkills_IgnoresDeprecatedBatchSize(t *testing.T) {
 			PriorStrength: 1, MaxDeviation: 1.5, MinScore: 500000, TukeyK: 4.685,
 			MinPlayerRecords: 1,
 		},
-		cfg: RunnerConfig{PlayerBatchSize: 0},
+		cfg: RunnerConfig{PlayerBatchSize: 0}, // triggers the inner default
 	}
 	skills, err := r.collectPlayerSkills(context.Background())
 	assert.NoError(t, err)
@@ -207,6 +212,32 @@ func TestCollectPlayerSkills_Empty(t *testing.T) {
 	skills, err := r.collectPlayerSkills(context.Background())
 	assert.NoError(t, err)
 	assert.Empty(t, skills)
+}
+
+// TestCollectPlayerSkills_BatchPause verifies that a positive BatchPause sleeps
+// between pages and yields to ctx.Done(). Uses a very short pause so the test
+// stays fast.
+func TestCollectPlayerSkills_BatchPause(t *testing.T) {
+	db := setupTestDB(t)
+	chartID := seedSingleChart(t, db)
+	// Two pages of data so at least one pause fires.
+	for i := 0; i < 6; i++ {
+		u := fmt.Sprintf("u%02d", i)
+		seedUser(t, db, u)
+		seedRatedPlay(t, db, u, chartID, 15000+i*100, true)
+	}
+
+	r := newTestRunner(db, RunnerConfig{
+		PlayerBatchSize: 3,                     // forces at least two pages
+		BatchPause:      10 * time.Millisecond, // brief pause
+	})
+	start := time.Now()
+	skills, err := r.collectPlayerSkills(context.Background())
+	elapsed := time.Since(start)
+	assert.NoError(t, err)
+	assert.Len(t, skills, 6)
+	assert.GreaterOrEqual(t, elapsed, 10*time.Millisecond,
+		"BatchPause must actually delay between pages")
 }
 
 // TestFetchBestSamples_FilterByMinRecords: samples from players with too few
@@ -271,10 +302,10 @@ func TestFetchBestSamples_AgeDaysPopulated(t *testing.T) {
 	seedUser(t, db, "year")
 	seedUser(t, db, "zero")
 
-	seedPlayWithTime(t, db, "fresh", charts[0], 16500, fixedNow)                    // 0d
-	seedPlayWithTime(t, db, "month", charts[1], 16500, fixedNow.AddDate(0, 0, -30)) // 30d
-	seedPlayWithTime(t, db, "year", charts[2], 16500, fixedNow.AddDate(-1, 0, 0))   // 365d
-	seedPlayWithTime(t, db, "zero", charts[3], 16500, time.Time{})                  // unset
+	seedPlayWithTime(t, db, "fresh", charts[0], 16500, fixedNow)                          // 0d
+	seedPlayWithTime(t, db, "month", charts[1], 16500, fixedNow.AddDate(0, 0, -30))       // 30d
+	seedPlayWithTime(t, db, "year", charts[2], 16500, fixedNow.AddDate(-1, 0, 0))         // 365d
+	seedPlayWithTime(t, db, "zero", charts[3], 16500, time.Time{})                        // unset
 
 	r := newTestRunner(db, RunnerConfig{ChartBatchSize: 10})
 	r.nowFunc = func() time.Time { return fixedNow }
