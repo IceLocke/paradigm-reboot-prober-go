@@ -76,7 +76,7 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── fitting/                 # Fitting-level calculator library (used ONLY by cmd/fitting)
 │   │   ├── inverter.go          # Closed-form inverse of pkg/rating.SingleRating
 │   │   ├── calculator.go        # Weighting + robust aggregation + shrinkage + deviation cap
-│   │   ├── player_skill.go      # Per-player B50 mean rating collection (keyset pagination)
+│   │   ├── player_skill.go      # Per-player B50 mean rating collection (database-side window aggregation)
 │   │   └── runner.go            # Orchestrator: load → batch-process charts → persist
 │   ├── logging/                 # Structured logging infrastructure (slog + context)
 │   │   ├── context.go           # AppendCtx helper, context key for slog attrs
@@ -503,7 +503,7 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `fitting.min_score`          | —               | `500000`                          | Discard samples with score below this threshold                            |
 | `fitting.tukey_k`            | —               | `4.685`                           | Tukey biweight tuning constant                                             |
 | `fitting.chart_batch_size`   | —               | `200`                             | Charts processed per DB batch (keeps per-tx footprint small)                |
-| `fitting.player_batch_size`  | —               | `500`                             | Distinct users fetched per paginated skill-collection query                 |
+| `fitting.player_batch_size`  | —               | `500`                             | Deprecated compatibility setting; ignored by single-query skill aggregation |
 | `fitting.batch_pause`        | `FITTING_BATCH_PAUSE` | `50ms`                     | Sleep between chart batches to ease DB load (Go duration string)           |
 
 **Startup guard**: The server will `log.Fatal` if `secret_key` is left at the default `"your_secret_key_here"`, or if `jwt_expiration`/`username_pattern` cannot be parsed, or if `bcrypt_cost` is out of range, or if `logging.output` is not one of `stdout`/`stderr`/`file`, or if `logging.output=file` but `logging.file` is empty, or if `logging.format` is not `text` or `json`, or if `metrics.enabled=true` and any of `metrics.addr` is empty / `metrics.path` does not start with `/` / `metrics.addr` equals `server.port`, or if `fitting.interval`/`fitting.batch_pause` cannot be parsed as durations, or if `fitting.interval` is non-positive, or if `fitting.proximity_sigma`/`fitting.tukey_k` is non-positive, or if `fitting.prior_strength`/`fitting.max_deviation`/`fitting.deviation_penalty`/`fitting.high_skill_sigma_ratio`/`fitting.max_deviation_low` is negative, or if `fitting.max_deviation_low > 0` and any of (`max_deviation_low > max_deviation`, `max_deviation_low_at ≤ 0`, `max_deviation_high_at ≤ max_deviation_low_at`), or if `fitting.chart_batch_size`/`fitting.player_batch_size` is non-positive.

@@ -47,3 +47,6 @@ web/style-samples/*
 .playwright-mcp/*
 
 **/config.yaml
+
+# Local production dumps and analysis inputs
+data/

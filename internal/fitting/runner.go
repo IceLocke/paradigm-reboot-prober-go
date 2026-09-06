@@ -2,20 +2,23 @@ package fitting
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"paradigm-reboot-prober-go/internal/model"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // RunnerConfig bundles the non-Params runtime knobs (things that change
 // *how* the run iterates the DB rather than *what* fitting values come out).
 type RunnerConfig struct {
-	ChartBatchSize  int
+	ChartBatchSize int
+	// Deprecated: player skills are aggregated by one database query. Retained
+	// so older callers and configuration files remain source-compatible.
 	PlayerBatchSize int
 	BatchPause      time.Duration
 }
@@ -35,9 +38,6 @@ type Runner struct {
 func NewRunner(db *gorm.DB, params Params, cfg RunnerConfig) *Runner {
 	if cfg.ChartBatchSize <= 0 {
 		cfg.ChartBatchSize = 200
-	}
-	if cfg.PlayerBatchSize <= 0 {
-		cfg.PlayerBatchSize = 500
 	}
 	return &Runner{db: db, params: params, cfg: cfg, nowFunc: time.Now}
 }
@@ -77,7 +77,6 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 	report.Started = time.Now()
 	slog.InfoContext(ctx, "fitting run starting",
 		"chart_batch_size", r.cfg.ChartBatchSize,
-		"player_batch_size", r.cfg.PlayerBatchSize,
 		"batch_pause_ms", r.cfg.BatchPause.Milliseconds(),
 	)
 	defer func() {
@@ -141,6 +140,7 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 			continue
 		}
 
+		persistItems := make([]persistItem, 0, len(batch))
 		for _, c := range batch {
 			if err := ctx.Err(); err != nil {
 				return report, err
@@ -156,11 +156,13 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 				report.ChartsPublished++
 			}
 
-			if err := r.persist(ctx, c.ID, c.Level, res); err != nil {
-				slog.ErrorContext(ctx, "persist fitting result failed",
-					"chart_id", c.ID, "err", err)
-				report.ErrorsEncountered++
-			}
+			persistItems = append(persistItems, persistItem{chartID: c.ID, officialLevel: c.Level, result: res})
+		}
+
+		if err := r.persistBatch(ctx, persistItems); err != nil {
+			slog.ErrorContext(ctx, "persist fitting batch failed",
+				"batch_start", start, "batch_size", len(persistItems), "err", err)
+			report.ErrorsEncountered += len(persistItems)
 		}
 
 		if r.cfg.BatchPause > 0 && end < len(charts) {
@@ -175,60 +177,70 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 	return report, nil
 }
 
-// persist writes charts.fitting_level and upserts chart_statistics. It runs
-// inside a short per-chart transaction so a long run does not hold large
-// locks; the main probe server keeps serving live queries.
-func (r *Runner) persist(ctx context.Context, chartID int, officialLevel float64, res Result) error {
+type persistItem struct {
+	chartID       int
+	officialLevel float64
+	result        Result
+}
+
+// persistBatch writes one computed chart batch in a short transaction. The
+// CASE update and conflict-aware statistics insert reduce a cold start from
+// several statements per chart to two statements per batch, which matters
+// much more than local query time when the analytical binary and PostgreSQL
+// are on different hosts.
+func (r *Runner) persistBatch(ctx context.Context, items []persistItem) error {
+	if len(items) == 0 {
+		return nil
+	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 1. Update charts.fitting_level. A nil FittingLevel persists NULL,
-		//    explicitly signalling "abstained" to downstream consumers.
+		ids := make([]int, 0, len(items))
+		caseArgs := make([]any, 0, len(items)*2)
+		var caseSQL strings.Builder
+		caseSQL.WriteString("CASE id")
+		for _, item := range items {
+			ids = append(ids, item.chartID)
+			caseSQL.WriteString(" WHEN ? THEN ?")
+			caseArgs = append(caseArgs, item.chartID)
+			if item.result.FittingLevel == nil {
+				caseArgs = append(caseArgs, nil)
+			} else {
+				caseArgs = append(caseArgs, *item.result.FittingLevel)
+			}
+		}
+		caseSQL.WriteString(" ELSE fitting_level END")
 		if err := tx.Model(&model.Chart{}).
-			Where("id = ?", chartID).
-			Update("fitting_level", res.FittingLevel).Error; err != nil {
-			return fmt.Errorf("update chart %d: %w", chartID, err)
+			Where("id IN ?", ids).
+			UpdateColumn("fitting_level", gorm.Expr(caseSQL.String(), caseArgs...)).Error; err != nil {
+			return fmt.Errorf("update fitting-level batch: %w", err)
 		}
 
-		// 2. Upsert chart_statistics. We use two-step read-modify-write so the
-		//    logic is identical across SQLite and PostgreSQL (no Clauses/
-		//    OnConflict syntax divergence). Contention is irrelevant here —
-		//    only the fitting binary writes this table.
 		now := time.Now()
-		stat := model.ChartStatistic{
-			ChartID:             chartID,
-			OfficialLevel:       officialLevel,
-			FittingLevel:        res.FittingLevel,
-			SampleCount:         res.SampleCount,
-			EffectiveSampleSize: res.EffectiveSampleSize,
-			WeightedMean:        res.WeightedMean,
-			WeightedMedian:      res.WeightedMedian,
-			StdDev:              res.StdDev,
-			MAD:                 res.MAD,
-			LastComputedAt:      now,
+		stats := make([]model.ChartStatistic, 0, len(items))
+		for _, item := range items {
+			res := item.result
+			stats = append(stats, model.ChartStatistic{
+				ChartID:             item.chartID,
+				OfficialLevel:       item.officialLevel,
+				FittingLevel:        res.FittingLevel,
+				SampleCount:         res.SampleCount,
+				EffectiveSampleSize: res.EffectiveSampleSize,
+				WeightedMean:        res.WeightedMean,
+				WeightedMedian:      res.WeightedMedian,
+				StdDev:              res.StdDev,
+				MAD:                 res.MAD,
+				LastComputedAt:      now,
+			})
 		}
-		var existing model.ChartStatistic
-		err := tx.Where("chart_id = ?", chartID).First(&existing).Error
-		switch {
-		case err == nil:
-			stat.CreatedAt = existing.CreatedAt // preserve initial observation time
-			if err := tx.Model(&existing).Updates(map[string]interface{}{
-				"official_level":        stat.OfficialLevel,
-				"fitting_level":         stat.FittingLevel,
-				"sample_count":          stat.SampleCount,
-				"effective_sample_size": stat.EffectiveSampleSize,
-				"weighted_mean":         stat.WeightedMean,
-				"weighted_median":       stat.WeightedMedian,
-				"std_dev":               stat.StdDev,
-				"mad":                   stat.MAD,
-				"last_computed_at":      stat.LastComputedAt,
-			}).Error; err != nil {
-				return fmt.Errorf("update chart_statistics %d: %w", chartID, err)
-			}
-		case errors.Is(err, gorm.ErrRecordNotFound):
-			if err := tx.Create(&stat).Error; err != nil {
-				return fmt.Errorf("insert chart_statistics %d: %w", chartID, err)
-			}
-		default:
-			return fmt.Errorf("read chart_statistics %d: %w", chartID, err)
+		updateColumns := []string{
+			"official_level", "fitting_level", "sample_count",
+			"effective_sample_size", "weighted_mean", "weighted_median",
+			"std_dev", "mad", "last_computed_at", "updated_at",
+		}
+		if err := tx.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "chart_id"}},
+			DoUpdates: clause.AssignmentColumns(updateColumns),
+		}).Create(&stats).Error; err != nil {
+			return fmt.Errorf("upsert chart-statistics batch: %w", err)
 		}
 		return nil
 	})

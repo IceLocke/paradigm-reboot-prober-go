@@ -459,7 +459,7 @@ for each chart c with official level L_c:
 | `fitting.score_good_weight`     | $w_{\text{good}}$      | `0`       | Weight at $s_{\text{good}}$; must lie in $(0, 1)$ when enabled (typical `0.6`).        |
 | `fitting.tukey_k`               | $k$                    | `4.685`   | Biweight tuning constant.                                                              |
 | `fitting.chart_batch_size`      | —                      | `200`     | Charts processed per DB batch.                                                         |
-| `fitting.player_batch_size`     | —                      | `500`     | Users fetched per page.                                                                |
+| `fitting.player_batch_size`     | —                      | `500`     | Deprecated compatibility setting; player skills now use one database aggregation.      |
 | `fitting.batch_pause`           | —                      | `50ms`    | Sleep between batches (DB load relief).                                                |
 
 ## 7. Database impact and schema
@@ -477,11 +477,14 @@ The calculator writes:
 
 To minimize impact on the live probe service:
 
-- Player skills are built with **keyset pagination** over distinct
-  `username`s (batch size `player_batch_size`), never OFFSET-scanning.
+- Player skills are ranked and averaged in one database-side window
+  aggregation, returning one compact row per player instead of transferring
+  every best-record rating to Go.
 - Charts are processed in fixed-size batches (`chart_batch_size`); a short
   `batch_pause` separates batches.
-- Each chart's write is its own short transaction — long locks never form.
+- Each chart batch is persisted in one short transaction: one `CASE` update
+  for `charts.fitting_level` and one conflict-aware bulk upsert for
+  `chart_statistics`.
 - The probe server's caches are not invalidated; they refresh naturally via
   TTL after the next upload touches the user.
 
