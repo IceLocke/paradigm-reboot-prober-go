@@ -9,6 +9,7 @@ import (
 
 	"paradigm-reboot-prober-go/internal/model"
 
+	"github.com/samber/lo"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -186,7 +187,7 @@ type persistItem struct {
 }
 
 // persistBatch writes one computed chart batch in a short transaction. The
-// CASE update and conflict-aware statistics insert reduce a cold start from
+// VALUES update and conflict-aware statistics insert reduce a cold start from
 // several statements per chart to two statements per batch, which matters
 // much more than local query time when the analytical binary and PostgreSQL
 // are on different hosts.
@@ -195,32 +196,35 @@ func (r *Runner) persistBatch(ctx context.Context, items []persistItem) error {
 		return nil
 	}
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		ids := make([]int, 0, len(items))
-		caseArgs := make([]any, 0, len(items)*2)
-		var caseSQL strings.Builder
-		caseSQL.WriteString("CASE id")
-		for _, item := range items {
-			ids = append(ids, item.chartID)
-			caseSQL.WriteString(" WHEN ? THEN ?")
-			caseArgs = append(caseArgs, item.chartID)
+		// Portable across PostgreSQL and SQLite: both name the columns of a
+		// bare VALUES derived table column1/column2 (column-alias lists like
+		// `AS v(id, fitting_level)` are PostgreSQL-only), and the CASTs give
+		// PostgreSQL's parameter-type inference the column types the bare
+		// VALUES list cannot (no-op under SQLite's dynamic typing).
+		var updateSQL strings.Builder
+		updateSQL.WriteString("UPDATE charts SET fitting_level = v.column2 FROM (VALUES ")
+		valueArgs := make([]any, 0, len(items)*2)
+		for i, item := range items {
+			if i > 0 {
+				updateSQL.WriteString(", ")
+			}
+			updateSQL.WriteString("(CAST(? AS bigint), CAST(? AS double precision))")
+			valueArgs = append(valueArgs, item.chartID)
 			if item.result.FittingLevel == nil {
-				caseArgs = append(caseArgs, nil)
+				valueArgs = append(valueArgs, nil)
 			} else {
-				caseArgs = append(caseArgs, *item.result.FittingLevel)
+				valueArgs = append(valueArgs, *item.result.FittingLevel)
 			}
 		}
-		caseSQL.WriteString(" ELSE fitting_level END")
-		if err := tx.Model(&model.Chart{}).
-			Where("id IN ?", ids).
-			UpdateColumn("fitting_level", gorm.Expr(caseSQL.String(), caseArgs...)).Error; err != nil {
+		updateSQL.WriteString(") AS v WHERE charts.id = v.column1")
+		if err := tx.Exec(updateSQL.String(), valueArgs...).Error; err != nil {
 			return fmt.Errorf("update fitting-level batch: %w", err)
 		}
 
 		now := time.Now()
-		stats := make([]model.ChartStatistic, 0, len(items))
-		for _, item := range items {
+		stats := lo.Map(items, func(item persistItem, _ int) model.ChartStatistic {
 			res := item.result
-			stats = append(stats, model.ChartStatistic{
+			return model.ChartStatistic{
 				ChartID:             item.chartID,
 				OfficialLevel:       item.officialLevel,
 				FittingLevel:        res.FittingLevel,
@@ -231,8 +235,8 @@ func (r *Runner) persistBatch(ctx context.Context, items []persistItem) error {
 				StdDev:              res.StdDev,
 				MAD:                 res.MAD,
 				LastComputedAt:      now,
-			})
-		}
+			}
+		})
 		updateColumns := []string{
 			"official_level", "fitting_level", "sample_count",
 			"effective_sample_size", "weighted_mean", "weighted_median",

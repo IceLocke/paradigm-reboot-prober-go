@@ -312,6 +312,234 @@ func TestRunner_PersistUpdatesExistingStat(t *testing.T) {
 		"LastComputedAt should be >= first run's")
 }
 
+// TestRunner_PersistBatchMixedFittingLevels is a focused unit test for
+// persistBatch's CASE-expression branches (runner.go: `CASE id WHEN ? THEN ?`).
+// One batch mixes a published result (non-nil FittingLevel) with empty and
+// abstained results (nil FittingLevel), and both nil charts carry a *stale*
+// fitting_level left by a previous run. The statement must write the
+// dereferenced value for the published chart and NULL for the other two —
+// including overwriting their stale non-null values, since the ELSE arm only
+// protects rows absent from the batch, never nil results within it.
+func TestRunner_PersistBatchMixedFittingLevels(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	song := model.Song{SongBase: model.SongBase{
+		WikiID: "mixed_song", Title: "Mixed", Artist: "A", Genre: "G", Cover: "c",
+		Illustrator: "I", Version: "V", Album: "Al", BPM: "100", Length: "1:00",
+	}}
+	if err := db.Create(&song).Error; err != nil {
+		t.Fatalf("create song: %v", err)
+	}
+	emptyChart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyDetected, Level: 14.0, Notes: 800}
+	publishedChart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyInvaded, Level: 16.5, Notes: 1000}
+	abstainedChart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyMassive, Level: 15.0, Notes: 900}
+	for _, c := range []*model.Chart{&emptyChart, &publishedChart, &abstainedChart} {
+		if err := db.Create(c).Error; err != nil {
+			t.Fatalf("create chart: %v", err)
+		}
+	}
+
+	// Simulate a previous run that published values on the two charts which
+	// now abstain — the nil branch must reset them to NULL.
+	stale := 13.5
+	if err := db.Model(&model.Chart{}).
+		Where("id IN ?", []int{emptyChart.ID, abstainedChart.ID}).
+		UpdateColumn("fitting_level", stale).Error; err != nil {
+		t.Fatalf("seed stale fitting_level: %v", err)
+	}
+
+	fit := 15.72
+	runner := NewRunner(db, Params{}, RunnerConfig{}) // persistBatch ignores params
+	items := []persistItem{
+		// nil first, published in the middle, nil last — so the non-nil arg
+		// sits between two NULL args inside the CASE list.
+		{chartID: emptyChart.ID, officialLevel: emptyChart.Level, result: Result{}},
+		{chartID: publishedChart.ID, officialLevel: publishedChart.Level,
+			result: Result{
+				FittingLevel:        &fit,
+				SampleCount:         42,
+				EffectiveSampleSize: 30.5,
+				WeightedMean:        15.68,
+				WeightedMedian:      15.70,
+				StdDev:              0.21,
+				MAD:                 0.11,
+			}},
+		{chartID: abstainedChart.ID, officialLevel: abstainedChart.Level,
+			result: Result{SampleCount: 2, EffectiveSampleSize: 1.9, WeightedMean: 14.9, WeightedMedian: 14.9}},
+	}
+	if err := runner.persistBatch(ctx, items); err != nil {
+		t.Fatalf("persistBatch: %v", err)
+	}
+
+	// --- charts.fitting_level: value vs NULL, stale values overwritten ---
+	var charts []model.Chart
+	if err := db.Order("id ASC").Find(&charts).Error; err != nil {
+		t.Fatalf("reload charts: %v", err)
+	}
+	if !assert.Len(t, charts, 3) {
+		return
+	}
+	byID := make(map[int]model.Chart, len(charts))
+	for _, c := range charts {
+		byID[c.ID] = c
+	}
+	assert.Nil(t, byID[emptyChart.ID].FittingLevel,
+		"empty chart: stale non-null fitting_level must be overwritten with NULL")
+	assert.Nil(t, byID[abstainedChart.ID].FittingLevel,
+		"abstained chart: stale non-null fitting_level must be overwritten with NULL")
+	if got := byID[publishedChart.ID].FittingLevel; assert.NotNil(t, got, "published chart must keep a non-null value") {
+		assert.InDelta(t, fit, *got, 1e-9)
+	}
+
+	// --- chart_statistics mirrors the same nil/non-nil split ---
+	var stats []model.ChartStatistic
+	if err := db.Order("chart_id ASC").Find(&stats).Error; err != nil {
+		t.Fatalf("reload stats: %v", err)
+	}
+	if !assert.Len(t, stats, 3, "one stats row per chart") {
+		return
+	}
+	statByID := make(map[int]model.ChartStatistic, len(stats))
+	for _, s := range stats {
+		statByID[s.ChartID] = s
+	}
+	assert.Nil(t, statByID[emptyChart.ID].FittingLevel)
+	assert.Equal(t, 0, statByID[emptyChart.ID].SampleCount)
+
+	assert.Nil(t, statByID[abstainedChart.ID].FittingLevel)
+	assert.Equal(t, 2, statByID[abstainedChart.ID].SampleCount,
+		"abstained chart keeps its insufficient-sample stats for post-hoc analysis")
+	assert.InDelta(t, 1.9, statByID[abstainedChart.ID].EffectiveSampleSize, 1e-9)
+	assert.False(t, statByID[abstainedChart.ID].LastComputedAt.IsZero())
+
+	pubStat := statByID[publishedChart.ID]
+	if assert.NotNil(t, pubStat.FittingLevel) {
+		assert.InDelta(t, fit, *pubStat.FittingLevel, 1e-9)
+	}
+	assert.Equal(t, publishedChart.Level, pubStat.OfficialLevel)
+	assert.Equal(t, 42, pubStat.SampleCount)
+	assert.InDelta(t, 30.5, pubStat.EffectiveSampleSize, 1e-9)
+}
+
+// TestRunner_MixedBatchPublishEmptyAbstain drives a full Run() whose single
+// chart batch contains all three outcome kinds — one chart publishes, one has
+// no records (empty), one has too few effective samples (abstains). The point
+// is persistBatch's CASE update receiving BOTH nil and non-nil args in the
+// same statement: the two nil charts start with stale fitting_level values
+// from a previous run and must end up NULL while the published chart gets its
+// fresh value — all in one UPDATE.
+func TestRunner_MixedBatchPublishEmptyAbstain(t *testing.T) {
+	db := setupTestDB(t)
+	ctx := context.Background()
+
+	song := model.Song{SongBase: model.SongBase{
+		WikiID: "batch_song", Title: "Batch", Artist: "A", Genre: "G", Cover: "c",
+		Illustrator: "I", Version: "V", Album: "Al", BPM: "100", Length: "1:00",
+	}}
+	if err := db.Create(&song).Error; err != nil {
+		t.Fatalf("create song: %v", err)
+	}
+	publishedChart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyMassive, Level: 16.5, Notes: 1000}
+	emptyChart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyInvaded, Level: 14.0, Notes: 800}
+	abstainedChart := model.Chart{SongID: song.ID, Difficulty: model.DifficultyDetected, Level: 15.0, Notes: 900}
+	for _, c := range []*model.Chart{&publishedChart, &emptyChart, &abstainedChart} {
+		if err := db.Create(c).Error; err != nil {
+			t.Fatalf("create chart: %v", err)
+		}
+	}
+
+	// Stale published values left by a hypothetical earlier run — the empty
+	// and abstained charts must have them reset to NULL by this run.
+	if err := db.Model(&model.Chart{}).
+		Where("id IN ?", []int{emptyChart.ID, abstainedChart.ID}).
+		UpdateColumn("fitting_level", 13.5).Error; err != nil {
+		t.Fatalf("seed stale fitting_level: %v", err)
+	}
+
+	// Published chart: 10 players whose single best record brackets a true
+	// level of 15.5 (skill equals the record's own rating). The rating is
+	// computed against the *true* level so the stored rating matches `skill`.
+	const trueLevel = 15.5
+	for i := 0; i < 10; i++ {
+		u := fmt.Sprintf("pub%02d", i)
+		seedUser(t, db, u)
+		skill := 155.0 + float64(i)*0.25
+		seedBestRecord(t, db, u, publishedChart.ID, simulateScore(trueLevel, skill), trueLevel)
+	}
+	// Abstained chart: only 2 valid samples → N_eff ≈ 2 < MinEffectiveSamples,
+	// so ComputeFitting returns a nil FittingLevel with non-zero sample stats.
+	for i := 0; i < 2; i++ {
+		u := fmt.Sprintf("abs%02d", i)
+		seedUser(t, db, u)
+		seedBestRecord(t, db, u, abstainedChart.ID,
+			simulateScore(15.0, 150.0+float64(i)*0.5), abstainedChart.Level)
+	}
+	// emptyChart deliberately gets nothing at all.
+
+	runner := NewRunner(db, Params{
+		MinEffectiveSamples: 3.0,
+		SkillTopK:           50,
+		ProximitySigma:      20.0,
+		VolumeFullAt:        5,
+		PriorStrength:       1.0,
+		MaxDeviation:        1.5,
+		MinScore:            500000,
+		TukeyK:              4.685,
+		MinPlayerRecords:    1,
+	}, RunnerConfig{ChartBatchSize: 10, PlayerBatchSize: 50}) // one batch holds all 3 charts
+	report, err := runner.Run(ctx)
+	if err != nil {
+		t.Fatalf("run: %v", err)
+	}
+
+	assert.Equal(t, 12, report.PlayersConsidered)
+	assert.Equal(t, 3, report.ChartsTotal)
+	assert.Equal(t, 3, report.ChartsProcessed)
+	assert.Equal(t, 1, report.ChartsPublished)
+	assert.Equal(t, 1, report.ChartsEmpty)
+	assert.Equal(t, 1, report.ChartsAbstained)
+	assert.Equal(t, 0, report.ErrorsEncountered)
+
+	// --- charts.fitting_level: one non-null, two NULL (stale overwritten) ---
+	var charts []model.Chart
+	if err := db.Order("id ASC").Find(&charts).Error; err != nil {
+		t.Fatalf("reload charts: %v", err)
+	}
+	byID := make(map[int]model.Chart, len(charts))
+	for _, c := range charts {
+		byID[c.ID] = c
+	}
+	assert.Nil(t, byID[emptyChart.ID].FittingLevel, "empty chart must end NULL despite stale value")
+	assert.Nil(t, byID[abstainedChart.ID].FittingLevel, "abstained chart must end NULL despite stale value")
+	pubFit := byID[publishedChart.ID].FittingLevel
+	if assert.NotNil(t, pubFit, "published chart must have a non-null fitting_level") {
+		assert.InDelta(t, trueLevel, *pubFit, 0.8)
+		assert.Less(t, *pubFit, byID[publishedChart.ID].Level)
+	}
+
+	// --- stats rows mirror the same split ---
+	var stats []model.ChartStatistic
+	if err := db.Order("chart_id ASC").Find(&stats).Error; err != nil {
+		t.Fatalf("reload stats: %v", err)
+	}
+	if !assert.Len(t, stats, 3) {
+		return
+	}
+	statByID := make(map[int]model.ChartStatistic, len(stats))
+	for _, s := range stats {
+		statByID[s.ChartID] = s
+	}
+	assert.Nil(t, statByID[emptyChart.ID].FittingLevel)
+	assert.Equal(t, 0, statByID[emptyChart.ID].SampleCount)
+	assert.Nil(t, statByID[abstainedChart.ID].FittingLevel)
+	assert.Equal(t, 2, statByID[abstainedChart.ID].SampleCount)
+	if statFit := statByID[publishedChart.ID].FittingLevel; assert.NotNil(t, statFit) {
+		assert.InDelta(t, *pubFit, *statFit, 1e-9,
+			"chart_statistics.fitting_level must mirror charts.fitting_level")
+	}
+}
+
 // seedBestRecord inserts one PlayRecord + one BestPlayRecord pointing at it,
 // with a rating precomputed via SingleRating so skill computation works.
 func seedBestRecord(t *testing.T, db *gorm.DB, username string, chartID int, score int, level float64) {

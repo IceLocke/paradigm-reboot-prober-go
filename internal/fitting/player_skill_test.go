@@ -302,10 +302,10 @@ func TestFetchBestSamples_AgeDaysPopulated(t *testing.T) {
 	seedUser(t, db, "year")
 	seedUser(t, db, "zero")
 
-	seedPlayWithTime(t, db, "fresh", charts[0], 16500, fixedNow)                          // 0d
-	seedPlayWithTime(t, db, "month", charts[1], 16500, fixedNow.AddDate(0, 0, -30))       // 30d
-	seedPlayWithTime(t, db, "year", charts[2], 16500, fixedNow.AddDate(-1, 0, 0))         // 365d
-	seedPlayWithTime(t, db, "zero", charts[3], 16500, time.Time{})                        // unset
+	seedPlayWithTime(t, db, "fresh", charts[0], 16500, fixedNow)                    // 0d
+	seedPlayWithTime(t, db, "month", charts[1], 16500, fixedNow.AddDate(0, 0, -30)) // 30d
+	seedPlayWithTime(t, db, "year", charts[2], 16500, fixedNow.AddDate(-1, 0, 0))   // 365d
+	seedPlayWithTime(t, db, "zero", charts[3], 16500, time.Time{})                  // unset
 
 	r := newTestRunner(db, RunnerConfig{ChartBatchSize: 10})
 	r.nowFunc = func() time.Time { return fixedNow }
