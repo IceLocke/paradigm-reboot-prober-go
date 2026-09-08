@@ -61,9 +61,12 @@ func main() {
 		return
 	}
 
-	// Build DSN
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
-		dbConfig.Host, dbConfig.User, dbConfig.Password, dbConfig.DBName, dbConfig.Port, dbConfig.SSLMode)
+	// Build DSN. Mirror internal/util/database.go: always single-quote the password
+	// and escape embedded quotes/backslashes per libpq rules, so an empty password
+	// cannot swallow the next keyword and special characters survive parsing.
+	escapedPassword := strings.ReplaceAll(strings.ReplaceAll(dbConfig.Password, `\`, `\\`), `'`, `\'`)
+	dsn := fmt.Sprintf("host=%s user=%s password='%s' dbname=%s port=%d sslmode=%s",
+		dbConfig.Host, dbConfig.User, escapedPassword, dbConfig.DBName, dbConfig.Port, dbConfig.SSLMode)
 
 	// Connect to database
 	db, err := sql.Open("pgx", dsn)

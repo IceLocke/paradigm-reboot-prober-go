@@ -69,8 +69,8 @@ type RunReport struct {
 
 // Run executes one pass: build player-skill cache → iterate charts in
 // batches → compute & persist fitting levels + statistics. Any context
-// cancellation aborts promptly; partial progress stays persisted (updates
-// are committed per-chart, not per-batch).
+// cancellation aborts promptly; partial progress stays persisted (each
+// completed batch is committed before the run moves on).
 //
 // Named returns so the deferred finalizer can inspect err and emit a
 // per-outcome log line (errors → ERROR, otherwise INFO), plus unconditionally
@@ -201,23 +201,20 @@ func (r *Runner) persistBatch(ctx context.Context, items []persistItem) error {
 		// `AS v(id, fitting_level)` are PostgreSQL-only), and the CASTs give
 		// PostgreSQL's parameter-type inference the column types the bare
 		// VALUES list cannot (no-op under SQLite's dynamic typing).
-		var updateSQL strings.Builder
-		updateSQL.WriteString("UPDATE charts SET fitting_level = v.column2 FROM (VALUES ")
-		valueArgs := make([]any, 0, len(items)*2)
+		placeholders := make([]string, len(items))
+		args := make([]any, 0, len(items)*2)
 		for i, item := range items {
-			if i > 0 {
-				updateSQL.WriteString(", ")
+			placeholders[i] = "(CAST(? AS bigint), CAST(? AS double precision))"
+			var level any
+			if item.result.FittingLevel != nil {
+				level = *item.result.FittingLevel
 			}
-			updateSQL.WriteString("(CAST(? AS bigint), CAST(? AS double precision))")
-			valueArgs = append(valueArgs, item.chartID)
-			if item.result.FittingLevel == nil {
-				valueArgs = append(valueArgs, nil)
-			} else {
-				valueArgs = append(valueArgs, *item.result.FittingLevel)
-			}
+			args = append(args, item.chartID, level)
 		}
-		updateSQL.WriteString(") AS v WHERE charts.id = v.column1")
-		if err := tx.Exec(updateSQL.String(), valueArgs...).Error; err != nil {
+		updateSQL := fmt.Sprintf(
+			"UPDATE charts SET fitting_level = v.column2 FROM (VALUES %s) AS v WHERE charts.id = v.column1 AND charts.deleted_at IS NULL",
+			strings.Join(placeholders, ","))
+		if err := tx.Exec(updateSQL, args...).Error; err != nil {
 			return fmt.Errorf("update fitting-level batch: %w", err)
 		}
 

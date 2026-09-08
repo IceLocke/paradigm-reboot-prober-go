@@ -1,6 +1,8 @@
 package config
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -258,6 +260,13 @@ func LoadConfig(configPath string) {
 	if v := os.Getenv("FITTING_BATCH_PAUSE"); v != "" {
 		GlobalConfig.Fitting.BatchPause = v
 	}
+
+	// Fail fast on database misconfiguration before anything downstream builds
+	// a connection string from it.
+	if err := GlobalConfig.Validate(); err != nil {
+		log.Fatalf("Invalid configuration: %v", err)
+	}
+
 	// Re-parse derived values after file/env overrides
 	JWTExpirationDuration, err = time.ParseDuration(GlobalConfig.Auth.JWTExpiration)
 	if err != nil {
@@ -400,4 +409,53 @@ func LoadConfig(configPath string) {
 	if GlobalConfig.Fitting.PlayerBatchSize <= 0 {
 		log.Fatalf("fitting.player_batch_size must be > 0, got %d", GlobalConfig.Fitting.PlayerBatchSize)
 	}
+}
+
+// Validate reports configuration problems that would otherwise only surface as
+// confusing runtime failures (e.g. a mis-parsed or mis-targeted database DSN),
+// so the caller can fail fast at startup. It covers the database section; the
+// remaining sections are validated inline in LoadConfig.
+func (c *Config) Validate() error {
+	switch c.Database.Type {
+	case "sqlite":
+		if strings.TrimSpace(c.Database.DSN) == "" {
+			return errors.New(`database.dsn must be set when database.type is "sqlite"`)
+		}
+	case "postgres":
+		// host/user/dbname are interpolated into the keyword/value DSN unquoted,
+		// so whitespace, quotes, or backslashes would corrupt it. The password is
+		// exempt: it is single-quoted and escaped per libpq rules when the DSN
+		// is built (see internal/util/database.go), so any value is safe there.
+		for _, field := range []struct{ name, value string }{
+			{"database.host", c.Database.Host},
+			{"database.user", c.Database.User},
+			{"database.dbname", c.Database.DBName},
+		} {
+			if strings.TrimSpace(field.value) == "" {
+				return fmt.Errorf("%s must be set when database.type is %q", field.name, c.Database.Type)
+			}
+			if strings.ContainsAny(field.value, " \t\n\r'\\") {
+				return fmt.Errorf("%s must not contain whitespace, quotes, or backslashes: %q", field.name, field.value)
+			}
+		}
+		if c.Database.Port < 1 || c.Database.Port > 65535 {
+			return fmt.Errorf("database.port must be in 1-65535 when database.type is %q, got %d",
+				c.Database.Type, c.Database.Port)
+		}
+		if c.Database.SSLMode != "" && !isValidSSLMode(c.Database.SSLMode) {
+			return fmt.Errorf("database.sslmode must be one of disable, allow, prefer, require, verify-ca, verify-full, got %q",
+				c.Database.SSLMode)
+		}
+	default:
+		return fmt.Errorf("unsupported database.type %q: must be %q or %q", c.Database.Type, "sqlite", "postgres")
+	}
+	return nil
+}
+
+func isValidSSLMode(mode string) bool {
+	switch mode {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+		return true
+	}
+	return false
 }

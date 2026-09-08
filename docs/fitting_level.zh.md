@@ -222,7 +222,7 @@ $$
 N^{\text{eff}}_c = \dfrac{\left(\sum_p w_{p,c}\right)^{2}}{\sum_p w_{p,c}^{2}}.
 $$
 
-当 $N^{\text{eff}}_c < \text{min\_samples}$(默认 8)时,**弃算**:
+当 $N^{\text{eff}}_c < \text{min\_samples}$(默认 5)时,**弃算**:
 `charts.fitting_level` 写入 `NULL`,但 `chart_statistics` 依然写入诊断字段供离线
 排查。
 
@@ -295,15 +295,20 @@ $$
     μ_c     := Σ w·δ̂ / Σ w                                    # §4.4
     N_eff_c := (Σ w)² / Σ w²
     若 N_eff_c < min_samples:
-        写入 FittingLevel = NULL;仍写 chart_statistics;继续
+        标记 FittingLevel = NULL(诊断字段照常积累);继续
     dev     := μ_c - L_c                                       # §4.5
     n_ref   := 2 · min_samples
     κ_eff   := κ · (1 + λ·dev²·n_ref / N_eff_c)
     L̂_c     := (N_eff_c·μ_c + κ_eff·L_c) / (N_eff_c + κ_eff)
     Δ       := effectiveMaxDeviation(L_c)                      # §4.6
     L̂_c     := L_c + clip(L̂_c - L_c, -Δ, Δ)
-    UPDATE charts SET fitting_level = L̂_c WHERE id = c
-    UPSERT chart_statistics (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
+    把 (c, L̂_c, 诊断字段) 积累进待写批次                          # 此时不写库
+
+每积累 chart_batch_size 张谱面(以及遍历结束)后,把整批结果放进一个短事务
+统一落库(§7):
+    一条 UPDATE ... FROM (VALUES ...) 批量更新 charts.fitting_level
+    一条带冲突处理的批量 UPSERT 写入 chart_statistics
+        (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
 ```
 
 ## 6. 超参数(来自 `config.yaml`)
@@ -350,8 +355,9 @@ $$
 - 玩家实力以 distinct `username` 为键做**键集分页**(每批 `player_batch_size`),
   不使用 OFFSET 扫描。
 - 谱面按固定批 `chart_batch_size` 处理,批次间插入 `batch_pause` 短暂休眠。
-- 每批谱面使用一个短事务落库:`charts.fitting_level` 由一条 `CASE` 更新,
-  `chart_statistics` 由一条带冲突处理的批量 upsert 写入。
+- 每批谱面使用一个短事务落库:`charts.fitting_level` 由一条
+  `UPDATE ... FROM (VALUES ...)` 派生表语句批量更新,`chart_statistics` 由
+  一条带冲突处理的批量 upsert 写入。
 - 查分服务的缓存不会被主动失效,依靠 TTL 自然过期;下一次用户上传会顺带刷新到
   新的 `fitting_level`。
 

@@ -313,7 +313,7 @@ N^{\text{eff}}_c = \dfrac{\left(\sum_p w_{p,c}\right)^{2}}{\sum_p w_{p,c}^{2}}.
 $$
 
 We abstain from publishing a fitting level when $N^{\text{eff}}_c <
-\text{min\_samples}$ (default 8): the column `charts.fitting_level` is
+\text{min\_samples}$ (default 5): the column `charts.fitting_level` is
 written as `NULL`, while `chart_statistics` still records the diagnostic
 fields for review.
 
@@ -424,15 +424,20 @@ for each chart c with official level L_c:
     μ_c     := Σ w·δ̂ / Σ w                                    # §4.4
     N_eff_c := (Σ w)² / Σ w²
     if N_eff_c < min_samples:
-        publish FittingLevel = NULL; keep stats; continue
+        mark FittingLevel = NULL (stats still accumulate); continue
     dev     := μ_c - L_c                                       # §4.5
     n_ref   := 2 · min_samples
     κ_eff   := κ · (1 + λ·dev²·n_ref / N_eff_c)
     L̂_c     := (N_eff_c·μ_c + κ_eff·L_c) / (N_eff_c + κ_eff)
     Δ       := effectiveMaxDeviation(L_c)                      # §4.6
     L̂_c     := L_c + clip(L̂_c - L_c, -Δ, Δ)
-    UPDATE charts SET fitting_level = L̂_c WHERE id = c
-    UPSERT chart_statistics (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
+    append (c, L̂_c, diagnostics) to the pending batch          # no DB write yet
+
+Every chart_batch_size charts (and at the end of the pass) the pending batch
+is flushed in one short transaction (§7):
+    one UPDATE ... FROM (VALUES ...) bulk-updates charts.fitting_level
+    one conflict-aware bulk UPSERT writes chart_statistics
+        (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
 ```
 
 ## 6. Hyperparameters (from `config.yaml`)
@@ -481,8 +486,9 @@ To minimize impact on the live probe service:
   `username`s (batch size `player_batch_size`), never OFFSET-scanning.
 - Charts are processed in fixed-size batches (`chart_batch_size`); a short
   `batch_pause` separates batches.
-- Each chart batch is persisted in one short transaction: one `CASE` update
-  for `charts.fitting_level` and one conflict-aware bulk upsert for
+- Each chart batch is persisted in one short transaction: one
+  `UPDATE ... FROM (VALUES ...)` derived-table update for
+  `charts.fitting_level` and one conflict-aware bulk upsert for
   `chart_statistics`.
 - The probe server's caches are not invalidated; they refresh naturally via
   TTL after the next upload touches the user.

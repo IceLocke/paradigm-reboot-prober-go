@@ -313,13 +313,14 @@ func TestRunner_PersistUpdatesExistingStat(t *testing.T) {
 }
 
 // TestRunner_PersistBatchMixedFittingLevels is a focused unit test for
-// persistBatch's CASE-expression branches (runner.go: `CASE id WHEN ? THEN ?`).
-// One batch mixes a published result (non-nil FittingLevel) with empty and
-// abstained results (nil FittingLevel), and both nil charts carry a *stale*
-// fitting_level left by a previous run. The statement must write the
-// dereferenced value for the published chart and NULL for the other two —
-// including overwriting their stale non-null values, since the ELSE arm only
-// protects rows absent from the batch, never nil results within it.
+// persistBatch's batched VALUES update (runner.go: `UPDATE charts SET
+// fitting_level = v.column2 FROM (VALUES ...) AS v`). One batch mixes a
+// published result (non-nil FittingLevel) with empty and abstained results
+// (nil FittingLevel), and both nil charts carry a *stale* fitting_level left
+// by a previous run. The statement must write the dereferenced value for the
+// published chart and NULL for the other two — including overwriting their
+// stale non-null values: the id join only protects rows absent from the
+// batch, never nil results within it.
 func TestRunner_PersistBatchMixedFittingLevels(t *testing.T) {
 	db := setupTestDB(t)
 	ctx := context.Background()
@@ -353,7 +354,7 @@ func TestRunner_PersistBatchMixedFittingLevels(t *testing.T) {
 	runner := NewRunner(db, Params{}, RunnerConfig{}) // persistBatch ignores params
 	items := []persistItem{
 		// nil first, published in the middle, nil last — so the non-nil arg
-		// sits between two NULL args inside the CASE list.
+		// sits between two NULL args inside the VALUES list.
 		{chartID: emptyChart.ID, officialLevel: emptyChart.Level, result: Result{}},
 		{chartID: publishedChart.ID, officialLevel: publishedChart.Level,
 			result: Result{
@@ -425,7 +426,7 @@ func TestRunner_PersistBatchMixedFittingLevels(t *testing.T) {
 // TestRunner_MixedBatchPublishEmptyAbstain drives a full Run() whose single
 // chart batch contains all three outcome kinds — one chart publishes, one has
 // no records (empty), one has too few effective samples (abstains). The point
-// is persistBatch's CASE update receiving BOTH nil and non-nil args in the
+// is persistBatch's VALUES update receiving BOTH nil and non-nil args in the
 // same statement: the two nil charts start with stale fitting_level values
 // from a previous run and must end up NULL while the published chart gets its
 // fresh value — all in one UPDATE.
@@ -537,6 +538,47 @@ func TestRunner_MixedBatchPublishEmptyAbstain(t *testing.T) {
 	if statFit := statByID[publishedChart.ID].FittingLevel; assert.NotNil(t, statFit) {
 		assert.InDelta(t, *pubFit, *statFit, 1e-9,
 			"chart_statistics.fitting_level must mirror charts.fitting_level")
+	}
+}
+
+func TestRunner_PersistBatchSkipsSoftDeletedChart(t *testing.T) {
+	db := setupTestDB(t)
+
+	song := model.Song{SongBase: model.SongBase{
+		WikiID: "soft_deleted_song", Title: "Soft deleted", Artist: "A", Genre: "G", Cover: "c",
+		Illustrator: "I", Version: "V", Album: "Al", BPM: "100", Length: "1:00",
+	}}
+	if err := db.Create(&song).Error; err != nil {
+		t.Fatalf("create song: %v", err)
+	}
+
+	stale := 13.5
+	chart := model.Chart{
+		SongID: song.ID, Difficulty: model.DifficultyMassive, Level: 14.0,
+		FittingLevel: &stale, Notes: 1000,
+	}
+	if err := db.Create(&chart).Error; err != nil {
+		t.Fatalf("create chart: %v", err)
+	}
+	if err := db.Delete(&chart).Error; err != nil {
+		t.Fatalf("soft-delete chart: %v", err)
+	}
+
+	fresh := 14.25
+	runner := NewRunner(db, Params{}, RunnerConfig{})
+	if err := runner.persistBatch(context.Background(), []persistItem{{
+		chartID: chart.ID,
+		result:  Result{FittingLevel: &fresh},
+	}}); err != nil {
+		t.Fatalf("persistBatch: %v", err)
+	}
+
+	var deleted model.Chart
+	if err := db.Unscoped().First(&deleted, chart.ID).Error; err != nil {
+		t.Fatalf("reload soft-deleted chart: %v", err)
+	}
+	if assert.NotNil(t, deleted.FittingLevel, "soft-deleted chart should retain its prior fitting_level") {
+		assert.InDelta(t, stale, *deleted.FittingLevel, 1e-9)
 	}
 }
 
