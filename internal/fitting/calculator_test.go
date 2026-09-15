@@ -437,7 +437,6 @@ func TestWeightedMedian_EdgeCases(t *testing.T) {
 	assert.InDelta(t, 3.0, weightedMedian([]float64{5, 1, 3, 2, 4}, []float64{0, 0, 0, 0, 0}), 1e-9)
 }
 
-
 // --- DeviationPenalty coverage --------------------------------------------
 //
 // The penalty targets the exact scenario the user hit in production: an
@@ -551,7 +550,6 @@ func TestComputeFitting_DeviationPenalty_LowDeviation_NoOp(t *testing.T) {
 	assert.InDelta(t, 14.05, *res.FittingLevel, 0.02,
 		"negligible penalty when dev≈0: must track the old shrinkage result")
 }
-
 
 // --- HighSkillSigmaRatio coverage -----------------------------------------
 //
@@ -745,7 +743,7 @@ func TestComputeFitting_RampEngagesAtLowLevel(t *testing.T) {
 	params.MaxDeviationLowAt = 12
 	params.MaxDeviationHighAt = 17
 
-	trueLevel := 15.0    // samples imply L ≈ 15
+	trueLevel := 15.0     // samples imply L ≈ 15
 	officialLevel := 12.0 // but the chart is officially lv12 — huge over-the-top gap
 
 	samples := make([]Sample, 0, 60)
@@ -809,7 +807,6 @@ func TestComputeFitting_RampRelaxesAtHighLevel(t *testing.T) {
 			"at lv17 the cap must relax beyond MaxDeviationLow (sanity check)")
 	}
 }
-
 
 // --- score-quality weighting -----------------------------------------------
 
@@ -985,7 +982,6 @@ func TestComputeFitting_ScoreQualityWeight_NoOpWhenAllHighScore(t *testing.T) {
 	assert.InDelta(t, *resOff.FittingLevel, *resOn.FittingLevel, 1e-6,
 		"score-quality weighting must be a no-op when every sample is ≥ ScoreFullAt")
 }
-
 
 // --- sample-age decay ------------------------------------------------------
 

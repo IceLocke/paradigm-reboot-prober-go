@@ -5,6 +5,7 @@ import (
 	"log"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
+	"strings"
 
 	"github.com/glebarez/sqlite"
 	"gorm.io/driver/postgres"
@@ -21,8 +22,12 @@ func InitDB() {
 
 	switch dbConfig.Type {
 	case "postgres":
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=%s",
-			dbConfig.Host, dbConfig.User, dbConfig.Password, dbConfig.DBName, dbConfig.Port, dbConfig.SSLMode)
+		// pgx's DSN parser mis-handles an unquoted empty value (e.g. `password= dbname=...`
+		// swallows the following keyword as the password), so always single-quote the
+		// password and escape embedded quotes/backslashes per libpq rules.
+		escapedPassword := strings.ReplaceAll(strings.ReplaceAll(dbConfig.Password, `\`, `\\`), `'`, `\'`)
+		dsn := fmt.Sprintf("host=%s user=%s password='%s' dbname=%s port=%d sslmode=%s",
+			dbConfig.Host, dbConfig.User, escapedPassword, dbConfig.DBName, dbConfig.Port, dbConfig.SSLMode)
 		dialector = postgres.Open(dsn)
 	case "sqlite":
 		dialector = sqlite.Open(dbConfig.DSN)
