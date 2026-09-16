@@ -117,6 +117,14 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 	}
 	report.ChartsTotal = len(charts)
 
+	var calibration *Calibration
+	if r.params.CalibrationEnabled {
+		calibration, err = r.collectCalibration(ctx, charts, skills)
+		if err != nil {
+			return report, fmt.Errorf("collect calibration: %w", err)
+		}
+	}
+
 	// 3. Batch-process charts.
 	for start := 0; start < len(charts); start += r.cfg.ChartBatchSize {
 		if err := ctx.Err(); err != nil {
@@ -149,6 +157,9 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 				return report, err
 			}
 			samples := samplesByChart[c.ID]
+			if calibration != nil {
+				samples = calibration.Apply(c.ID, c.Level, samples)
+			}
 			res := ComputeFitting(c.Level, samples, r.params)
 			report.ChartsProcessed++
 			if len(samples) == 0 {

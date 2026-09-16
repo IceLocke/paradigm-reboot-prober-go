@@ -27,17 +27,21 @@ import (
 // pre-weight, so stale records contribute less than fresh ones. AgeDays <= 0
 // is treated as "fresh" (decay factor = 1).
 type Sample struct {
-	Username      string
-	Score         int
-	PlayerSkill   float64
-	PlayerRecords int
-	AgeDays       float64
+	Username        string
+	Score           int
+	PlayerSkill     float64
+	PlayerRecords   int
+	AgeDays         float64
+	LevelCorrection *float64 // leave-chart-out background residual; nil means unsupported
 }
 
 // Params bundles all tunable knobs exposed through config.fitting.*. See
 // docs/fitting_level.en.md (English) / docs/fitting_level.zh.md (中文) for
 // the full derivation.
 type Params struct {
+	CalibrationEnabled bool    // use empirical residual calibration; requires prepared samples
+	CalibrationScale   float64 // final residual gain after shrinkage, in (0,1]
+
 	MinEffectiveSamples float64 // minimum N_eff to publish a FittingLevel
 	SkillTopK           int     // K in top-K player skill proxy (must be ≥ 1; historically 50)
 	SampleHalflifeDays  float64 // half-life in days for the sample-age decay weight; <=0 disables (no decay)
@@ -76,7 +80,8 @@ type Result struct {
 // ComputeFitting runs the full pipeline for one chart:
 //
 //  1. Per-sample inverse-rating: given (score, PlayerSkill), solve for the
-//     level that makes SingleRating match the player's typical B50 rating.
+//     level that makes SingleRating match the player's top-K rating. In
+//     calibrated mode subtract the leave-chart-out cohort residual first.
 //  2. Pre-weighting: each sample receives a composite weight equal to
 //     proximityWeight × volumeWeight × scoreQualityWeight. proximityWeight
 //     is a Gaussian centered on 10·Level (so players whose skill matches
@@ -90,81 +95,36 @@ type Result struct {
 //  4. Aggregation: compute weighted mean and Kish effective sample size
 //     (N_eff = (Σw)² / Σw²) of the surviving samples.
 //  5. Bayesian shrinkage: pull the weighted mean toward the official level
-//     with prior strength κ, then cap the deviation at MaxDeviation.
+//     with prior strength κ, then cap the deviation at MaxDeviation and
+//     apply CalibrationScale to the final residual when calibration is enabled.
 //
 // When fewer than MinEffectiveSamples surviving samples remain, FittingLevel
 // is left nil — we prefer abstention over publishing a shaky number.
 func ComputeFitting(officialLevel float64, samples []Sample, params Params) Result {
 	res := Result{}
+	if !isFinite(officialLevel) || officialLevel < MinInferredLevel || officialLevel > MaxInferredLevel || (params.CalibrationEnabled && (!isFinite(params.CalibrationScale) || params.CalibrationScale <= 0 || params.CalibrationScale > 1)) {
+		return res
+	}
 
 	// ----- 1. Per-sample inversion + pre-weight -----
 	inferred := make([]float64, 0, len(samples))
 	prew := make([]float64, 0, len(samples))
 	var raw int
 	for _, s := range samples {
-		if s.Score < params.MinScore {
-			continue
+		if s.Score >= params.MinScore {
+			if _, ok := InverseLevel(s.Score, s.PlayerSkill); ok {
+				raw++
+			}
 		}
-		level, ok := InverseLevel(s.Score, s.PlayerSkill)
+		level, w, ok := weightedInference(officialLevel, s, params)
 		if !ok {
 			continue
 		}
-		raw++
-		// proximity weight: Gaussian on (skill − 10·Level) in rating units.
-		//
-		// Crucially, the σ is **asymmetric**. A player whose skill greatly
-		// exceeds 10·Level (i.e. a high-rank player on a low-level chart) is
-		// almost certain to hit an AP-tier score, at which point InverseLevel
-		// degenerates into simply echoing the player's skill rather than
-		// measuring the chart. We therefore shrink σ on that side
-		// (σ_high = σ · HighSkillSigmaRatio).
-		//
-		// Just rescaling σ is not enough on its own — Kish's N_eff is
-		// scale-invariant, so 5 identically-weighted samples still count as
-		// N_eff=5 even when each carries 1% weight. We therefore also
-		// **hard-discard** any sample beyond a 2.5 · σ radius, so raw /
-		// inferred / N_eff all drop together. Combined with asymmetric σ,
-		// over-skilled samples (diff > 2.5 · σ_high) are dropped entirely,
-		// which is what causes chronically mis-played lv14 charts to correctly
-		// abstain rather than publish a skill-echoed fit.
-		const proximityCutoffSigmas = 2.5
-		diff := s.PlayerSkill - 10.0*officialLevel
-		sigma := params.ProximitySigma
-		if diff > 0 && params.HighSkillSigmaRatio > 0 {
-			sigma = sigma * params.HighSkillSigmaRatio
-		}
-		if math.Abs(diff) > proximityCutoffSigmas*sigma {
-			continue
-		}
-		proximity := math.Exp(-(diff * diff) / (2.0 * sigma * sigma))
-		// volume weight: linear ramp to 1.0 at VolumeFullAt records.
-		volume := 1.0
-		if params.VolumeFullAt > 0 && s.PlayerRecords < params.VolumeFullAt {
-			volume = float64(s.PlayerRecords) / float64(params.VolumeFullAt)
-		}
-		// score-quality weight: the actual score a player achieved conveys how
-		// much of the chart they "really" have under control. Business domain
-		// knowledge from Paradigm: Reboot:
-		//   - score < 1,000,000: the player has not really "passed" the chart
-		//     (the rating curve's inversion is also numerically unstable below
-		//     1M) — give zero weight.
-		//   - score ≥ 1,007,500: the player "会打" (has a handle on) the chart;
-		//     samples here carry substantial weight.
-		//   - score ≥ 1,009,000: the commonly pursued "高分" tier; saturate the
-		//     weight to 1.0 — these are the most reliable samples.
-		scoreQ := scoreQualityWeight(s.Score, params)
-		// sample-age weight: exponential half-life decay on play-time. Players'
-		// behaviour drifts over time — charts get played by newer, better-tuned
-		// cohorts; older records are less representative of "how players of this
-		// skill band play this chart TODAY". When SampleHalflifeDays is set,
-		// each sample gets an extra factor exp(-ln2 · AgeDays / halflife), so a
-		// record that is one halflife old contributes half as much. Disabled
-		// (factor = 1) when SampleHalflifeDays ≤ 0 or AgeDays ≤ 0 (fresh sample /
-		// missing timestamp fallback).
-		ageW := sampleAgeWeight(s.AgeDays, params.SampleHalflifeDays)
-		w := proximity * volume * scoreQ * ageW
-		if w <= 0 || math.IsNaN(w) {
-			continue
+		if params.CalibrationEnabled {
+			if s.Score >= 1010000 || s.LevelCorrection == nil || !isFinite(*s.LevelCorrection) {
+				continue
+			}
+			level -= *s.LevelCorrection
 		}
 		inferred = append(inferred, level)
 		prew = append(prew, w)
@@ -273,6 +233,9 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 		} else if diff < -capVal {
 			shrunk = officialLevel - capVal
 		}
+	}
+	if params.CalibrationEnabled {
+		shrunk = officialLevel + params.CalibrationScale*(shrunk-officialLevel)
 	}
 	res.FittingLevel = &shrunk
 	return res
@@ -423,3 +386,76 @@ func weightedMedian(values, weights []float64) float64 {
 	// Numerical fallthrough; should not happen in practice.
 	return values[idx[n-1]]
 }
+
+// weightedInference is shared by training and inference to keep eligibility and weights identical.
+func weightedInference(officialLevel float64, s Sample, params Params) (float64, float64, bool) {
+	if !isFinite(s.PlayerSkill) || s.PlayerSkill <= 0 || (params.MinPlayerRecords > 0 && s.PlayerRecords < params.MinPlayerRecords) {
+		return 0, 0, false
+	}
+	if s.Score < params.MinScore {
+		return 0, 0, false
+	}
+	level, ok := InverseLevel(s.Score, s.PlayerSkill)
+	if !ok {
+		return 0, 0, false
+	}
+	// proximity weight: Gaussian on (skill − 10·Level) in rating units.
+	//
+	// Crucially, the σ is **asymmetric**. A player whose skill greatly
+	// exceeds 10·Level (i.e. a high-rank player on a low-level chart) is
+	// almost certain to hit an AP-tier score, at which point InverseLevel
+	// degenerates into simply echoing the player's skill rather than
+	// measuring the chart. We therefore shrink σ on that side
+	// (σ_high = σ · HighSkillSigmaRatio).
+	//
+	// Just rescaling σ is not enough on its own — Kish's N_eff is
+	// scale-invariant, so 5 identically-weighted samples still count as
+	// N_eff=5 even when each carries 1% weight. We therefore also
+	// **hard-discard** any sample beyond a 2.5 · σ radius, so contributing
+	// samples / N_eff drop together (raw counts inversion survivors). Combined with asymmetric σ,
+	// over-skilled samples (diff > 2.5 · σ_high) are dropped entirely,
+	// which is what causes chronically mis-played lv14 charts to correctly
+	// abstain rather than publish a skill-echoed fit.
+	const proximityCutoffSigmas = 2.5
+	diff := s.PlayerSkill - 10.0*officialLevel
+	sigma := params.ProximitySigma
+	if diff > 0 && params.HighSkillSigmaRatio > 0 {
+		sigma = sigma * params.HighSkillSigmaRatio
+	}
+	if math.Abs(diff) > proximityCutoffSigmas*sigma {
+		return 0, 0, false
+	}
+	proximity := math.Exp(-(diff * diff) / (2.0 * sigma * sigma))
+	// volume weight: linear ramp to 1.0 at VolumeFullAt records.
+	volume := 1.0
+	if params.VolumeFullAt > 0 && s.PlayerRecords < params.VolumeFullAt {
+		volume = float64(s.PlayerRecords) / float64(params.VolumeFullAt)
+	}
+	// score-quality weight: the actual score a player achieved conveys how
+	// much of the chart they "really" have under control. Business domain
+	// knowledge from Paradigm: Reboot:
+	//   - score < 1,000,000: the player has not really "passed" the chart
+	//     (the rating curve's inversion is also numerically unstable below
+	//     1M) — give zero weight.
+	//   - score ≥ 1,007,500: the player "会打" (has a handle on) the chart;
+	//     samples here carry substantial weight.
+	//   - score ≥ 1,009,000: the commonly pursued "高分" tier; saturate the
+	//     weight to 1.0 — these are the most reliable samples.
+	scoreQ := scoreQualityWeight(s.Score, params)
+	// sample-age weight: exponential half-life decay on play-time. Players'
+	// behaviour drifts over time — charts get played by newer, better-tuned
+	// cohorts; older records are less representative of "how players of this
+	// skill band play this chart TODAY". When SampleHalflifeDays is set,
+	// each sample gets an extra factor exp(-ln2 · AgeDays / halflife), so a
+	// record that is one halflife old contributes half as much. Disabled
+	// (factor = 1) when SampleHalflifeDays ≤ 0 or AgeDays ≤ 0 (fresh sample /
+	// missing timestamp fallback).
+	ageW := sampleAgeWeight(s.AgeDays, params.SampleHalflifeDays)
+	w := proximity * volume * scoreQ * ageW
+	if w <= 0 || math.IsNaN(w) {
+		return 0, 0, false
+	}
+	return level, w, true
+}
+
+func isFinite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }

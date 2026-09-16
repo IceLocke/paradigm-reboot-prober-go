@@ -58,28 +58,8 @@ func cmdRun(args []string) {
 	util.InitDB()
 
 	// 5. Build the runner.
+	params := configuredParams()
 	fp := config.GlobalConfig.Fitting
-	params := fitting.Params{
-		MinEffectiveSamples: fp.MinSamples,
-		SkillTopK:           fp.SkillTopK,
-		SampleHalflifeDays:  fp.SampleHalflifeDays,
-		ProximitySigma:      fp.ProximitySigma,
-		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
-		VolumeFullAt:        fp.VolumeFullAt,
-		PriorStrength:       fp.PriorStrength,
-		DeviationPenalty:    fp.DeviationPenalty,
-		MaxDeviation:        fp.MaxDeviation,
-		MaxDeviationLow:     fp.MaxDeviationLow,
-		MaxDeviationLowAt:   fp.MaxDeviationLowAt,
-		MaxDeviationHighAt:  fp.MaxDeviationHighAt,
-		MinScore:            fp.MinScore,
-		ScoreFloorAt:        fp.ScoreFloorAt,
-		ScoreGoodAt:         fp.ScoreGoodAt,
-		ScoreFullAt:         fp.ScoreFullAt,
-		ScoreGoodWeight:     fp.ScoreGoodWeight,
-		TukeyK:              fp.TukeyK,
-		MinPlayerRecords:    fp.MinPlayerRecords,
-	}
 	cfg := fitting.RunnerConfig{
 		ChartBatchSize:  fp.ChartBatchSize,
 		PlayerBatchSize: fp.PlayerBatchSize,
@@ -139,5 +119,33 @@ func runTick(ctx context.Context, runner *fitting.Runner) {
 			"duration_ms", report.Duration.Milliseconds(),
 		)
 		return
+	}
+}
+
+// configuredParams is shared by run, analyze and offline evaluation.
+func configuredParams() fitting.Params {
+	fp := config.GlobalConfig.Fitting
+	return fitting.Params{
+		MinEffectiveSamples: fp.MinSamples,
+		CalibrationEnabled:  fp.CalibrationEnabled,
+		CalibrationScale:    fp.CalibrationScale,
+		SkillTopK:           fp.SkillTopK,
+		SampleHalflifeDays:  fp.SampleHalflifeDays,
+		ProximitySigma:      fp.ProximitySigma,
+		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
+		VolumeFullAt:        fp.VolumeFullAt,
+		PriorStrength:       fp.PriorStrength,
+		DeviationPenalty:    fp.DeviationPenalty,
+		MaxDeviation:        fp.MaxDeviation,
+		MaxDeviationLow:     fp.MaxDeviationLow,
+		MaxDeviationLowAt:   fp.MaxDeviationLowAt,
+		MaxDeviationHighAt:  fp.MaxDeviationHighAt,
+		MinScore:            fp.MinScore,
+		ScoreFloorAt:        fp.ScoreFloorAt,
+		ScoreGoodAt:         fp.ScoreGoodAt,
+		ScoreFullAt:         fp.ScoreFullAt,
+		ScoreGoodWeight:     fp.ScoreGoodWeight,
+		TukeyK:              fp.TukeyK,
+		MinPlayerRecords:    fp.MinPlayerRecords,
 	}
 }

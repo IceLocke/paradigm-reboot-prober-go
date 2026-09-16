@@ -61,6 +61,8 @@ type Config struct {
 		Interval            string  `yaml:"interval"`               // Go duration string (e.g. "6h"); run continuously via ticker
 		MinSamples          float64 `yaml:"min_samples"`            // minimum effective sample size required to publish FittingLevel
 		MinPlayerRecords    int     `yaml:"min_player_records"`     // a player needs at least this many best_play_records to contribute
+		CalibrationEnabled  bool    `yaml:"calibration_enabled"`    // empirical leave-chart-out residual calibration
+		CalibrationScale    float64 `yaml:"calibration_scale"`      // final calibrated residual gain in (0,1]
 		SkillTopK           int     `yaml:"skill_top_k"`            // number of top-rating best-records used to compute a player's skill proxy B_p; must be ≥ 1 (historically 50)
 		SampleHalflifeDays  float64 `yaml:"sample_halflife_days"`   // exponential half-life (in days) for sample-age decay weight; 0 = disabled
 		ProximitySigma      float64 `yaml:"proximity_sigma"`        // Gaussian σ (rating units) centered at 10×Level for the proximity weight
@@ -124,7 +126,9 @@ func InitDefaults() {
 	GlobalConfig.Fitting.Interval = "6h"
 	GlobalConfig.Fitting.MinSamples = 5.0
 	GlobalConfig.Fitting.MinPlayerRecords = 20
-	GlobalConfig.Fitting.SkillTopK = 50
+	GlobalConfig.Fitting.CalibrationEnabled = true
+	GlobalConfig.Fitting.CalibrationScale = 0.1
+	GlobalConfig.Fitting.SkillTopK = 20
 	GlobalConfig.Fitting.SampleHalflifeDays = 0
 	GlobalConfig.Fitting.ProximitySigma = 18.5
 	GlobalConfig.Fitting.HighSkillSigmaRatio = 0.2
@@ -340,6 +344,9 @@ func LoadConfig(configPath string) {
 	}
 	if GlobalConfig.Fitting.ProximitySigma <= 0 {
 		log.Fatalf("fitting.proximity_sigma must be > 0, got %f", GlobalConfig.Fitting.ProximitySigma)
+	}
+	if GlobalConfig.Fitting.CalibrationEnabled && !(GlobalConfig.Fitting.CalibrationScale > 0 && GlobalConfig.Fitting.CalibrationScale <= 1) {
+		log.Fatal("fitting.calibration_scale must be in (0,1] when calibration is enabled")
 	}
 	if GlobalConfig.Fitting.SkillTopK < 1 {
 		log.Fatalf("fitting.skill_top_k must be ≥ 1, got %d", GlobalConfig.Fitting.SkillTopK)

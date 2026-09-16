@@ -42,7 +42,7 @@ posterior point estimate $\hat{L}_c$ (`fitting_level`) that:
 | $\hat{L}_c$              | Computed fitting level (float, written to `charts.fitting_level`).                         |
 | $s_{p,c}$                | Best score of player $p$ on chart $c$ (integer, 0–1 010 000).                              |
 | $r_{p,c}$                | Single-chart rating assigned to $(p,c)$ under the official level; see `pkg/rating/rating.go`. |
-| $B_p$                    | Player $p$'s float **B50 mean rating**: mean of their top-$K$ single-chart ratings, $K=\min(|\text{best}_p|, 50)$. |
+| $B_p$                    | Player $p$'s float **top-K mean rating**: mean of their top-$K$ single-chart ratings, $K=\min(|\text{best}_p|, \texttt{skill\_top\_k})$, default 20; $K\ge1$. |
 | $n_p$                    | Total number of best records belonging to player $p$.                                       |
 | $\hat{\delta}_{p,c}$     | Level inferred from $(s_{p,c}, B_p)$; see §4.1.                                            |
 | $w^{\text{prox}}_{p,c}$  | Proximity weight.                                                                         |
@@ -83,6 +83,66 @@ clamped to $\max(\mathrm{Rating}, 0)$. The persisted column
 
 ## 4. Algorithm
 
+### 4.0 Current default: chart-balanced residual calibration
+
+The defaults are `skill_top_k: 20`, `calibration_enabled: true`, and
+`calibration_scale: 0.1`. A player's top-K mean is a performance ceiling,
+not an unbiased target for every best record. Treating it as such explains
+much of the old upward bias. Section 4.1 now supplies a **raw observation**;
+the following correction precedes section 4.3.
+
+Let $I(s,B)$ be the inverse rating and $g=B/10-L_c$ the ability gap. For each
+chart, bin samples by $k=\lfloor g/0.5\rfloor$. Using exactly the preweights
+in section 4.2, compute the weighted median $m_{c,k}$ of $I(s,B)-L_c$ in
+each cell with at least three eligible records. Perfect scores
+($s\ge1\,010\,000$) are censored observations and are excluded from both
+calibration training and calibrated inference.
+
+For a target chart $c$ and cell $k$, exclude the entire target chart. Only
+peer cells with $|L_j-L_c|\le1$ and $|k'-k|\le2$ contribute, with weights
+
+$$
+a_{j,k'}=\exp\left[-\frac12\left(\left(\frac{L_j-L_c}{0.5}\right)^2+(k'-k)^2\right)\right].
+$$
+
+First combine each peer chart into one value
+$v_j=\sum_{k'}a_{j,k'}m_{j,k'}/\sum_{k'}a_{j,k'}$, with weight
+$u_j=\max_{k'}a_{j,k'}$. The weighted median of these chart values is the
+background residual $b_{c,k}$. Chart balancing prevents popular charts or
+charts occupying many ability cells from dominating the reference.
+Require at least **ten other charts**; unsupported target cells abstain,
+without silently reverting to the uncalibrated estimator.
+
+Feed $\widetilde\delta_{p,c}=I(s_{p,c},B_p)-b_{c,k(p,c)}$ into the existing
+median/MAD, Tukey, effective sample size, prior shrinkage and cap in
+sections 4.3–4.6. If the capped result is $L_c^*$, publish
+
+$$
+\widehat L_c=L_c+\gamma(L_c^*-L_c),\qquad\gamma=0.1.
+$$
+
+Official levels anchor the scale; score differences determine deviations.
+Subjective votes calibrate the global amplitude and validate direction;
+they are never injected as individual chart targets. The training-song
+subset estimates a gain of 0.09155, rounded to 0.1. On 225 common voted
+charts, MAE against votes changes from 0.29222 (old B20) to 0.02774,
+versus 0.03086 for official levels alone. On 47 held-out charts grouped by
+song, these values are 0.26930, 0.02489 and 0.02938. This is retrospective
+validation, not an untouched prospective test. See the
+[replay report](./fitting_calibration_evaluation.zh.md) for reproduction,
+coverage, failure examples and limitations. The algorithm does not force
+zero global bias or equal counts of upward/downward adjustments.
+
+The runner adds a batched training pass, retaining only cell summaries,
+then computes/persists results in the existing second pass. It remains
+entirely within `cmd/fitting`. Statistical means describe corrected levels
+before final gain; `fitting_level` contains the final output. `sample_count`
+still counts raw successful inversions, not contributing players.
+
+Set `calibration_enabled: false` and preserve the old `skill_top_k` to
+replay the legacy pipeline below. Historical alpha/sigma sweeps below
+describe the old estimator, not validation of the new calibration.
+
 ### 4.1 Per-sample inferred level
 
 For each best record $(p, c)$ we invert $\mathrm{Rating}$ in $L$, treating
@@ -102,7 +162,7 @@ undefined at $s = 0$. We reject the sample if $\hat{\delta}_{p,c} \notin
 [0.1, 20.0]$ — the usable level range of the game.
 
 Intuitively $\hat{\delta}_{p,c}$ answers "what level *would* make this player's
-observed score exactly match their typical B50 rating". If the chart is
+observed score exactly match their top-K mean rating (B20 by default)". If the chart is
 actually easier than its official level, players systematically score above
 their skill target, driving $\hat{\delta}_{p,c}$ below $L_c$.
 
@@ -398,23 +458,25 @@ startup validator rejects the most common misconfigurations (see
 majority of fitted values already sit inside the trapezoidal window, so
 $\Delta(L)$ fires only very rarely — it is a guardrail against the
 occasional catastrophic outlier, not a lever for pulling mid-level charts
-closer to their official values. The real levers for mid-level bias are
-$\alpha$ and $\kappa$ — see §4.2 and §4.5.
+closer to their official values. Current background bias is handled by section 4.0; alpha and kappa
+still control eligibility and shrinkage.
 
 ## 5. Summary pipeline
 
 ```
+calibration := first-pass chart/cell summaries from §4.0
 for each chart c with official level L_c:
     samples := { (p, s_{p,c}) : p ∈ P_c, s_{p,c} ≥ s_min }
     for each sample:
         δ̂ := InverseRating(s_{p,c}, B_p)                      # §4.1
         if δ̂ ∉ [0.1, 20.0]: drop
+        if calibration enabled: drop perfect/unsupported samples, otherwise δ̂ -= b_{c,k}
         diff  := B_p - 10·L_c                                   # §4.2
         σ_eff := (diff > 0 ? α·σ_prox : σ_prox)
         if |diff| > 2.5·σ_eff: drop                              #  ← hard cutoff
         w_prox := exp(-diff² / (2·σ_eff²))
         w_vol  := min(1, n_p / V_full)
-        w_pre  := w_prox * w_vol
+        w_pre  := w_prox * w_vol * score_quality * sample_age
     m_c  := weighted_median(δ̂; w_pre)                          # §4.3
     MAD  := weighted_median(|δ̂ - m_c|; w_pre)
     for each sample:
@@ -431,6 +493,7 @@ for each chart c with official level L_c:
     L̂_c     := (N_eff_c·μ_c + κ_eff·L_c) / (N_eff_c + κ_eff)
     Δ       := effectiveMaxDeviation(L_c)                      # §4.6
     L̂_c     := L_c + clip(L̂_c - L_c, -Δ, Δ)
+    if calibration enabled: L̂_c := L_c + γ * (L̂_c - L_c)
     append (c, L̂_c, diagnostics) to the pending batch          # no DB write yet
 
 Every chart_batch_size charts (and at the end of the pass) the pending batch
@@ -444,6 +507,10 @@ is flushed in one short transaction (§7):
 
 | Key                             | Symbol                 | Default   | Role                                                                                   |
 |---------------------------------|------------------------|-----------|----------------------------------------------------------------------------------------|
+| `fitting.skill_top_k` | K | `20` | Number of highest ratings used for player skill. |
+| `fitting.calibration_enabled` | — | `true` | Enable §4.0; false restores legacy inference. |
+| `fitting.calibration_scale` | γ | `0.1` | Residual gain after cap; must be in (0,1] when enabled. |
+| `fitting.sample_halflife_days` | — | `0` | Optional sample-age half-life; zero disables. |
 | `fitting.enabled`               | —                      | `true`    | Master switch for the microservice.                                                    |
 | `fitting.interval`              | —                      | `6h`      | Ticker period (Go duration).                                                           |
 | `fitting.min_samples`           | min_samples            | `5.0`     | $N^{\text{eff}}$ below this → abstain.                                                 |
@@ -564,15 +631,8 @@ Then schedule it externally:
 
 ## 9. Known limitations
 
-1. **Closed ecosystem.** The player-skill target $B_p$ is derived from the
-   same ratings that the official level generates. A systematic bias in the
-   official levels propagates weakly into $B_p$. Mitigation: proximity
-   weighting constrains the "band" of players contributing, so the bias is
-   at most second-order; extensive outlier trimming further suppresses it.
-2. **No temporal decay.** Scores are treated equally regardless of
-   `record_time`. If the game meta shifts (e.g. judgement changes), old
-   records could anchor the estimate against the new reality. Adding a
-   recency kernel is straightforward future work.
-3. **Chart additions.** Newly added charts with very few plays receive
-   `fitting_level = NULL` by design. Abstention is the correct behaviour
-   until $N^{\text{eff}}$ crosses `min_samples`.
+1. Official levels anchor both ratings and the reference population. Local calibration cannot identify a shared absolute error across an entire neighborhood. B20 still includes the target performance; this is not a fully independent player skill estimate.
+2. Best scores reflect practice and self-selected charts. A scalar skill cannot represent individual chart-style strengths; robust aggregation does not remove these systematic effects.
+3. Time decay is available through `sample_halflife_days`, but disabled by default. Enabling it requires revalidation of the gain. Multiple database batches do not form a transactionally consistent snapshot.
+4. Perfect scores, insufficient peer charts or insufficient target effective samples cause abstention. Coverage can decrease; report it alongside error metrics.
+5. The 0.1 gain is conservative and supported mainly by high-level chart votes. It can underestimate severe misratings and still gets some directions wrong. See the [replay report](./fitting_calibration_evaluation.zh.md).

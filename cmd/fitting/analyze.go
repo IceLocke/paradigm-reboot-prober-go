@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sort"
 
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/fitting"
@@ -46,7 +45,7 @@ func cmdAnalyze(args []string) {
 	}
 
 	config.LoadConfig(*configPath)
-	util.InitDB()
+	util.ConnectDB()
 
 	ctx := context.Background()
 
@@ -60,73 +59,35 @@ func cmdAnalyze(args []string) {
 	}
 	fmt.Printf("=== chart %d | level=%.1f | difficulty=%s ===\n\n", chart.ID, chart.Level, chart.Difficulty)
 
-	// 2. Load samples and skills (inline queries — we don't need paging for a single chart).
-	samples := analyzeLoadSamples(ctx, *chartID)
-	fmt.Printf("total raw samples: %d\n\n", len(samples))
-
-	// 3. Bucket breakdown: who's playing, what they're scoring, what their skill is.
-	analyzePrintBuckets(chart.Level, samples)
-
-	// 4. Run ComputeFitting under several configs.
+	base := configuredParams()
+	runner := fitting.NewRunner(util.DB, base, fitting.RunnerConfig{})
+	samples, err := runner.LoadChartSamples(ctx, *chartID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "load samples: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("total samples: %d; skill top-K: %d\n\n", len(samples), base.SkillTopK)
+	analyzePrintBuckets(chart.Level, samples, base)
 	type cfg struct {
 		name   string
 		params fitting.Params
-		filter func(fitting.Sample) bool // optional pre-filter applied BEFORE ComputeFitting
 	}
-	// The "base" Params below are pulled from the loaded config (same values the
-	// `run` subcommand uses in production), so the diagnostic reflects the
-	// shipping algorithm. To probe knob changes, derive a Params from `base` and
-	// override just the field(s) under investigation.
-	fp := config.GlobalConfig.Fitting
-	base := fitting.Params{
-		MinEffectiveSamples: fp.MinSamples,
-		SkillTopK:           fp.SkillTopK,
-		SampleHalflifeDays:  fp.SampleHalflifeDays,
-		ProximitySigma:      fp.ProximitySigma,
-		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
-		VolumeFullAt:        fp.VolumeFullAt,
-		PriorStrength:       fp.PriorStrength,
-		DeviationPenalty:    fp.DeviationPenalty,
-		MaxDeviation:        fp.MaxDeviation,
-		MaxDeviationLow:     fp.MaxDeviationLow,
-		MaxDeviationLowAt:   fp.MaxDeviationLowAt,
-		MaxDeviationHighAt:  fp.MaxDeviationHighAt,
-		MinScore:            fp.MinScore,
-		TukeyK:              fp.TukeyK,
-		MinPlayerRecords:    fp.MinPlayerRecords,
-	}
-	withRatio := func(p fitting.Params, r float64) fitting.Params { p.HighSkillSigmaRatio = r; return p }
-	flatCap := base // pre-ramp behaviour (flat ±MaxDeviation); useful for before/after comparison
-	flatCap.MaxDeviationLow = 0
-
+	legacy := base
+	legacy.CalibrationEnabled = false
+	unscaled := base
+	unscaled.CalibrationScale = 1
 	configs := []cfg{
-		{fmt.Sprintf("base (α=%.2f, ramp)", base.HighSkillSigmaRatio), base, nil},
-		{fmt.Sprintf("base (α=%.2f, flat cap)", base.HighSkillSigmaRatio), flatCap, nil},
-		{"α=0.3", withRatio(base, 0.3), nil},
-		{"α=0.2", withRatio(base, 0.2), nil},
-		{"α=0.15", withRatio(base, 0.15), nil},
-		{"α=0.1", withRatio(base, 0.1), nil},
-		{"score<1000000 only", base, func(s fitting.Sample) bool { return s.Score < 1000000 }},
-		{"score<1005000 only", base, func(s fitting.Sample) bool { return s.Score < 1005000 }},
+		{"configured", base},
+		{"legacy (same top-K)", legacy},
+		{"calibrated, gain=1", unscaled},
 	}
-
 	fmt.Println("\n=== ComputeFitting results ===")
 	fmt.Println()
 	fmt.Printf("%-32s %-8s %-8s %-8s %-8s %-8s %-8s\n",
 		"config", "raw", "nEff", "wmed", "wmean", "sd", "fit")
 	fmt.Println(analyzeRepeat("-", 84))
 	for _, c := range configs {
-		in := samples
-		if c.filter != nil {
-			filt := make([]fitting.Sample, 0, len(samples))
-			for _, s := range samples {
-				if c.filter(s) {
-					filt = append(filt, s)
-				}
-			}
-			in = filt
-		}
-		r := fitting.ComputeFitting(chart.Level, in, c.params)
+		r := fitting.ComputeFitting(chart.Level, samples, c.params)
 		fit := "nil"
 		if r.FittingLevel != nil {
 			fit = fmt.Sprintf("%.3f", *r.FittingLevel)
@@ -137,124 +98,12 @@ func cmdAnalyze(args []string) {
 	}
 }
 
-// analyzeLoadSamples reads best_play_records + play_records for `chartID`
-// and joins with each player's top-50 average rating (same definition the
-// runner uses). Returns a ready-to-feed []fitting.Sample.
-//
-// Prefixed `analyze*` so the symbol cannot collide with anything in the
-// sibling run.go file.
-func analyzeLoadSamples(ctx context.Context, chartID int) []fitting.Sample {
-	type row struct {
-		Username string
-		Score    int
-	}
-	var raw []row
-	if err := util.DB.WithContext(ctx).
-		Table("best_play_records").
-		Select("best_play_records.username AS username, play_records.score AS score").
-		Joins("JOIN play_records ON play_records.id = best_play_records.play_record_id").
-		Where("best_play_records.chart_id = ?", chartID).
-		Where("best_play_records.deleted_at IS NULL").
-		Where("play_records.deleted_at IS NULL").
-		Scan(&raw).Error; err != nil {
-		fmt.Fprintf(os.Stderr, "fetch samples failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	if len(raw) == 0 {
-		return nil
-	}
-
-	userSet := make(map[string]struct{}, len(raw))
-	for _, r := range raw {
-		userSet[r.Username] = struct{}{}
-	}
-	usernames := make([]string, 0, len(userSet))
-	for u := range userSet {
-		usernames = append(usernames, u)
-	}
-	sort.Strings(usernames)
-
-	type ratingRow struct {
-		Username string
-		Rating   int
-	}
-	var ratings []ratingRow
-	if err := util.DB.WithContext(ctx).
-		Table("play_records").
-		Select("play_records.username AS username, play_records.rating AS rating").
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
-		Where("play_records.username IN ?", usernames).
-		Where("play_records.deleted_at IS NULL").
-		Where("best_play_records.deleted_at IS NULL").
-		Order("play_records.username ASC, play_records.rating DESC").
-		Scan(&ratings).Error; err != nil {
-		fmt.Fprintf(os.Stderr, "fetch ratings failed: %v\n", err)
-		os.Exit(1)
-	}
-
-	type skill struct {
-		avgRating float64
-		n         int
-	}
-	skills := make(map[string]skill, len(usernames))
-	curUser := ""
-	buf := make([]int, 0, 64)
-	total := 0
-	flush := func() {
-		if curUser == "" {
-			return
-		}
-		k := buf
-		if len(k) > 50 {
-			k = k[:50]
-		}
-		sum := 0
-		for _, v := range k {
-			sum += v
-		}
-		avg := 0.0
-		if len(k) > 0 {
-			avg = float64(sum) / float64(len(k)) / 100.0
-		}
-		skills[curUser] = skill{avg, total}
-	}
-	for _, r := range ratings {
-		if r.Username != curUser {
-			flush()
-			curUser = r.Username
-			buf = buf[:0]
-			total = 0
-		}
-		total++
-		if len(buf) < 50 {
-			buf = append(buf, r.Rating)
-		}
-	}
-	flush()
-
-	out := make([]fitting.Sample, 0, len(raw))
-	for _, r := range raw {
-		s, ok := skills[r.Username]
-		if !ok {
-			continue
-		}
-		out = append(out, fitting.Sample{
-			Username:      r.Username,
-			Score:         r.Score,
-			PlayerSkill:   s.avgRating,
-			PlayerRecords: s.n,
-		})
-	}
-	return out
-}
-
 // analyzePrintBuckets splits samples by score into canonical buckets and
 // reports, per bucket: count, avg player skill, avg inferred level, and
-// avg (current default) proximity weight with α=0.5. This is the single
+// avg configured proximity weight. This is the single
 // most useful view for seeing WHY fitting is being pulled away from the
 // official level.
-func analyzePrintBuckets(official float64, samples []fitting.Sample) {
+func analyzePrintBuckets(official float64, samples []fitting.Sample, params fitting.Params) {
 	buckets := []struct {
 		label string
 		lo    int
@@ -273,7 +122,7 @@ func analyzePrintBuckets(official float64, samples []fitting.Sample) {
 
 	fmt.Printf("=== per-score-bucket breakdown (official level = %.1f) ===\n\n", official)
 	fmt.Printf("%-20s %-6s %-10s %-10s %-12s\n",
-		"score bucket", "n", "avg_skill", "avg_infL", "avg_prox(α=0.5)")
+		"score bucket", "n", "avg_skill", "avg_infL", "avg_prox")
 	fmt.Println(analyzeRepeat("-", 62))
 
 	for _, b := range buckets {
@@ -288,11 +137,14 @@ func analyzePrintBuckets(official float64, samples []fitting.Sample) {
 				continue
 			}
 			diff := s.PlayerSkill - 10.0*official
-			sigma := 20.0
-			if diff > 0 {
-				sigma = 10.0 // α=0.5
+			sigma := params.ProximitySigma
+			if diff > 0 && params.HighSkillSigmaRatio > 0 {
+				sigma *= params.HighSkillSigmaRatio
 			}
 			prox := math.Exp(-(diff * diff) / (2.0 * sigma * sigma))
+			if math.Abs(diff) > 2.5*sigma {
+				prox = 0
+			}
 			n++
 			sumSkill += s.PlayerSkill
 			sumInfL += inferred

@@ -19,6 +19,7 @@
 //
 //	fitting run [flags]       continuous or one-shot calculation
 //	fitting analyze [flags]   read-only diagnostic for one chart
+//	fitting evaluate [flags]  local snapshot replay, without a database
 //
 // When no subcommand is given, `run` is assumed so that existing
 // invocations such as `./fitting`, `./fitting --once`, or
@@ -49,6 +50,9 @@ func main() {
 		case "run":
 			cmdRun(os.Args[2:])
 			return
+		case "evaluate":
+			cmdEvaluate(os.Args[2:])
+			return
 		case "analyze":
 			cmdAnalyze(os.Args[2:])
 			return
@@ -65,6 +69,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Subcommands:")
 	fmt.Fprintln(os.Stderr, "  run      (default) run the fitting calculator in continuous or --once mode")
+	fmt.Fprintln(os.Stderr, "  evaluate replay a local anonymized dump snapshot; no database connection")
 	fmt.Fprintln(os.Stderr, "  analyze  read-only diagnostic for one chart (prints bucket breakdown + config sweep)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Run `fitting <subcommand> --help` to see flags for each subcommand.")
