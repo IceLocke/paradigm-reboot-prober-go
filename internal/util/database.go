@@ -42,7 +42,6 @@ func ConnectDB() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-
 }
 
 func InitDB() {

@@ -15,13 +15,19 @@ reference, not a replacement for personal experience or official ratings.
 3. Estimate this ordinary performance gap from other charts, then measure
    whether the target is harder or easier than its peers. The target chart
    is excluded from its own reference population.
-4. Downweight outliers and pull weak evidence toward the official level.
-   Subjective votes help validate direction and calibrate the size of the
-   adjustment, preventing small differences from being exaggerated.
+4. Downweight outliers and pull weak or noisy evidence toward the official
+   level, keeping each chart within its deviation limits.
+5. After computing all estimates, balance their total using one common
+   offset and reapply every chart's limits. Each eligible chart counts once,
+   so popularity does not give a chart a larger share of the total.
 
 Votes never directly override an individual chart. Official levels provide
 the scale, scores provide observed performance, and votes provide an
 experience-based comparison.
+
+The published population has the same total fitting and official levels.
+This does not require every chart to differ, or equal counts of increases
+and decreases. Charts with insufficient evidence still display `—`.
 
 ## Reading the result
 
@@ -36,6 +42,4 @@ cannot identify exact difficulty and are excluded from calibrated fitting.
 Practice, chart-style strengths and self-selection still affect results.
 Disagreement with votes does not prove either estimate is correct.
 
-The default recalculation interval is six hours. Historical replay shows
-substantially less upward bias, but some charts still get the direction
-wrong. See the [evaluation and counterexamples](./fitting_calibration_evaluation.zh.md).
+The default recalculation interval is six hours.

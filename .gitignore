@@ -49,4 +49,7 @@ web/style-samples/*
 **/config.yaml
 
 # Local production dumps and analysis inputs
-data/
+/data/
+
+# Local fitting preview, replay tools, reports, and runtime files
+/local-preview/

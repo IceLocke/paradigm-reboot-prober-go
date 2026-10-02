@@ -1,32 +1,14 @@
 package main
 
-// The `analyze` subcommand is a READ-ONLY diagnostic tool.
-//
-// Usage:
-//
-//	go run ./cmd/fitting analyze -chart 51
-//
-// It connects to the same database as the `run` subcommand, loads all
-// best_play_records for the given chart joined with the per-player skill
-// snapshot, and prints:
-//
-//  1. A per-score-bucket breakdown of the sample set (count, avg skill,
-//     average inferred level) so you can see WHERE the bias lives.
-//  2. The output of fitting.ComputeFitting under several diagnostic Params
-//     configurations (status quo vs candidate fixes), side-by-side.
-//
-// The subcommand writes nothing back to the database. It is safe to run
-// against production. It is intentionally not driven by any scheduler — it
-// exists to debug distribution problems uncovered during tuning. If the
-// tool ever becomes obsolete, delete this file; none of its symbols are
-// referenced from the `run` subcommand.
+// The analyze subcommand replays the full fitting population without writes,
+// then displays score buckets, robust statistics and the final target estimate.
 
 import (
 	"context"
 	"flag"
 	"fmt"
-	"math"
 	"os"
+	"strings"
 
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/fitting"
@@ -61,49 +43,30 @@ func cmdAnalyze(args []string) {
 
 	base := configuredParams()
 	runner := fitting.NewRunner(util.DB, base, fitting.RunnerConfig{})
-	samples, err := runner.LoadChartSamples(ctx, *chartID)
+	analysis, err := runner.AnalyzeChart(ctx, *chartID)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "load samples: %v\n", err)
 		os.Exit(1)
 	}
+	samples := analysis.Samples
 	fmt.Printf("total samples: %d; skill top-K: %d\n\n", len(samples), base.SkillTopK)
-	analyzePrintBuckets(chart.Level, samples, base)
-	type cfg struct {
-		name   string
-		params fitting.Params
-	}
-	legacy := base
-	legacy.CalibrationEnabled = false
-	unscaled := base
-	unscaled.CalibrationScale = 1
-	configs := []cfg{
-		{"configured", base},
-		{"legacy (same top-K)", legacy},
-		{"calibrated, gain=1", unscaled},
-	}
-	fmt.Println("\n=== ComputeFitting results ===")
-	fmt.Println()
-	fmt.Printf("%-32s %-8s %-8s %-8s %-8s %-8s %-8s\n",
-		"config", "raw", "nEff", "wmed", "wmean", "sd", "fit")
-	fmt.Println(analyzeRepeat("-", 84))
-	for _, c := range configs {
-		r := fitting.ComputeFitting(chart.Level, samples, c.params)
-		fit := "nil"
-		if r.FittingLevel != nil {
-			fit = fmt.Sprintf("%.3f", *r.FittingLevel)
-		}
-		fmt.Printf("%-32s %-8d %-8.1f %-8.3f %-8.3f %-8.3f %-8s\n",
-			c.name, r.SampleCount, r.EffectiveSampleSize,
-			r.WeightedMedian, r.WeightedMean, r.StdDev, fit)
+	analyzePrintBuckets(samples)
+	fmt.Printf("\nPublished population: %d charts; official total: %.6f; fitting total: %.6f; offset: %+.6f\n",
+		analysis.Balance.Charts, analysis.Balance.OfficialSum, analysis.Balance.FittingSum, analysis.Balance.Offset)
+	result := analysis.Result
+	fmt.Printf("Raw inversions: %d; N_eff: %.2f; median: %.4f; mean: %.4f; SD: %.4f; MAD: %.4f\n",
+		result.SampleCount, result.EffectiveSampleSize, result.WeightedMedian, result.WeightedMean, result.StdDev, result.MAD)
+	if result.FittingLevel == nil {
+		fmt.Println("Fitting level: nil (insufficient samples or peer support)")
+	} else {
+		independent := fitting.ComputeFitting(chart.Level, samples, base)
+		fmt.Printf("Independent estimate: %.6f; final fitting level: %.6f\n", *independent.FittingLevel, *result.FittingLevel)
 	}
 }
 
-// analyzePrintBuckets splits samples by score into canonical buckets and
-// reports, per bucket: count, avg player skill, avg inferred level, and
-// avg configured proximity weight. This is the single
-// most useful view for seeing WHY fitting is being pulled away from the
-// official level.
-func analyzePrintBuckets(official float64, samples []fitting.Sample, params fitting.Params) {
+// Score buckets show raw inverse levels and the supported cohort corrections.
+// AP is excluded from calibrated fitting and appears here for diagnostics.
+func analyzePrintBuckets(samples []fitting.Sample) {
 	buckets := []struct {
 		label string
 		lo    int
@@ -120,48 +83,37 @@ func analyzePrintBuckets(official float64, samples []fitting.Sample, params fitt
 		{"AP (=1010000)", 1010000, 1010000},
 	}
 
-	fmt.Printf("=== per-score-bucket breakdown (official level = %.1f) ===\n\n", official)
-	fmt.Printf("%-20s %-6s %-10s %-10s %-12s\n",
-		"score bucket", "n", "avg_skill", "avg_infL", "avg_prox")
-	fmt.Println(analyzeRepeat("-", 62))
-
-	for _, b := range buckets {
-		var n int
-		var sumSkill, sumInfL, sumProx float64
-		for _, s := range samples {
-			if s.Score < b.lo || s.Score > b.hi {
+	fmt.Println("=== per-score-bucket breakdown (AP excluded in calibrated mode) ===")
+	fmt.Printf("%-20s %-6s %-10s %-10s %-12s %-10s\n",
+		"score bucket", "n", "avg_skill", "avg_infL", "reference_n", "avg_corrL")
+	fmt.Println(strings.Repeat("-", 78))
+	for _, bucket := range buckets {
+		var count, supported int
+		var skillSum, rawSum, correctedSum float64
+		for _, sample := range samples {
+			if sample.Score < bucket.lo || sample.Score > bucket.hi {
 				continue
 			}
-			inferred, ok := fitting.InverseLevel(s.Score, s.PlayerSkill)
+			inferred, ok := fitting.InverseLevel(sample.Score, sample.PlayerSkill)
 			if !ok {
 				continue
 			}
-			diff := s.PlayerSkill - 10.0*official
-			sigma := params.ProximitySigma
-			if diff > 0 && params.HighSkillSigmaRatio > 0 {
-				sigma *= params.HighSkillSigmaRatio
+			count++
+			skillSum += sample.PlayerSkill
+			rawSum += inferred
+			if sample.LevelCorrection != nil && sample.Score < 1010000 {
+				supported++
+				correctedSum += inferred - *sample.LevelCorrection
 			}
-			prox := math.Exp(-(diff * diff) / (2.0 * sigma * sigma))
-			if math.Abs(diff) > 2.5*sigma {
-				prox = 0
-			}
-			n++
-			sumSkill += s.PlayerSkill
-			sumInfL += inferred
-			sumProx += prox
 		}
-		if n == 0 {
+		if count == 0 {
 			continue
 		}
-		fmt.Printf("%-20s %-6d %-10.2f %-10.3f %-12.3f\n",
-			b.label, n, sumSkill/float64(n), sumInfL/float64(n), sumProx/float64(n))
+		corrected := "n/a"
+		if supported > 0 {
+			corrected = fmt.Sprintf("%.3f", correctedSum/float64(supported))
+		}
+		fmt.Printf("%-20s %-6d %-10.2f %-10.3f %-12d %-10s\n",
+			bucket.label, count, skillSum/float64(count), rawSum/float64(count), supported, corrected)
 	}
-}
-
-func analyzeRepeat(s string, n int) string {
-	out := make([]byte, 0, len(s)*n)
-	for i := 0; i < n; i++ {
-		out = append(out, s...)
-	}
-	return string(out)
 }

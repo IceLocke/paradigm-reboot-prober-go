@@ -35,7 +35,7 @@ func (c *Calibration) AddChart(id int, official float64, samples []Sample, param
 	for _, s := range samples {
 		level, w, ok := weightedInference(official, s, params)
 		if !ok || s.Score >= 1010000 {
-			continue // a perfect score is censored, not an exact difficulty observation
+			continue // perfect scores are censored, not exact difficulty observations
 		}
 		key := int(math.Floor((s.PlayerSkill/10 - official) / calibrationGapWidth))
 		if groups[key] == nil {
@@ -143,29 +143,43 @@ func (r *Runner) collectCalibration(ctx context.Context, charts []chartRow, skil
 	return c, nil
 }
 
-// LoadChartSamples is shared by the runner's diagnostic command so it uses
-// exactly the same configured top-K, age, volume and calibration definitions.
-// It only reads the database; it does not migrate or persist anything.
-func (r *Runner) LoadChartSamples(ctx context.Context, id int) ([]Sample, error) {
+// ChartAnalysis contains both independent sample statistics and the final
+// result after population balancing. It never migrates or writes the database.
+type ChartAnalysis struct {
+	Samples []Sample
+	Result  Result
+	Balance BalanceReport
+}
+
+// AnalyzeChart replays the same complete population as Run, so the displayed
+// target result includes exactly the same global offset.
+func (r *Runner) AnalyzeChart(ctx context.Context, id int) (ChartAnalysis, error) {
+	out := ChartAnalysis{}
 	skills, err := r.collectPlayerSkills(ctx)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	charts, err := r.fetchChartsSorted(ctx)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
 	index := sort.Search(len(charts), func(i int) bool { return charts[i].ID >= id })
 	if index == len(charts) || charts[index].ID != id {
-		return nil, fmt.Errorf("chart %d not found", id)
+		return out, fmt.Errorf("chart %d not found", id)
 	}
-	samples, err := r.fetchBestSamples(ctx, []int{id}, skills)
-	if err != nil || !r.params.CalibrationEnabled {
-		return samples[id], err
+	var calibration *Calibration
+	if r.params.CalibrationEnabled {
+		calibration, err = r.collectCalibration(ctx, charts, skills)
+		if err != nil {
+			return out, err
+		}
 	}
-	c, err := r.collectCalibration(ctx, charts, skills)
+
+	computed, err := r.computeCharts(ctx, charts, skills, calibration, id)
 	if err != nil {
-		return nil, err
+		return out, err
 	}
-	return c.Apply(id, charts[index].Level, samples[id]), nil
+	out.Balance = balanceCharts(charts, computed.results, r.params)
+	out.Samples, out.Result = computed.samples, computed.results[id]
+	return out, nil
 }

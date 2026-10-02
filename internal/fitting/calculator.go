@@ -39,11 +39,12 @@ type Sample struct {
 // docs/fitting_level.en.md (English) / docs/fitting_level.zh.md (中文) for
 // the full derivation.
 type Params struct {
-	CalibrationEnabled bool    // use empirical residual calibration; requires prepared samples
-	CalibrationScale   float64 // final residual gain after shrinkage, in (0,1]
+	CalibrationEnabled      bool    // use empirical residual calibration; requires prepared samples
+	CalibrationNoisePenalty float64 // sampling-noise attenuation; 0 disables
+	BalanceTotal            bool    // preserve the complete published population's official total
 
 	MinEffectiveSamples float64 // minimum N_eff to publish a FittingLevel
-	SkillTopK           int     // K in top-K player skill proxy (must be ≥ 1; historically 50)
+	SkillTopK           int     // K in top-K player skill proxy (must be ≥ 1)
 	SampleHalflifeDays  float64 // half-life in days for the sample-age decay weight; <=0 disables (no decay)
 	ProximitySigma      float64 // σ of the Gaussian proximity weight (skill ≤ 10·Level side), in rating units
 	HighSkillSigmaRatio float64 // σ multiplier for skill > 10·Level; <=0 or =1 means symmetric (disabled)
@@ -95,14 +96,15 @@ type Result struct {
 //  4. Aggregation: compute weighted mean and Kish effective sample size
 //     (N_eff = (Σw)² / Σw²) of the surviving samples.
 //  5. Bayesian shrinkage: pull the weighted mean toward the official level
-//     with prior strength κ, then cap the deviation at MaxDeviation and
-//     apply CalibrationScale to the final residual when calibration is enabled.
+//     with prior strength κ, attenuate sampling noise in calibrated mode,
+//     then cap the deviation at MaxDeviation. No uniform gain is applied.
+//     BalanceFittingTotals subsequently anchors the complete population.
 //
 // When fewer than MinEffectiveSamples surviving samples remain, FittingLevel
 // is left nil — we prefer abstention over publishing a shaky number.
 func ComputeFitting(officialLevel float64, samples []Sample, params Params) Result {
 	res := Result{}
-	if !isFinite(officialLevel) || officialLevel < MinInferredLevel || officialLevel > MaxInferredLevel || (params.CalibrationEnabled && (!isFinite(params.CalibrationScale) || params.CalibrationScale <= 0 || params.CalibrationScale > 1)) {
+	if !isFinite(officialLevel) || officialLevel < MinInferredLevel || officialLevel > MaxInferredLevel || (params.CalibrationEnabled && (!isFinite(params.CalibrationNoisePenalty) || params.CalibrationNoisePenalty < 0)) {
 		return res
 	}
 
@@ -226,6 +228,15 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 	}
 	kappaEff := params.PriorStrength * boost
 	shrunk := (nEff*mean + kappaEff*officialLevel) / (nEff + kappaEff)
+	if params.CalibrationEnabled {
+		residual := shrunk - officialLevel
+		noiseVariance := params.CalibrationNoisePenalty * res.StdDev * res.StdDev / nEff
+		// Attenuate sampling noise; this factor is not a confidence probability.
+		if noiseVariance > 0 {
+			residual *= residual * residual / (residual*residual + noiseVariance)
+		}
+		shrunk = officialLevel + residual
+	}
 	capVal := effectiveMaxDeviation(params, officialLevel)
 	if capVal > 0 {
 		if diff := shrunk - officialLevel; diff > capVal {
@@ -235,7 +246,7 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 		}
 	}
 	if params.CalibrationEnabled {
-		shrunk = officialLevel + params.CalibrationScale*(shrunk-officialLevel)
+		shrunk = math.Max(MinInferredLevel, math.Min(MaxInferredLevel, shrunk))
 	}
 	res.FittingLevel = &shrunk
 	return res

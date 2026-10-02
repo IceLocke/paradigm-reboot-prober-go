@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"os"
 	"regexp"
 	"strconv"
@@ -57,32 +58,33 @@ type Config struct {
 		ExcludePaths []string `yaml:"exclude_paths"` // Gin route templates starting with any of these prefixes are not counted in HTTP metrics
 	} `yaml:"metrics"`
 	Fitting struct {
-		Enabled             bool    `yaml:"enabled"`                // master switch for the fitting-calculator microservice
-		Interval            string  `yaml:"interval"`               // Go duration string (e.g. "6h"); run continuously via ticker
-		MinSamples          float64 `yaml:"min_samples"`            // minimum effective sample size required to publish FittingLevel
-		MinPlayerRecords    int     `yaml:"min_player_records"`     // a player needs at least this many best_play_records to contribute
-		CalibrationEnabled  bool    `yaml:"calibration_enabled"`    // empirical leave-chart-out residual calibration
-		CalibrationScale    float64 `yaml:"calibration_scale"`      // final calibrated residual gain in (0,1]
-		SkillTopK           int     `yaml:"skill_top_k"`            // number of top-rating best-records used to compute a player's skill proxy B_p; must be ≥ 1 (historically 50)
-		SampleHalflifeDays  float64 `yaml:"sample_halflife_days"`   // exponential half-life (in days) for sample-age decay weight; 0 = disabled
-		ProximitySigma      float64 `yaml:"proximity_sigma"`        // Gaussian σ (rating units) centered at 10×Level for the proximity weight
-		HighSkillSigmaRatio float64 `yaml:"high_skill_sigma_ratio"` // σ multiplier for skill > 10×Level (0 or 1 = symmetric)
-		VolumeFullAt        int     `yaml:"volume_full_at"`         // record count at which a player receives full volume weight (1.0)
-		PriorStrength       float64 `yaml:"prior_strength"`         // κ in Bayesian-style shrinkage toward the official level
-		DeviationPenalty    float64 `yaml:"deviation_penalty"`      // λ; extra prior weight when sample-mean deviates from official (0 disables)
-		MaxDeviation        float64 `yaml:"max_deviation"`          // |FittingLevel − Level| hard cap at high levels (in level units); also used as the flat cap when the ramp below is disabled
-		MaxDeviationLow     float64 `yaml:"max_deviation_low"`      // cap at or below MaxDeviationLowAt; ≤0 disables the level-dependent ramp (falls back to flat MaxDeviation)
-		MaxDeviationLowAt   float64 `yaml:"max_deviation_low_at"`   // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt
-		MaxDeviationHighAt  float64 `yaml:"max_deviation_high_at"`  // level at which cap = MaxDeviation; caps are log-interpolated between the two points
-		MinScore            int     `yaml:"min_score"`              // discard samples with score below this threshold
-		ScoreFloorAt        int     `yaml:"score_floor_at"`         // score below this gets zero score-quality weight; ≤0 disables the score-quality weight entirely
-		ScoreGoodAt         int     `yaml:"score_good_at"`          // score at which score-quality weight = ScoreGoodWeight ("会打" threshold)
-		ScoreFullAt         int     `yaml:"score_full_at"`          // score at which score-quality weight saturates to 1.0 ("高分" threshold)
-		ScoreGoodWeight     float64 `yaml:"score_good_weight"`      // score-quality weight at ScoreGoodAt; must be in (0, 1)
-		TukeyK              float64 `yaml:"tukey_k"`                // Tukey biweight tuning constant (usually 4.685)
-		ChartBatchSize      int     `yaml:"chart_batch_size"`       // number of charts processed per DB batch
-		PlayerBatchSize     int     `yaml:"player_batch_size"`      // number of users fetched per page during skill collection
-		BatchPause          string  `yaml:"batch_pause"`            // Go duration string; sleep between chart batches to ease DB load
+		Enabled                 bool    `yaml:"enabled"`                   // master switch for the fitting-calculator microservice
+		Interval                string  `yaml:"interval"`                  // Go duration string (e.g. "6h"); run continuously via ticker
+		MinSamples              float64 `yaml:"min_samples"`               // minimum effective sample size required to publish FittingLevel
+		MinPlayerRecords        int     `yaml:"min_player_records"`        // a player needs at least this many best_play_records to contribute
+		CalibrationEnabled      bool    `yaml:"calibration_enabled"`       // empirical leave-chart-out residual calibration
+		CalibrationNoisePenalty float64 `yaml:"calibration_noise_penalty"` // sampling-noise attenuation; 0 disables
+		BalanceTotal            bool    `yaml:"balance_total"`             // preserve the unweighted official total of published charts
+		SkillTopK               int     `yaml:"skill_top_k"`               // number of top-rating best-records used to compute a player's skill proxy B_p; must be ≥ 1
+		SampleHalflifeDays      float64 `yaml:"sample_halflife_days"`      // exponential half-life (in days) for sample-age decay weight; 0 = disabled
+		ProximitySigma          float64 `yaml:"proximity_sigma"`           // Gaussian σ (rating units) centered at 10×Level for the proximity weight
+		HighSkillSigmaRatio     float64 `yaml:"high_skill_sigma_ratio"`    // σ multiplier for skill > 10×Level (0 or 1 = symmetric)
+		VolumeFullAt            int     `yaml:"volume_full_at"`            // record count at which a player receives full volume weight (1.0)
+		PriorStrength           float64 `yaml:"prior_strength"`            // κ in Bayesian-style shrinkage toward the official level
+		DeviationPenalty        float64 `yaml:"deviation_penalty"`         // λ; extra prior weight when sample-mean deviates from official (0 disables)
+		MaxDeviation            float64 `yaml:"max_deviation"`             // |FittingLevel − Level| hard cap at high levels (in level units); also used as the flat cap when the ramp below is disabled
+		MaxDeviationLow         float64 `yaml:"max_deviation_low"`         // cap at or below MaxDeviationLowAt; ≤0 disables the level-dependent ramp (falls back to flat MaxDeviation)
+		MaxDeviationLowAt       float64 `yaml:"max_deviation_low_at"`      // level at which cap = MaxDeviationLow; must be < MaxDeviationHighAt
+		MaxDeviationHighAt      float64 `yaml:"max_deviation_high_at"`     // level at which cap = MaxDeviation; caps are log-interpolated between the two points
+		MinScore                int     `yaml:"min_score"`                 // discard samples with score below this threshold
+		ScoreFloorAt            int     `yaml:"score_floor_at"`            // score below this gets zero score-quality weight; ≤0 disables the score-quality weight entirely
+		ScoreGoodAt             int     `yaml:"score_good_at"`             // score at which score-quality weight = ScoreGoodWeight ("会打" threshold)
+		ScoreFullAt             int     `yaml:"score_full_at"`             // score at which score-quality weight saturates to 1.0 ("高分" threshold)
+		ScoreGoodWeight         float64 `yaml:"score_good_weight"`         // score-quality weight at ScoreGoodAt; must be in (0, 1)
+		TukeyK                  float64 `yaml:"tukey_k"`                   // Tukey biweight tuning constant (usually 4.685)
+		ChartBatchSize          int     `yaml:"chart_batch_size"`          // number of charts processed per DB batch
+		PlayerBatchSize         int     `yaml:"player_batch_size"`         // number of users fetched per page during skill collection
+		BatchPause              string  `yaml:"batch_pause"`               // Go duration string; sleep between chart batches to ease DB load
 	} `yaml:"fitting"`
 }
 
@@ -127,7 +129,8 @@ func InitDefaults() {
 	GlobalConfig.Fitting.MinSamples = 5.0
 	GlobalConfig.Fitting.MinPlayerRecords = 20
 	GlobalConfig.Fitting.CalibrationEnabled = true
-	GlobalConfig.Fitting.CalibrationScale = 0.1
+	GlobalConfig.Fitting.CalibrationNoisePenalty = 1
+	GlobalConfig.Fitting.BalanceTotal = true
 	GlobalConfig.Fitting.SkillTopK = 20
 	GlobalConfig.Fitting.SampleHalflifeDays = 0
 	GlobalConfig.Fitting.ProximitySigma = 18.5
@@ -135,15 +138,12 @@ func InitDefaults() {
 	GlobalConfig.Fitting.VolumeFullAt = 50
 	GlobalConfig.Fitting.PriorStrength = 5.0
 	GlobalConfig.Fitting.DeviationPenalty = 2.0
-	GlobalConfig.Fitting.MaxDeviation = 1.5
-	GlobalConfig.Fitting.MaxDeviationLow = 0.6
+	GlobalConfig.Fitting.MaxDeviation = 0.3
+	GlobalConfig.Fitting.MaxDeviationLow = 0.15
 	GlobalConfig.Fitting.MaxDeviationLowAt = 12.0
 	GlobalConfig.Fitting.MaxDeviationHighAt = 17.0
 	GlobalConfig.Fitting.MinScore = 500000
-	// Score-quality weight is opt-in. DB sweeps on prod data showed that enabling it
-	// in combination with α=0.2 over-corrects lv11-13 toward negative bias (the mid-
-	// level InverseLevel regime is the most sensitive). Leave all four anchors at 0
-	// to disable; populate all four together to activate.
+	// Score-quality weighting is optional. Set all four anchors to enable it.
 	GlobalConfig.Fitting.ScoreFloorAt = 0
 	GlobalConfig.Fitting.ScoreGoodAt = 0
 	GlobalConfig.Fitting.ScoreFullAt = 0
@@ -345,8 +345,8 @@ func LoadConfig(configPath string) {
 	if GlobalConfig.Fitting.ProximitySigma <= 0 {
 		log.Fatalf("fitting.proximity_sigma must be > 0, got %f", GlobalConfig.Fitting.ProximitySigma)
 	}
-	if GlobalConfig.Fitting.CalibrationEnabled && !(GlobalConfig.Fitting.CalibrationScale > 0 && GlobalConfig.Fitting.CalibrationScale <= 1) {
-		log.Fatal("fitting.calibration_scale must be in (0,1] when calibration is enabled")
+	if math.IsNaN(GlobalConfig.Fitting.CalibrationNoisePenalty) || math.IsInf(GlobalConfig.Fitting.CalibrationNoisePenalty, 0) || GlobalConfig.Fitting.CalibrationNoisePenalty < 0 {
+		log.Fatal("fitting.calibration_noise_penalty must be finite and >= 0")
 	}
 	if GlobalConfig.Fitting.SkillTopK < 1 {
 		log.Fatalf("fitting.skill_top_k must be ≥ 1, got %d", GlobalConfig.Fitting.SkillTopK)

@@ -76,8 +76,10 @@ Repository: `github.com/IceLocke/paradigm-reboot-prober-go`
 │   ├── fitting/                 # Fitting-level calculator library (used ONLY by cmd/fitting)
 │   │   ├── inverter.go          # Closed-form inverse of pkg/rating.SingleRating
 │   │   ├── calculator.go        # Weighting + robust aggregation + shrinkage + deviation cap
-│   │   ├── player_skill.go      # Per-player B50 mean rating collection (keyset pagination)
-│   │   └── runner.go            # Orchestrator: load → batch-process charts → persist
+│   │   ├── calibration.go       # Leave-chart-out cohort correction + read-only chart analysis
+│   │   ├── balance.go           # Match the published official total within final bounds
+│   │   ├── player_skill.go      # Per-player top-K mean rating collection (keyset pagination)
+│   │   └── runner.go            # Orchestrator: load → compute → balance → batch-persist
 │   ├── logging/                 # Structured logging infrastructure (slog + context)
 │   │   ├── context.go           # AppendCtx helper, context key for slog attrs
 │   │   ├── handler.go           # ContextHandler wrapping slog.Handler
@@ -327,7 +329,7 @@ The binary exposes two subcommands:
 | Subcommand | Purpose |
 |------------|---------|
 | `run` | Run the calculator in continuous mode (ticker) or one-shot (`--once`) mode. This is the **default** when no subcommand keyword is given, so existing invocations like `./fitting`, `./fitting --once`, or the Docker `command: ["./fitting", "-once"]` keep working unchanged. |
-| `analyze` | Read-only diagnostic for a single chart: prints the per-score-bucket breakdown and the result of `fitting.ComputeFitting` under several candidate `Params` configurations side-by-side. Writes nothing back to the DB; safe against production. |
+| `analyze` | Read-only diagnostic for a single chart: prints score buckets, sample statistics, the independent estimate and the final result after full-population balancing. Writes nothing back to the DB; safe against production. |
 
 ```bash
 # Local: continuous mode (runs every fitting.interval, default 6h) until SIGINT/SIGTERM
@@ -491,13 +493,16 @@ Configuration is loaded from `config/config.yaml`, with **environment variable o
 | `fitting.interval`           | `FITTING_INTERVAL` | `6h`                         | Ticker period for continuous mode (Go duration string, must be > 0)       |
 | `fitting.min_samples`        | —               | `5.0`                             | Minimum effective sample size (`N_eff`) to publish `FittingLevel`         |
 | `fitting.min_player_records` | —               | `20`                              | Minimum total best records a player must have to contribute samples        |
+| `fitting.calibration_enabled` | —              | `true`                            | Leave-chart-out peer calibration; false also bypasses noise attenuation and total balancing |
+| `fitting.calibration_noise_penalty` | —        | `1.0`                             | Finite nonnegative sampling-noise attenuation coefficient; zero disables |
+| `fitting.balance_total` | —                    | `true`                            | Preserve the unweighted official total of the complete published population, in calibrated mode |
 | `fitting.proximity_sigma`    | —               | `18.5`                            | Gaussian σ in rating units centered on 10×Level (proximity weight)        |
 | `fitting.high_skill_sigma_ratio` | —           | `0.2`                             | σ multiplier for skill > 10×Level (over-skill side); `1.0` = symmetric, samples beyond 2.5·σ are hard-dropped |
 | `fitting.volume_full_at`     | —               | `50`                              | Records count at which a player receives full volume weight (1.0)          |
 | `fitting.prior_strength`     | —               | `5.0`                             | κ in Bayesian shrinkage toward the official level                          |
 | `fitting.deviation_penalty`  | —               | `2.0`                             | λ; inflates κ by (1 + λ·dev²·nRef/nEff) when sample-mean strays from official (`0` disables) |
-| `fitting.max_deviation`      | —               | `1.5`                             | Hard cap on \|FittingLevel − Level\| at or above `max_deviation_high_at`; also the flat cap when the ramp is disabled |
-| `fitting.max_deviation_low`  | —               | `0.6`                             | Cap at or below `max_deviation_low_at`. ≤0 disables the level-dependent ramp (falls back to flat `max_deviation`) |
+| `fitting.max_deviation`      | —               | `0.3`                             | Final cap on \|FittingLevel − Level\| at or above `max_deviation_high_at`; also the flat cap when the ramp is disabled |
+| `fitting.max_deviation_low`  | —               | `0.15`                            | Final cap at or below `max_deviation_low_at`. ≤0 disables the level-dependent ramp (falls back to flat `max_deviation`) |
 | `fitting.max_deviation_low_at` | —             | `12.0`                            | Official level at which the cap equals `max_deviation_low`; must be < `max_deviation_high_at` when the ramp is enabled |
 | `fitting.max_deviation_high_at` | —            | `17.0`                            | Official level at which the cap equals `max_deviation`; between the two endpoints the cap follows a log interpolation `low · (high/low)^t` |
 | `fitting.min_score`          | —               | `500000`                          | Discard samples with score below this threshold                            |

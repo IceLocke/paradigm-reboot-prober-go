@@ -3,7 +3,6 @@ package fitting
 import (
 	"context"
 	"fmt"
-	"math"
 	"testing"
 
 	"paradigm-reboot-prober-go/internal/model"
@@ -24,7 +23,7 @@ func calibrationSamples(level, residual float64) []Sample {
 
 func TestCalibrationRemovesCeilingBiasAndPreservesDirection(t *testing.T) {
 	p := defaultParams()
-	p.CalibrationEnabled, p.CalibrationScale = true, 0.1
+	p.CalibrationEnabled = true
 	c := &Calibration{}
 	for id := 1; id <= 12; id++ {
 		c.AddChart(id, 15, calibrationSamples(15, 0.5), p)
@@ -71,7 +70,7 @@ func TestCalibrationExcludesTargetAndBalancesCharts(t *testing.T) {
 
 func TestCalibrationAbstainsWithoutPeersAndAtCeiling(t *testing.T) {
 	p := defaultParams()
-	p.CalibrationEnabled, p.CalibrationScale = true, 0.1
+	p.CalibrationEnabled = true
 	c := &Calibration{}
 	for id := 1; id <= 9; id++ {
 		c.AddChart(id, 15, calibrationSamples(15, 0.5), p)
@@ -79,15 +78,18 @@ func TestCalibrationAbstainsWithoutPeersAndAtCeiling(t *testing.T) {
 	s := calibrationSamples(15, 0.5)
 	assert.Nil(t, ComputeFitting(15, c.Apply(99, 15, s), p).FittingLevel)
 	assert.Nil(t, ComputeFitting(15, s, p).FittingLevel)
+	perfect := calibrationSamples(15, 0.5)
+	for i := range perfect {
+		perfect[i].Score = 1010000
+	}
+	c.AddChart(11, 15, perfect, p)
+	_, supported := c.Correction(99, 15, 160)
+	assert.False(t, supported, "AP-only charts cannot provide peer support")
 	c.AddChart(10, 15, s, p)
 	for i := range s {
 		s[i].Score = 1010000
 	}
 	assert.Nil(t, ComputeFitting(15, c.Apply(99, 15, s), p).FittingLevel)
-	for _, scale := range []float64{0, -1, 2, math.NaN(), math.Inf(1)} {
-		p.CalibrationScale = scale
-		assert.Nil(t, ComputeFitting(15, c.Apply(99, 15, calibrationSamples(15, 0.5)), p).FittingLevel)
-	}
 }
 
 func TestCalibrationHonorsCancellation(t *testing.T) {
@@ -100,22 +102,35 @@ func TestCalibrationHonorsCancellation(t *testing.T) {
 
 func TestCalibratedRunnerMatchesDiagnosticAcrossBatches(t *testing.T) {
 	db := setupTestDB(t)
-	charts := seedCharts(t, db, 12)
+	charts := seedCharts(t, db, 14)
+	peers := charts[:12]
 	assert.NoError(t, db.Model(&model.Chart{}).Where("id IN ?", charts).Update("level", 15).Error)
 	for u := 0; u < 12; u++ {
 		username := fmt.Sprintf("cal_player_%d", u)
 		seedUser(t, db, username)
-		for _, id := range charts {
-			seedRatedPlay(t, db, username, id, 16000, true)
+		for _, id := range peers {
+			recordID := seedRatedPlay(t, db, username, id, 16000, true)
+			if id == charts[0] || id == charts[1] {
+				level := 15.8
+				if id == charts[1] {
+					level = 15.2
+				}
+				assert.NoError(t, db.Model(&model.PlayRecord{}).Where("id = ?", recordID).Update("score", simulateScore(level, 160)).Error)
+			}
 		}
 	}
+	for u := 0; u < 2; u++ {
+		seedRatedPlay(t, db, fmt.Sprintf("cal_player_%d", u), charts[12], 16000, true)
+	}
+	assert.NoError(t, db.Model(&model.Chart{}).Where("id IN ?", charts[12:]).Update("fitting_level", 13.5).Error)
 	p := defaultParams()
-	p.SkillTopK, p.CalibrationEnabled, p.CalibrationScale = 20, true, 0.1
+	p.SkillTopK, p.CalibrationEnabled = 20, true
+	p.CalibrationNoisePenalty, p.BalanceTotal, p.MaxDeviation = 1, true, 0.3
 	r := NewRunner(db, p, RunnerConfig{ChartBatchSize: 3, PlayerBatchSize: 4})
 	ctx := context.Background()
-	samples, err := r.LoadChartSamples(ctx, charts[0])
+	analysis, err := r.AnalyzeChart(ctx, charts[0])
 	assert.NoError(t, err)
-	expected := ComputeFitting(15, samples, p)
+	expected := analysis.Result
 	if !assert.NotNil(t, expected.FittingLevel) {
 		return
 	}
@@ -124,15 +139,34 @@ func TestCalibratedRunnerMatchesDiagnosticAcrossBatches(t *testing.T) {
 	assert.Zero(t, statsBefore, "diagnostic is read only")
 	report, err := r.Run(ctx)
 	assert.NoError(t, err)
-	assert.Equal(t, len(charts), report.ChartsPublished)
+	assert.Equal(t, len(peers), report.ChartsPublished)
+	assert.Equal(t, 1, report.ChartsEmpty)
+	assert.Equal(t, 1, report.ChartsAbstained)
 	var chart model.Chart
 	assert.NoError(t, db.First(&chart, charts[0]).Error)
 	assert.Equal(t, expected.FittingLevel, chart.FittingLevel)
+	assert.InDelta(t, report.Balance.OfficialSum, report.Balance.FittingSum, 1e-10)
+	var persisted []model.ChartStatistic
+	assert.NoError(t, db.Find(&persisted).Error)
+	var total float64
+	for _, stat := range persisted {
+		if stat.ChartID == charts[12] || stat.ChartID == charts[13] {
+			assert.Nil(t, stat.FittingLevel)
+		} else if assert.NotNil(t, stat.FittingLevel) {
+			total += *stat.FittingLevel - stat.OfficialLevel
+		}
+	}
+	assert.InDelta(t, 0, total, 1e-10, "persist balanced values in statistics as well as charts")
 	// Changing batch boundaries cannot change the learned reference population.
 	r.cfg.ChartBatchSize = 7
-	second, err := r.LoadChartSamples(ctx, charts[0])
+	second, err := r.AnalyzeChart(ctx, charts[0])
 	assert.NoError(t, err)
-	assert.Equal(t, expected, ComputeFitting(15, second, p))
+	assert.Equal(t, expected, second.Result)
+	_, err = r.Run(ctx)
+	assert.NoError(t, err)
+	chart = model.Chart{}
+	assert.NoError(t, db.First(&chart, charts[0]).Error)
+	assert.Equal(t, expected.FittingLevel, chart.FittingLevel)
 	// Remove the peer population: an old published value must be cleared.
 	assert.NoError(t, db.Where("chart_id IN ?", charts[1:]).Delete(&model.BestPlayRecord{}).Error)
 	_, err = r.Run(ctx)

@@ -29,7 +29,7 @@ type Runner struct {
 	db      *gorm.DB
 	params  Params
 	cfg     RunnerConfig
-	nowFunc func() time.Time // injectable "now" for testing sample-age decay; defaults to time.Now
+	nowFunc func() time.Time // reference time for optional sample-age decay
 }
 
 // NewRunner constructs a runner. `db` is expected to already have the shared
@@ -44,8 +44,7 @@ func NewRunner(db *gorm.DB, params Params, cfg RunnerConfig) *Runner {
 	return &Runner{db: db, params: params, cfg: cfg, nowFunc: time.Now}
 }
 
-// now returns the runner's reference time. Uses nowFunc when set, otherwise
-// falls back to time.Now so a zero-valued Runner still works (defensive).
+// now returns the reference time for optional sample-age decay.
 func (r *Runner) now() time.Time {
 	if r.nowFunc != nil {
 		return r.nowFunc()
@@ -65,12 +64,15 @@ type RunReport struct {
 	ChartsAbstained   int // insufficient samples → nil fitting
 	ChartsEmpty       int // no samples at all
 	ErrorsEncountered int
+	Balance           BalanceReport
 }
 
 // Run executes one pass: build player-skill cache → iterate charts in
-// batches → compute & persist fitting levels + statistics. Any context
-// cancellation aborts promptly; partial progress stays persisted (each
-// completed batch is committed before the run moves on).
+// batches → compute all estimates → balance the published total → persist
+// fitting levels + statistics in batches. No writes occur until all estimates
+// are available, so a failed read cannot balance an incomplete population.
+// Cancellation during persistence can leave committed batches; a successful
+// pass is required for the total constraint to hold in the database.
 //
 // Named returns so the deferred finalizer can inspect err and emit a
 // per-outcome log line (errors → ERROR, otherwise INFO), plus unconditionally
@@ -94,6 +96,9 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 			"charts_abstained", report.ChartsAbstained,
 			"charts_empty", report.ChartsEmpty,
 			"errors", report.ErrorsEncountered,
+			"official_sum", report.Balance.OfficialSum,
+			"fitting_sum", report.Balance.FittingSum,
+			"balance_offset", report.Balance.Offset,
 		}
 		if err != nil {
 			slog.ErrorContext(ctx, "fitting run failed", append(attrs, "err", err)...)
@@ -125,7 +130,24 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 		}
 	}
 
-	// 3. Batch-process charts.
+	// 3. Compute the complete population before balancing or writing anything.
+	computed, err := r.computeCharts(ctx, charts, skills, calibration, 0)
+	if err != nil {
+		report.ErrorsEncountered++
+		return report, err
+	}
+	report.ChartsProcessed = len(computed.results)
+	report.ChartsEmpty = computed.empty
+	plannedPublished := 0
+	for _, result := range computed.results {
+		if result.FittingLevel != nil {
+			plannedPublished++
+		}
+	}
+	report.ChartsAbstained = report.ChartsProcessed - report.ChartsEmpty - plannedPublished
+	report.Balance = balanceCharts(charts, computed.results, r.params)
+
+	// 4. Persist the already balanced results in short transactions.
 	for start := 0; start < len(charts); start += r.cfg.ChartBatchSize {
 		if err := ctx.Err(); err != nil {
 			return report, err
@@ -136,47 +158,21 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 		}
 		batch := charts[start:end]
 
-		chartIDs := make([]int, len(batch))
-		levelByID := make(map[int]float64, len(batch))
-		for i, c := range batch {
-			chartIDs[i] = c.ID
-			levelByID[c.ID] = c.Level
-		}
-
-		samplesByChart, err := r.fetchBestSamples(ctx, chartIDs, skills)
-		if err != nil {
-			slog.ErrorContext(ctx, "fetch best samples batch failed",
-				"batch_start", start, "err", err)
-			report.ErrorsEncountered++
-			continue
-		}
-
 		persistItems := make([]persistItem, 0, len(batch))
 		for _, c := range batch {
-			if err := ctx.Err(); err != nil {
-				return report, err
-			}
-			samples := samplesByChart[c.ID]
-			if calibration != nil {
-				samples = calibration.Apply(c.ID, c.Level, samples)
-			}
-			res := ComputeFitting(c.Level, samples, r.params)
-			report.ChartsProcessed++
-			if len(samples) == 0 {
-				report.ChartsEmpty++
-			} else if res.FittingLevel == nil {
-				report.ChartsAbstained++
-			} else {
-				report.ChartsPublished++
-			}
-
-			persistItems = append(persistItems, persistItem{chartID: c.ID, officialLevel: c.Level, result: res})
+			persistItems = append(persistItems, persistItem{chartID: c.ID, officialLevel: c.Level, result: computed.results[c.ID]})
 		}
 
 		if err := r.persistBatch(ctx, persistItems); err != nil {
 			slog.ErrorContext(ctx, "persist fitting batch failed",
 				"batch_start", start, "batch_size", len(persistItems), "err", err)
 			report.ErrorsEncountered += len(persistItems)
+			return report, fmt.Errorf("persist fitting batch at %d: %w", start, err)
+		}
+		for _, item := range persistItems {
+			if item.result.FittingLevel != nil {
+				report.ChartsPublished++
+			}
 		}
 
 		if r.cfg.BatchPause > 0 && end < len(charts) {
@@ -189,6 +185,65 @@ func (r *Runner) Run(ctx context.Context) (report RunReport, err error) {
 	}
 
 	return report, nil
+}
+
+type computedCharts struct {
+	results map[int]Result
+	samples []Sample // only the diagnostic target; other sample batches are released
+	empty   int
+}
+
+// computeCharts is shared by production and diagnostics. Only small per-chart
+// results survive each batch. Keeping normalization outside this loop makes
+// the final levels independent of database batch boundaries.
+func (r *Runner) computeCharts(ctx context.Context, charts []chartRow, skills map[string]PlayerSkill, calibration *Calibration, targetID int) (computedCharts, error) {
+	out := computedCharts{results: make(map[int]Result, len(charts))}
+	for start := 0; start < len(charts); start += r.cfg.ChartBatchSize {
+		if err := ctx.Err(); err != nil {
+			return out, err
+		}
+		batch := charts[start:min(start+r.cfg.ChartBatchSize, len(charts))]
+		ids := make([]int, len(batch))
+		for i, c := range batch {
+			ids[i] = c.ID
+		}
+		samplesByChart, err := r.fetchBestSamples(ctx, ids, skills)
+		if err != nil {
+			return out, fmt.Errorf("fetch best samples at %d: %w", start, err)
+		}
+		for _, c := range batch {
+			if err := ctx.Err(); err != nil {
+				return out, err
+			}
+			samples := samplesByChart[c.ID]
+			if len(samples) == 0 {
+				out.empty++
+			}
+			if calibration != nil {
+				samples = calibration.Apply(c.ID, c.Level, samples)
+			}
+			out.results[c.ID] = ComputeFitting(c.Level, samples, r.params)
+			if c.ID == targetID {
+				out.samples = samples
+			}
+		}
+		if r.cfg.BatchPause > 0 && start+len(batch) < len(charts) {
+			select {
+			case <-ctx.Done():
+				return out, ctx.Err()
+			case <-time.After(r.cfg.BatchPause):
+			}
+		}
+	}
+	return out, nil
+}
+
+func balanceCharts(charts []chartRow, results map[int]Result, params Params) BalanceReport {
+	levels := make(map[int]float64, len(charts))
+	for _, c := range charts {
+		levels[c.ID] = c.Level
+	}
+	return BalanceFittingTotals(levels, results, params)
 }
 
 type persistItem struct {

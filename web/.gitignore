@@ -3,6 +3,7 @@ node_modules/
 
 # Build output
 dist/
+.wrangler/
 
 # Generated intermediates
 src/api/openapi3.json
