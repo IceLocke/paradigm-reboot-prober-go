@@ -10,7 +10,6 @@ import (
 
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/fitting"
-	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/util"
 )
 
@@ -31,20 +30,8 @@ func cmdRun(args []string) {
 	config.LoadConfig(*configPath)
 
 	// 2. Shared structured logging.
-	logCloser, err := logging.Setup(
-		config.GlobalConfig.Logging.Output,
-		config.GlobalConfig.Logging.File,
-		config.GlobalConfig.Logging.Format,
-	)
-	if err != nil {
-		panic(err)
-	}
+	baseCtx, logCloser := setupFittingLogging("run")
 	defer func() { _ = logCloser.Close() }()
-
-	// Attach a stable component attribute so fitting logs are easy to filter.
-	baseCtx := logging.AppendCtx(context.Background(),
-		slog.String("component", "fitting"),
-	)
 
 	// 3. The master switch skips continuous mode; --once runs explicitly.
 	if !config.GlobalConfig.Fitting.Enabled && !*once {

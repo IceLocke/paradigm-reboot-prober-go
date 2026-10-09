@@ -113,12 +113,15 @@ func ComputeFitting(officialLevel float64, samples []Sample, params Params) Resu
 	prew := make([]float64, 0, len(samples))
 	var raw int
 	for _, s := range samples {
-		if s.Score >= params.MinScore {
-			if _, ok := InverseLevel(s.Score, s.PlayerSkill); ok {
-				raw++
-			}
+		if s.Score < params.MinScore {
+			continue
 		}
-		level, w, ok := weightedInference(officialLevel, s, params)
+		level, ok := InverseLevel(s.Score, s.PlayerSkill)
+		if !ok {
+			continue
+		}
+		raw++ // Count successful inversions even when later eligibility checks fail.
+		w, ok := sampleWeight(officialLevel, s, params)
 		if !ok {
 			continue
 		}
@@ -398,17 +401,29 @@ func weightedMedian(values, weights []float64) float64 {
 	return values[idx[n-1]]
 }
 
-// weightedInference is shared by training and inference to keep eligibility and weights identical.
+// weightedInference inverts a training sample and applies the same weights as
+// ComputeFitting. Keeping weighting separate lets ComputeFitting count raw
+// inversions without repeating the inversion for contributing samples.
 func weightedInference(officialLevel float64, s Sample, params Params) (float64, float64, bool) {
-	if !isFinite(s.PlayerSkill) || s.PlayerSkill <= 0 || (params.MinPlayerRecords > 0 && s.PlayerRecords < params.MinPlayerRecords) {
-		return 0, 0, false
-	}
 	if s.Score < params.MinScore {
 		return 0, 0, false
 	}
 	level, ok := InverseLevel(s.Score, s.PlayerSkill)
 	if !ok {
 		return 0, 0, false
+	}
+	w, ok := sampleWeight(officialLevel, s, params)
+	if !ok {
+		return 0, 0, false
+	}
+	return level, w, true
+}
+
+// sampleWeight is shared by calibration training and chart inference so
+// eligibility and preweights remain identical.
+func sampleWeight(officialLevel float64, s Sample, params Params) (float64, bool) {
+	if !isFinite(s.PlayerSkill) || s.PlayerSkill <= 0 || (params.MinPlayerRecords > 0 && s.PlayerRecords < params.MinPlayerRecords) {
+		return 0, false
 	}
 	// proximity weight: Gaussian on (skill − 10·Level) in rating units.
 	//
@@ -434,7 +449,7 @@ func weightedInference(officialLevel float64, s Sample, params Params) (float64,
 		sigma = sigma * params.HighSkillSigmaRatio
 	}
 	if math.Abs(diff) > proximityCutoffSigmas*sigma {
-		return 0, 0, false
+		return 0, false
 	}
 	proximity := math.Exp(-(diff * diff) / (2.0 * sigma * sigma))
 	// volume weight: linear ramp to 1.0 at VolumeFullAt records.
@@ -464,9 +479,9 @@ func weightedInference(officialLevel float64, s Sample, params Params) (float64,
 	ageW := sampleAgeWeight(s.AgeDays, params.SampleHalflifeDays)
 	w := proximity * volume * scoreQ * ageW
 	if w <= 0 || math.IsNaN(w) {
-		return 0, 0, false
+		return 0, false
 	}
-	return level, w, true
+	return w, true
 }
 
 func isFinite(v float64) bool { return !math.IsNaN(v) && !math.IsInf(v, 0) }

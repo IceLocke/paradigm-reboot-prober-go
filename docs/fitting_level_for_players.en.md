@@ -29,6 +29,10 @@ The published population has the same total fitting and official levels.
 This does not require every chart to differ, or equal counts of increases
 and decreases. Charts with insufficient evidence still display `—`.
 
+Matching totals is a scale choice: we assume official levels are correct
+on average for the published charts. Scores do not prove this assumption,
+and balancing can hide a systematic average error in the official levels.
+
 ## Reading the result
 
 - Higher than official: relatively harder to achieve comparable performance.

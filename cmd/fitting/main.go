@@ -38,6 +38,8 @@ import (
 )
 
 func main() {
+	// TODO: Use Cobra for subcommands and flags in a follow-up PR, preserving
+	// the default run command and existing command-line compatibility.
 	// Subcommand dispatch. The first positional argument selects a
 	// subcommand; everything else is forwarded to that subcommand's own
 	// flag parser. Unknown first arguments (including flags like "--once")

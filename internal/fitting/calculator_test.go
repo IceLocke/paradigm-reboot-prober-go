@@ -419,6 +419,43 @@ func TestComputeFitting_ZeroVolumeWeight(t *testing.T) {
 		"N_eff must collapse to 1 after ghosts are zeroed out")
 }
 
+func TestComputeFitting_RawCountIncludesFilteredInversions(t *testing.T) {
+	params := defaultParams()
+	params.CalibrationEnabled = true
+	params.MinEffectiveSamples = 0.5
+	params.MinPlayerRecords = 20
+	params.HighSkillSigmaRatio = 0.2
+	params.PriorStrength = 0
+	params.ScoreFloorAt = 1_000_000
+	params.ScoreGoodAt = 1_007_500
+	params.ScoreFullAt = 1_009_000
+	params.ScoreGoodWeight = 0.6
+	correction := 0.0
+	contributor := Sample{Score: 1_009_000, PlayerSkill: 167, PlayerRecords: 50, LevelCorrection: &correction}
+	baseline := ComputeFitting(16, []Sample{contributor}, params)
+	if !assert.NotNil(t, baseline.FittingLevel) {
+		return
+	}
+
+	for _, tc := range []struct {
+		name   string
+		sample Sample
+	}{
+		{"too few player records", Sample{Score: 1_009_000, PlayerSkill: 167, PlayerRecords: 19, LevelCorrection: &correction}},
+		{"outside skill band", Sample{Score: 1_009_000, PlayerSkill: 190, PlayerRecords: 50, LevelCorrection: &correction}},
+		{"zero score weight", Sample{Score: 990_000, PlayerSkill: 160, PlayerRecords: 50, LevelCorrection: &correction}},
+		{"unsupported calibration", Sample{Score: 1_009_000, PlayerSkill: 167, PlayerRecords: 50}},
+		{"perfect score", Sample{Score: 1_010_000, PlayerSkill: 167, PlayerRecords: 50, LevelCorrection: &correction}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ComputeFitting(16, []Sample{contributor, tc.sample}, params)
+			assert.Equal(t, 2, result.SampleCount, "filtered inversions still count as raw samples")
+			result.SampleCount = baseline.SampleCount
+			assert.Equal(t, baseline, result, "filtered samples must not affect the fit or aggregate statistics")
+		})
+	}
+}
+
 // weightedMedian exercises.
 func TestWeightedMedian_SimpleAndWeighted(t *testing.T) {
 	assert.InDelta(t, 3.0, weightedMedian([]float64{1, 2, 3, 4, 5}, []float64{1, 1, 1, 1, 1}), 1e-9)

@@ -130,6 +130,28 @@ a smooth noise penalty, not a confidence probability: it does not capture
 uncertainty in peer calibration, practice or player selection. No minimum
 deviation is imposed on ordinary charts.
 
+**Why anchor the total to official levels?** This is an explicit modeling
+assumption, not a measured conservation law. Player skill is computed from
+ratings based on official levels, and peer calibration measures relative
+performance gaps. Neither supplies an absolute difficulty reference
+independent of the official scale. We choose the official mean of the
+published population as that reference, assuming its average error is zero;
+balancing removes any remaining common drift of the estimator.
+
+This assumption is not established by the score data. If official levels
+have a systematic average error, balancing hides that error. Changes in the
+published population can also shift the offset and move an otherwise
+unchanged chart. Use `balance_total: false` to inspect independent estimates
+while retaining peer calibration and noise attenuation. The diagnostic
+logs both the independent and final estimates so the effect is visible.
+
+For example, three charts with official levels `(16, 16, 16)` and independent
+estimates `(16.2, 16.1, 16.0)` have a mean deviation of `+0.1`. If no bounds
+are active, subtracting `0.1` gives `(16.1, 16.0, 15.9)`, preserving their
+relative differences and restoring the official total of `48`. This
+illustrates the chosen scale anchor; it does not prove the third chart is
+easier in an absolute sense. Active bounds require the projection below.
+
 After computing **all** independent estimates, find one offset $b$ such that
 
 $$
@@ -506,6 +528,20 @@ go run ./cmd/fitting --once -config config/config.yaml
 # Read-only diagnostic for one chart (does not write the DB)
 go run ./cmd/fitting analyze -chart 870 -config config/config.yaml
 ```
+
+Both subcommands use the shared `logging.output` / `logging.format` settings.
+Startup logs report the effective fitting configuration, including
+`skill_top_k`, calibration and balancing switches, sample thresholds, and
+`max_deviation` / `max_deviation_low` with their level endpoints. Analysis
+emits structured score buckets, statistics, population totals and estimates;
+numeric fields remain numbers in JSON logs and unavailable levels are null.
+
+`analyze` uses `ConnectDB` to query the existing schema without migrations;
+`run` and the probe server use `InitDB`. `AutoMigrate` is idempotent, but it
+can still execute DDL when tables, columns or indexes differ from the models.
+Skipping it keeps diagnostics free of schema changes and lets them run with
+read-only database credentials. Initialize or migrate the schema separately
+before running analysis.
 
 The binary exits cleanly on `SIGINT` / `SIGTERM`. In continuous mode a
 transient DB error during one pass is logged but does **not** kill the loop;

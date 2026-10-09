@@ -20,6 +20,12 @@ type BalanceReport struct {
 // minimizes squared changes to the independent estimates:
 // delta_c = clamp(raw_delta_c - offset, lower_c, upper_c), sum(delta_c) = 0.
 //
+// This is an optional scale anchor, not an empirical conservation law: assume
+// the official mean is appropriate for the published population and suppress
+// shared estimator drift. It can hide a real population-wide rating bias;
+// disable Params.BalanceTotal to inspect independent estimates. See the
+// rationale and example in docs/fitting_level.en.md, section 4.0.
+//
 // Call once before persistence, never once per database batch. New pointers
 // are assigned to map entries so copies of input Results are not mutated.
 func BalanceFittingTotals(official map[int]float64, results map[int]Result, params Params) BalanceReport {

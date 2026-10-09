@@ -6,12 +6,12 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
+	"log/slog"
 	"os"
-	"strings"
 
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/fitting"
+	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/internal/util"
 )
@@ -22,51 +22,72 @@ func cmdAnalyze(args []string) {
 	chartID := fs.Int("chart", 0, "Chart ID to analyze (required)")
 	_ = fs.Parse(args)
 	if *chartID == 0 {
-		fmt.Fprintln(os.Stderr, "error: -chart is required")
+		slog.Error("-chart is required")
 		os.Exit(2)
 	}
 
 	config.LoadConfig(*configPath)
+	ctx, logCloser := setupFittingLogging("analyze")
+	defer func() { _ = logCloser.Close() }()
+	ctx = logging.AppendCtx(ctx, slog.Int("chart_id", *chartID))
 	util.ConnectDB()
-
-	ctx := context.Background()
 
 	// 1. Load chart metadata.
 	var chart model.Chart
 	if err := util.DB.WithContext(ctx).
 		Select("id, level, song_id, difficulty").
 		First(&chart, *chartID).Error; err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load chart %d: %v\n", *chartID, err)
+		slog.ErrorContext(ctx, "failed to load chart", "err", err)
 		os.Exit(1)
 	}
-	fmt.Printf("=== chart %d | level=%.1f | difficulty=%s ===\n\n", chart.ID, chart.Level, chart.Difficulty)
+	slog.InfoContext(ctx, "analyzing chart", "official_level", chart.Level, "difficulty", chart.Difficulty)
 
 	base := configuredParams()
 	runner := fitting.NewRunner(util.DB, base, fitting.RunnerConfig{})
 	analysis, err := runner.AnalyzeChart(ctx, *chartID)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "load samples: %v\n", err)
+		slog.ErrorContext(ctx, "failed to analyze chart", "err", err)
 		os.Exit(1)
 	}
 	samples := analysis.Samples
-	fmt.Printf("total samples: %d; skill top-K: %d\n\n", len(samples), base.SkillTopK)
-	analyzePrintBuckets(samples)
-	fmt.Printf("\nPublished population: %d charts; official total: %.6f; fitting total: %.6f; offset: %+.6f\n",
-		analysis.Balance.Charts, analysis.Balance.OfficialSum, analysis.Balance.FittingSum, analysis.Balance.Offset)
+	slog.InfoContext(ctx, "chart samples loaded", "samples", len(samples))
+	analyzeLogBuckets(ctx, samples)
+	slog.InfoContext(ctx, "published population",
+		"charts", analysis.Balance.Charts,
+		"official_sum", analysis.Balance.OfficialSum,
+		"fitting_sum", analysis.Balance.FittingSum,
+		"balance_offset", analysis.Balance.Offset,
+	)
 	result := analysis.Result
-	fmt.Printf("Raw inversions: %d; N_eff: %.2f; median: %.4f; mean: %.4f; SD: %.4f; MAD: %.4f\n",
-		result.SampleCount, result.EffectiveSampleSize, result.WeightedMedian, result.WeightedMean, result.StdDev, result.MAD)
+	slog.InfoContext(ctx, "chart statistics",
+		"sample_count", result.SampleCount,
+		"effective_sample_size", result.EffectiveSampleSize,
+		"weighted_median", result.WeightedMedian,
+		"weighted_mean", result.WeightedMean,
+		"stddev", result.StdDev,
+		"mad", result.MAD,
+	)
 	if result.FittingLevel == nil {
-		fmt.Println("Fitting level: nil (insufficient samples or peer support)")
+		slog.InfoContext(ctx, "chart fitting result",
+			"fitting_level", nil,
+			"reason", "insufficient samples or peer support",
+		)
 	} else {
 		independent := fitting.ComputeFitting(chart.Level, samples, base)
-		fmt.Printf("Independent estimate: %.6f; final fitting level: %.6f\n", *independent.FittingLevel, *result.FittingLevel)
+		var independentLevel any
+		if independent.FittingLevel != nil {
+			independentLevel = *independent.FittingLevel
+		}
+		slog.InfoContext(ctx, "chart fitting result",
+			"independent_fitting_level", independentLevel,
+			"fitting_level", *result.FittingLevel,
+		)
 	}
 }
 
 // Score buckets show raw inverse levels and the supported cohort corrections.
 // AP is excluded from calibrated fitting and appears here for diagnostics.
-func analyzePrintBuckets(samples []fitting.Sample) {
+func analyzeLogBuckets(ctx context.Context, samples []fitting.Sample) {
 	buckets := []struct {
 		label string
 		lo    int
@@ -83,10 +104,6 @@ func analyzePrintBuckets(samples []fitting.Sample) {
 		{"AP (=1010000)", 1010000, 1010000},
 	}
 
-	fmt.Println("=== per-score-bucket breakdown (AP excluded in calibrated mode) ===")
-	fmt.Printf("%-20s %-6s %-10s %-10s %-12s %-10s\n",
-		"score bucket", "n", "avg_skill", "avg_infL", "reference_n", "avg_corrL")
-	fmt.Println(strings.Repeat("-", 78))
 	for _, bucket := range buckets {
 		var count, supported int
 		var skillSum, rawSum, correctedSum float64
@@ -109,11 +126,17 @@ func analyzePrintBuckets(samples []fitting.Sample) {
 		if count == 0 {
 			continue
 		}
-		corrected := "n/a"
+		var corrected any
 		if supported > 0 {
-			corrected = fmt.Sprintf("%.3f", correctedSum/float64(supported))
+			corrected = correctedSum / float64(supported)
 		}
-		fmt.Printf("%-20s %-6d %-10.2f %-10.3f %-12d %-10s\n",
-			bucket.label, count, skillSum/float64(count), rawSum/float64(count), supported, corrected)
+		slog.InfoContext(ctx, "score bucket",
+			"score_bucket", bucket.label,
+			"samples", count,
+			"avg_skill", skillSum/float64(count),
+			"avg_inferred_level", rawSum/float64(count),
+			"reference_samples", supported,
+			"avg_corrected_level", corrected,
+		)
 	}
 }

@@ -15,6 +15,10 @@ import (
 var DB *gorm.DB
 
 // ConnectDB opens the configured database without running schema migrations.
+// Read-only commands such as fitting analyze use this path: AutoMigrate is
+// idempotent, but may still issue DDL when the schema differs from the models
+// and requires migration privileges. Diagnostics should only query the
+// existing schema; server and fitting run use InitDB to migrate it.
 func ConnectDB() {
 	var err error
 	var dialector gorm.Dialector
