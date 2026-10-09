@@ -10,7 +10,6 @@ import (
 
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/fitting"
-	"paradigm-reboot-prober-go/internal/logging"
 	"paradigm-reboot-prober-go/internal/util"
 )
 
@@ -31,24 +30,10 @@ func cmdRun(args []string) {
 	config.LoadConfig(*configPath)
 
 	// 2. Shared structured logging.
-	logCloser, err := logging.Setup(
-		config.GlobalConfig.Logging.Output,
-		config.GlobalConfig.Logging.File,
-		config.GlobalConfig.Logging.Format,
-	)
-	if err != nil {
-		panic(err)
-	}
+	baseCtx, logCloser := setupFittingLogging("run")
 	defer func() { _ = logCloser.Close() }()
 
-	// Attach a stable component attribute so fitting logs are easy to filter.
-	baseCtx := logging.AppendCtx(context.Background(),
-		slog.String("component", "fitting"),
-	)
-
-	// 3. Master switch: when disabled we still initialize the DB so
-	//    AutoMigrate keeps chart_statistics in sync with the schema, but we
-	//    skip all actual work.
+	// 3. The master switch skips continuous mode; --once runs explicitly.
 	if !config.GlobalConfig.Fitting.Enabled && !*once {
 		slog.InfoContext(baseCtx, "fitting disabled by config.fitting.enabled; exiting")
 		return
@@ -58,28 +43,8 @@ func cmdRun(args []string) {
 	util.InitDB()
 
 	// 5. Build the runner.
+	params := configuredParams()
 	fp := config.GlobalConfig.Fitting
-	params := fitting.Params{
-		MinEffectiveSamples: fp.MinSamples,
-		SkillTopK:           fp.SkillTopK,
-		SampleHalflifeDays:  fp.SampleHalflifeDays,
-		ProximitySigma:      fp.ProximitySigma,
-		HighSkillSigmaRatio: fp.HighSkillSigmaRatio,
-		VolumeFullAt:        fp.VolumeFullAt,
-		PriorStrength:       fp.PriorStrength,
-		DeviationPenalty:    fp.DeviationPenalty,
-		MaxDeviation:        fp.MaxDeviation,
-		MaxDeviationLow:     fp.MaxDeviationLow,
-		MaxDeviationLowAt:   fp.MaxDeviationLowAt,
-		MaxDeviationHighAt:  fp.MaxDeviationHighAt,
-		MinScore:            fp.MinScore,
-		ScoreFloorAt:        fp.ScoreFloorAt,
-		ScoreGoodAt:         fp.ScoreGoodAt,
-		ScoreFullAt:         fp.ScoreFullAt,
-		ScoreGoodWeight:     fp.ScoreGoodWeight,
-		TukeyK:              fp.TukeyK,
-		MinPlayerRecords:    fp.MinPlayerRecords,
-	}
 	cfg := fitting.RunnerConfig{
 		ChartBatchSize:  fp.ChartBatchSize,
 		PlayerBatchSize: fp.PlayerBatchSize,
@@ -139,5 +104,34 @@ func runTick(ctx context.Context, runner *fitting.Runner) {
 			"duration_ms", report.Duration.Milliseconds(),
 		)
 		return
+	}
+}
+
+// configuredParams is shared by run and analyze.
+func configuredParams() fitting.Params {
+	fp := config.GlobalConfig.Fitting
+	return fitting.Params{
+		MinEffectiveSamples:     fp.MinSamples,
+		CalibrationEnabled:      fp.CalibrationEnabled,
+		CalibrationNoisePenalty: fp.CalibrationNoisePenalty,
+		BalanceTotal:            fp.BalanceTotal,
+		SkillTopK:               fp.SkillTopK,
+		SampleHalflifeDays:      fp.SampleHalflifeDays,
+		ProximitySigma:          fp.ProximitySigma,
+		HighSkillSigmaRatio:     fp.HighSkillSigmaRatio,
+		VolumeFullAt:            fp.VolumeFullAt,
+		PriorStrength:           fp.PriorStrength,
+		DeviationPenalty:        fp.DeviationPenalty,
+		MaxDeviation:            fp.MaxDeviation,
+		MaxDeviationLow:         fp.MaxDeviationLow,
+		MaxDeviationLowAt:       fp.MaxDeviationLowAt,
+		MaxDeviationHighAt:      fp.MaxDeviationHighAt,
+		MinScore:                fp.MinScore,
+		ScoreFloorAt:            fp.ScoreFloorAt,
+		ScoreGoodAt:             fp.ScoreGoodAt,
+		ScoreFullAt:             fp.ScoreFullAt,
+		ScoreGoodWeight:         fp.ScoreGoodWeight,
+		TukeyK:                  fp.TukeyK,
+		MinPlayerRecords:        fp.MinPlayerRecords,
 	}
 }

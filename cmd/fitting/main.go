@@ -38,6 +38,8 @@ import (
 )
 
 func main() {
+	// TODO: Use Cobra for subcommands and flags in a follow-up PR, preserving
+	// the default run command and existing command-line compatibility.
 	// Subcommand dispatch. The first positional argument selects a
 	// subcommand; everything else is forwarded to that subcommand's own
 	// flag parser. Unknown first arguments (including flags like "--once")
@@ -65,7 +67,7 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Subcommands:")
 	fmt.Fprintln(os.Stderr, "  run      (default) run the fitting calculator in continuous or --once mode")
-	fmt.Fprintln(os.Stderr, "  analyze  read-only diagnostic for one chart (prints bucket breakdown + config sweep)")
+	fmt.Fprintln(os.Stderr, "  analyze  read-only chart diagnostic (score buckets, statistics and final estimate)")
 	fmt.Fprintln(os.Stderr, "")
 	fmt.Fprintln(os.Stderr, "Run `fitting <subcommand> --help` to see flags for each subcommand.")
 }

@@ -35,7 +35,7 @@ $p$ 对该谱面的最佳成绩分布 $\{s_{p,c}\}$,给出一个后验点估计 
 | $\hat{L}_c$                  | 计算得到的拟合定数(浮点,写入 `charts.fitting_level`)。                                |
 | $s_{p,c}$                    | 玩家 $p$ 在谱面 $c$ 上的最佳成绩(整数,范围 0–1 010 000)。                              |
 | $r_{p,c}$                    | 按官方定数计算的单曲 rating,见 `pkg/rating/rating.go`。                                 |
-| $B_p$                        | 玩家 $p$ 的**浮点 B50 均值 rating**:其前 $K$ 个最高单曲 rating 的算术平均,$K = \min(\|\text{best}_p\|, 50)$。 |
+| $B_p$                        | 玩家 $p$ 的**浮点 top-K 均值 rating**:其前 $K$ 个最高单曲 rating 的算术平均,$K = \min(\|\text{best}_p\|, \texttt{skill\_top\_k})$，默认20。 |
 | $n_p$                        | 玩家 $p$ 的最佳记录总数。                                                               |
 | $\hat{\delta}_{p,c}$         | 根据 $(s_{p,c}, B_p)$ 反推出的单样本定数;见 §4.1。                                      |
 | $w^{\text{prox}}_{p,c}$      | 邻近权重(玩家实力离 $10L_c$ 越近越高,远超 2.5σ 直接丢弃)。                          |
@@ -57,7 +57,7 @@ $p$ 对该谱面的最佳成绩分布 $\{s_{p,c}\}$,给出一个后验点估计 
 ## 3. Rating 公式(参考)
 
 单次成绩的 rating 由 `pkg/rating/rating.go` 中的分段函数 $\mathrm{Rating}(L, s)$
-定义。令 $b = \lfloor\max(s, 1\,010\,000)\rfloor$,则
+定义。先将成绩截断至 $s\le1\,010\,000$，然后计算：
 
 $$
 \mathrm{Rating}(L, s) =
@@ -79,6 +79,84 @@ $$
 
 ## 4. 算法
 
+### 4.0 当前默认：基于同类谱面的残差校准
+
+默认使用 `skill_top_k: 20`、`calibration_enabled: true`、
+`calibration_noise_penalty: 1`、`balance_total: true`。
+B20 表达玩家最好的发挥，不能直接作为每张谱面的表现目标。
+它用于实力分组，§4.1 的反推结果作为**原始观测**，先校准，再进入 §4.3。
+
+记原始反推为 $I(s,B)$，官方定数为 $L_c$，实力差距为 $g=B/10-L_c$。
+每个谱面按 $k=\lfloor g/0.5\rfloor$ 分格，用与 §4.2 完全相同的预权重，
+计算格内 $I(s,B)-L_c$ 的加权中位数 $m_{c,k}$。一格至少需要 3 条合格成绩；
+满分 $s\ge1\,010\,000$ 属于上限截断的观测，在校准训练与推断中均不参与。
+
+预测目标谱面 $c$ 的某个实力格 $k$ 时，**排除整个目标谱面**，只取
+$|L_j-L_c|\le1$、$|k'-k|\le2$ 的其他谱面格。权重为：
+
+$$
+a_{j,k'}=\exp\left[-\frac12\left(\left(\frac{L_j-L_c}{0.5}\right)^2+(k'-k)^2\right)\right].
+$$
+
+同一参考谱面先合成一个值 $v_j=\sum_{k'}a_{j,k'}m_{j,k'}/\sum_{k'}a_{j,k'}$，
+其权重为 $u_j=\max_{k'}a_{j,k'}$。背景偏差 $b_{c,k}$ 为这些 $v_j$ 的加权中位数。
+这样热门谱面不会仅因成绩更多、占据更多格子而支配基准。
+至少需要 **10 张其他谱面**提供支持；不足时丢弃该实力格的目标样本，不回退到未经校准的 B20。
+
+进入 §4.3 的单样本定数变为：
+
+$$
+\widetilde\delta_{p,c}=I(s_{p,c},B_p)-b_{c,k(p,c)}.
+$$
+
+§4.3–4.5 的中位数、MAD、Tukey、有效样本数与收缩均作用于校准后的值。
+记收缩后的偏差为 $r_c$，近似采样方差为 $v_c=\sigma_c^2/N_c^{\mathrm{eff}}$。
+先抑制与采样噪声相当的小偏差，再应用最终上限：
+
+$$
+d_c^0=\operatorname{clip}\left(r_c\frac{r_c^2}{r_c^2+\tau v_c},\ell_c,u_c\right),
+\qquad\tau=1.
+$$
+
+分母为零或 $\tau=0$ 时，衰减因子取 1。这是平滑的噪声惩罚，不是置信概率；
+它没有涵盖背景校准、玩家练习和选曲习惯的不确定性，也没有设置最小调整幅度。
+
+**为什么要约束总和？** 这是显式的建模假设，不是从数据中验证出的“难度守恒”。
+玩家实力来自按官方定数计算的 rating，参考谱面校准衡量的是相对表现差距，
+两者都没有提供独立于官方尺度的绝对难度基准。因此选择同一批有结果谱面的官方均值
+作为尺度锚点，假设这批官方定数的平均误差为零，再用总和约束消除估计器残留的整体漂移。
+
+成绩数据本身并未证明这个假设。如果官方定数存在系统性的平均误差，约束也会掩盖它；
+有结果的谱面集合变化时，公共偏移量可能变化，使独立估计未变的谱面也跟着调整。
+设置 `balance_total: false` 可以保留参考谱面校准和噪声衰减，只查看独立估计。
+诊断日志会同时显示独立估计和最终结果，便于评估这一步的影响。
+
+例如，三张谱面的官方定数均为 `16`，独立估计分别为 `(16.2, 16.1, 16.0)`，
+平均偏差为 `+0.1`。在没有触及上下限时，统一减去 `0.1` 得到 `(16.1, 16.0, 15.9)`，
+保留相对差距，并使总和恢复为官方的 `48`。这说明了所选尺度锚点的作用，
+不能据此证明第三张谱面在绝对意义上更简单；触及上下限时则需使用下面的投影。
+
+完成**全部谱面**的独立计算后，求一个公共偏移量 $b$：
+
+$$
+d_c=\operatorname{clip}(d_c^0-b,\ell_c,u_c),\qquad
+\sum_{c\in\mathcal P}d_c=0,\qquad\widehat L_c=L_c+d_c,
+$$
+
+其中 $\mathcal P$ 只包含有拟合结果的谱面，
+$\ell_c=\max(-\Delta(L_c),0.1-L_c)$，$u_c=\min(\Delta(L_c),20-L_c)$。
+用确定顺序的二分法求解这个带边界的最小二乘投影；每张谱面只计一次，不按成绩数量加权。
+居中时重新应用上下限，避免原本已达上限的谱面越界。弃算谱面仍为 NULL。
+总和约束只执行一次，不能逐数据库批次执行，因此批次大小不会改变定数。
+它不要求上调、下调的数量相等，也不要求每首歌都偏离官方。
+
+主观投票可用于验证结果，但不参与生产计算，也不作为某张谱面的目标定数。
+
+计算器分批建立校准格统计，计算完整结果集、平衡总和后再分批写入数据库。
+诊断中的均值、中位数、标准差和 MAD 描述收缩、噪声衰减及总和约束前的校准值；
+`fitting_level` 保存最终输出。`sample_count` 统计通过最低分数门槛的原始成功反推数，
+不是最终参与聚合的样本数。独立估计和最终输出均限制在 `[0.1,20]` 内。
+
 ### 4.1 单样本反推定数
 
 对每条最佳记录 $(p, c)$,我们以 $B_p$ 为 rating 目标,反解 $\mathrm{Rating}$ 关于
@@ -96,13 +174,13 @@ $$
 在 $s = 0$ 时无定义。若 $\hat{\delta}_{p,c} \notin [0.1, 20.0]$(游戏实际使用的
 定数范围之外),则丢弃该样本。
 
-直观理解:$\hat{\delta}_{p,c}$ 回答的是"怎样的谱面定数才能让这位玩家的实际成绩
-恰好等于其 B50 平均 rating"。如果一张谱面的实际难度低于官方定数,玩家会普遍
-打出高于自己实力目标的分数,从而把 $\hat{\delta}_{p,c}$ 推向小于 $L_c$ 的一侧。
+这是相对于玩家 top-K 平均 rating 的原始观测。应先减去 §4.0 的同类谱面
+背景残差，再做聚合；原始反推本身不能判断谱面是否偏难或偏易。
 
 ### 4.2 预权重
 
-**邻近权重(不对称 · 硬截断)。** 实力 $B_p$ 接近 $10\cdot L_c$ 的玩家正处于该谱面的“目标难度区间”,他们的成绩分布信息量最大。我们以 rating 单位下、均值为零的**不对称**高斯核打分,并在 2.5·σ 处**硬截断**:
+**邻近权重(不对称 · 硬截断)。** 玩家实力 $B_p$ 接近 $10L_c$ 时权重较大；
+over-skilled 一侧使用更窄的带宽，限制远高于谱面目标实力的玩家对结果的影响。
 
 $$
 \sigma_{\text{eff}}(B_p) =
@@ -113,39 +191,11 @@ $$
 \qquad
 w^{\text{prox}}_{p,c} = \begin{cases}
 \exp\!\left(-\dfrac{(B_p - 10L_c)^2}{2\,\sigma_{\text{eff}}(B_p)^{2}}\right), & \bigl|B_p - 10L_c\bigr| \le 2.5\,\sigma_{\text{eff}}(B_p),\\[8pt]
-0\ (\text{样本丢弃,不计入 raw 与}\ N^{\text{eff}}), & \bigl|B_p - 10L_c\bigr| > 2.5\,\sigma_{\text{eff}}(B_p).
+0\ (\text{样本丢弃,不计入}\ N^{\text{eff}}), & \bigl|B_p - 10L_c\bigr| > 2.5\,\sigma_{\text{eff}}(B_p).
 \end{cases}
 $$
 
 默认 $\sigma_{\text{prox}} = 18.5$(对应 under-skilled 侧 $\pm 1.85$ 定数单位的实力带宽,over-skilled 侧 $\pm 0.37$),$\alpha = 0.2$。
-
-**为什么不对称?** 实力远超 $10L_c$ 的大佬在低定数谱面上几乎必然 AP,此时 §4.1 的单样本反推退化为“回声”玩家自己的 $B_p/10$,而不再度量谱面难度。这类样本会系统性地将 $\hat{\delta}$ 拉高,正是中段偏差的主要来源。在 over-skilled 一侧缩小 σ(乘以 α)将这一福度大幅压缩,但不影响 under-skilled 一侧—— 实力跟不上的玩家仍然提供信息,只是权重自然较低。
-
-**为什么还要硬截断?** Kish 的 $N^{\text{eff}}$ 是尺度无关的(它度量的是权重的相对分布而非绝对大小),仅缩小 σ 不会让这类样本在样本数的估计上消失—— 5 个权重皆为 1% 的样本仍算 $N^{\text{eff}} = 5$。因此我们在 $2.5\,\sigma_{\text{eff}}$ 处直接截断,让 raw / inferred / $N^{\text{eff}}$ 一起下降。结果:一张长期被大佬乱打的低定数谱面会因为样本不足而正确地**弃算**(§4.4),而不是发布一个被大佬实力回声主导的拟合值。
-
-**默认 $\alpha = 0.2$ 的来历。** 最初版本采用对称 σ($\alpha = 1$),考察全局偏差后发现中段(lv13–lv15.5)的 $\hat{L}_c$ 系统性高于官方定数 $+0.5 \sim +0.8$。按生产库(1187 谱面,441 069 best play records)的横向 sweep:
-
-| α    | 全局 $\mathrm{avg}(\hat\delta)$ | lv13 bias | lv15 bias | lv16 bias | 最坏 band\|dev\| (n≥5) |
-|------|--------|----------|----------|----------|----------|
-| 0.15 | −0.020 | −0.186   | +0.107   | −0.078   | 0.222    |
-| 0.17 | +0.007 | −0.150   | +0.142   | −0.068   | 0.206    |
-| **0.20** | **+0.050** | **−0.089** | **+0.194** | **−0.054** | **0.194** |
-| 0.22 | +0.079 | −0.052   | +0.228   | −0.045   | 0.228    |
-| 0.30 (旧) | +0.196 | +0.134 | +0.350 | −0.018 | 0.350    |
-
-α 更小会把中低层(lv11–lv13)过度压往负,α 更大会让 lv15+ 正偏再次抬头,两个方向在 α = 0.20 相遇于最小的 band-wise 最大绝对偏差(0.194)。全局 $\mathrm{avg}(\hat\delta)$ 自身在 α ≈ 0.17 处归零,但此时 lv11–lv13 全部滑到 $-0.15 \sim -0.21$;我们以 **“用户看到的每一个 band 都重要”** 为设计原则,故选 α = 0.20 作为 minimax 最优点。
-
-**σ 的微调。** 固定 α = 0.20 后对 $\sigma_{\text{prox}}$ 与 `min_samples` 做二维网格搜索(生产库,1187 谱面):
-
-| $\sigma_{\text{prox}}$ | min_samples | 发布数 | 全局 avg | lv11 bias | lv15 bias | 最坏 band\|dev\| |
-|-------|-------|--------|----------|-----------|-----------|------------------|
-| 20.0  | 8     | 417    | +0.050   | −0.192    | +0.194    | 0.194            |
-| 19.0  | 5     | 441    | +0.037   | −0.168    | +0.177    | 0.177            |
-| **18.5** | **5** | **437** | **+0.032** | **−0.170** | **+0.169** | **0.170** |
-| 18.0  | 5     | 436    | +0.025   | −0.194    | +0.160    | 0.194            |
-| 15.0  | 5     | 429    | −0.006   | −0.198    | +0.116    | 0.198            |
-
-把 σ 从 20 调到 18.5 进一步压低 lv15+ 的正偏,同时不至于像 σ ≤ 18 那样把 lv11 的负偏反向拉爆。`min_samples` 从 8 放宽到 5 增加了 ~24 张谱面的发布覆盖,mad/bias 几乎无变化—— 小样本谱面的偏差由 §4.4 的 DeviationPenalty($\lambda=2$)向官方定数收缩。
 
 **数据量权重。** 记录太少的玩家 $B_p$ 估计噪声较大。我们采用线性斜坡,在
 $V_{\text{full}} = 50$ 条记录时饱和:
@@ -167,34 +217,37 @@ $$
 
 推荐锚点(如需启用):$s_{\text{floor}} = 1{,}000{,}000$(业务定义的 “没真正过了”阈值),$s_{\text{good}} = 1{,}007{,}500$(“会打”阈值),$s_{\text{full}} = 1{,}009{,}000$(“高分”阈值),$w_{\text{good}} = 0.6$。**本系统默认将四个锚点全置为 0**,此因子退化为 $1$,等价于关闭本子节。`score_floor_at`、`score_good_at`、`score_full_at`、`score_good_weight` 任意一项全部置为 0 或错配时同样退化。
 
-**这一步在解决什么问题?** 原样本库中大约 24% 的成绩在 100 万以下,另有 40% 在 100 万到 100.75 万之间(“刚过”带)。这些样本在同权重时给出的反推 $\hat{\delta}$ 存在幸存者偏差(survivorship bias)——我们只看到“恰好过了”的样本,没看到“没过”的同能力玩家。把这些样本降权相当于在预权重阶段对幸存者偏差做折扣。
+分数质量权重默认关闭；启用时，校准训练和目标推断使用相同的权重。
 
-**为什么默认关闭?** 在 $\alpha = 0.3$ 的前代默认下启用本因子（$w_{\text{good}} = 0.6$）有明显收益——全局 $\mathrm{avg}(\hat{\delta})$ 从 $+0.20$ 压到 $+0.08$（-59%），lv14–lv15 带的偏差一并回落。但在新默认 $\alpha = 0.2$ 下，α 本身已经把中高定数带的正偏差拉下来（lv15 从 $+0.35$ 降到 $+0.19$），再叠加 $w^{\text{score}}$ 会把 lv11–lv13 挂在 $-0.30$ 量级的负偏过度修正上。生产库的实验表明，单靠 $\alpha = 0.2$ 获得的 band-wise 最大 \|dev\| = $0.194$，优于 $(\alpha=0.25, w_{\text{good}}=0.9)$ 组合的 $0.29$。设计上两个途径都指向 “减弱 over-trustful 的样本”，在本库的分布下不适合叠加。
+**时间权重(可选,默认关闭)。** 当 `sample_halflife_days` 为正数 $H$ 时，
+对距 `play_records.record_time` 的天数 $a\ge0$ 使用 $w^{\text{age}}=2^{-a/H}$；
+缺少时间或时间在未来时取 $a=0$。关闭时权重为 1。
 
-**与 InverseLevel 数学的相互作用（为什么在本库上默认关闭）。** 在 rating 公式下，同一 $B_p$ 的玩家在 AP（score = 1{,}010{,}000）时反推到的 $\hat{L} = B_p/10 - 1$，而在 score = 1{,}000{,}500 时反推到的 $\hat{L} \approx B_p/10 - 0.033$——也就是说，**高分样本在数学上就会反推出更低的 level**。引入分数权重等于加大高分样本的声音，因此会把整体 $\hat{L}_c$ 轻度向下推，而不仅仅是把 lv15 正偏差 “修平”——这就是为什么在 $\alpha = 0.2$ 已经能把 lv15 正偏压到 $+0.19$ 的前提下，再打开分数权重反而把中低等级 band 的偏差翻到 $-0.3$ 数量级。这个 feature 在它最初设计的 “α 宽松 + 没有其他补偿” 在的场景下是有价值的；在当前默认下则是相反效果。代码、测试、文档与配置框架都保留，供必要时用户自己开启（例如在某个局部 sub-库上 α 需要更宽松的时候）。
-
-**合成预权重:** $\tilde{w}_{p,c} = w^{\text{prox}}_{p,c} \cdot w^{\text{vol}}_p \cdot w^{\text{score}}_{p,c}$。
+**合成预权重:** $\tilde{w}_{p,c} = w^{\text{prox}}_{p,c} \cdot w^{\text{vol}}_p \cdot w^{\text{score}}_{p,c} \cdot w^{\text{age}}_{p,c}$。
 
 ### 4.3 鲁棒裁剪(Tukey 双权)
 
 在预权重 $\{\tilde{w}_{p,c}\}$ 下,令 $\tilde{m}_c$、$\mathrm{MAD}_c$ 分别为
-$\{\hat{\delta}_{p,c}\}$ 的**加权中位数**与**加权中位数绝对偏差**(同值时按
-$\hat{\delta}$ 升序断开):
+$\{\widetilde{\delta}_{p,c}\}$ 的**加权中位数**与**加权中位数绝对偏差**(同值时按
+$\widetilde{\delta}$ 升序断开):
 
 $$
-\tilde{m}_c = \operatorname*{wmedian}_{p \in P_c}\hat{\delta}_{p,c};
+\tilde{m}_c = \operatorname*{wmedian}_{p \in P_c}\widetilde{\delta}_{p,c};
 \qquad
-\mathrm{MAD}_c = \operatorname*{wmedian}_{p \in P_c}\bigl|\hat{\delta}_{p,c} - \tilde{m}_c\bigr|.
+\mathrm{MAD}_c = \operatorname*{wmedian}_{p \in P_c}\bigl|\widetilde{\delta}_{p,c} - \tilde{m}_c\bigr|.
 $$
 
 对每条样本计算标准化残差
 
 $$
-u_{p,c} = \dfrac{\hat{\delta}_{p,c} - \tilde{m}_c}{k \cdot \max(\mathrm{MAD}_c, \epsilon)},
+u_{p,c} = \dfrac{\widetilde{\delta}_{p,c} - \tilde{m}_c}{h_c},\qquad
+h_c=\begin{cases}
+k\cdot\mathrm{MAD}_c, & k\cdot\mathrm{MAD}_c>10^{-9},\\
+k\cdot0.01(|L_c|+1), & \text{否则}.
+\end{cases}
 $$
 
-其中 $\epsilon$ 为下限保护(实现中取 $(|L_c|+1) \times 1\%$),用于整批样本异常
-集中时避免除零。再应用 Tukey 双权函数
+样本异常集中时使用上述下限保护，避免除零。再应用 Tukey 双权函数
 
 $$
 w^{\text{rob}}_{p,c} = \begin{cases}
@@ -203,8 +256,7 @@ w^{\text{rob}}_{p,c} = \begin{cases}
 \end{cases}
 $$
 
-反推定数距加权中位数超过 $k\cdot\mathrm{MAD}_c$ 的样本在最终估计中的贡献直接
-**清零**,直面"记录可信度 / 偏中心"问题——远离共识的样本被完全抑制。
+校准定数距加权中位数超过鲁棒尺度 $h_c$ 的样本在最终估计中的贡献为零。
 
 ### 4.4 聚合
 
@@ -213,7 +265,7 @@ $$
 **加权均值**(收缩前的估计量):
 
 $$
-\mu_c = \dfrac{\sum_p w_{p,c}\,\hat{\delta}_{p,c}}{\sum_p w_{p,c}}.
+\mu_c = \dfrac{\sum_p w_{p,c}\,\widetilde{\delta}_{p,c}}{\sum_p w_{p,c}}.
 $$
 
 **Kish 有效样本量**(当前加权方案等价于多少个"理想"无权样本):
@@ -239,10 +291,10 @@ $$
 
 $$
 \kappa_{\text{eff}} = \kappa\cdot\left(1 + \lambda\,(\mu_c - L_c)^2\cdot\dfrac{n_{\text{ref}}}{N^{\text{eff}}_c}\right),
-\qquad n_{\text{ref}} = 2\cdot\text{min\_samples},
+\qquad n_{\text{ref}} = \max(1,2\cdot\text{min\_samples}),
 $$
 
-当偏差为零或 $N^{\text{eff}}_c \gg n_{\text{ref}}$ 时 boost 退化为 1(无绩效开销),而当偏差大且样本少时 $\kappa_{\text{eff}}$ 二次放大、反比于 $N^{\text{eff}}_c$,恰好符合“偏得越多越需要证据”的直觉。默认 $\lambda = 2$。将 $\lambda = 0$ 即回退到旧的静态- $\kappa$ 行为,所有测试设置 $\lambda = 0$ 进行回归。
+当偏差为零或 $N^{\text{eff}}_c \gg n_{\text{ref}}$ 时 boost 接近 1,而当偏差大且样本少时 $\kappa_{\text{eff}}$ 二次放大、反比于 $N^{\text{eff}}_c$,恰好符合“偏得越多越需要证据”的直觉。默认 $\lambda = 2$。将 $\lambda = 0$ 即关闭偏差惩罚。
 
 等价解读:“相信官方定数”的程度相当于 $\kappa_{\text{eff}}$ 个伪样本—— $N^{\text{eff}}_c \gg \kappa_{\text{eff}}$ 时估计值基本等于数据,$N^{\text{eff}}_c \ll \kappa_{\text{eff}}$ 时靠近官方定数;且偏差越大这条天秤越向官方端倾斜。
 
@@ -254,7 +306,7 @@ $$
 \hat{L}_c \leftarrow L_c + \operatorname{clip}\!\bigl(\hat{L}_c - L_c,\ -\Delta(L_c),\ \Delta(L_c)\bigr).
 $$
 
-**为什么随定数变化?** Reboot 的官方定数轴在游戏体验上是大致对数的—— 从 lv12 到 lv13 的难度跳跃远小于从 lv16 到 lv17 的难度跳跃。因此在低定数端我们希望 cap 更紧,不让拟合值跈过“真实难度梯级”;在高定数端则希望 cap 更宽,因为官方步长更粗,需要给算法更多“发挥空间”。我们在两个端点间用**对数线性**插值:
+低定数端使用较紧的上限，高定数端允许更大的调整。两个端点间用**对数线性**插值：
 
 $$
 \Delta(L) =
@@ -266,30 +318,35 @@ $$
 \qquad t(L) = \dfrac{L - L_{\text{low}}}{L_{\text{high}} - L_{\text{low}}}.
 $$
 
-默认值:$\Delta_{\min} = 0.6$,$\Delta_{\max} = 1.5$,$L_{\text{low}} = 12.0$,$L_{\text{high}} = 17.0$。从端点对处中间点 $L = 14.5$ 有 $\Delta(14.5) = \sqrt{\Delta_{\min}\cdot\Delta_{\max}} \approx 0.949$,符合“随 level 单调上升且不突变”的期望。
+默认值:$\Delta_{\min} = 0.15$,$\Delta_{\max} = 0.3$,$L_{\text{low}} = 12.0$,$L_{\text{high}} = 17.0$。中间点 $L = 14.5$ 有 $\Delta(14.5) = \sqrt{\Delta_{\min}\cdot\Delta_{\max}} \approx 0.212$。这些是最终输出上限，在噪声衰减后应用，并在全库居中时重新应用。
 
 **退化规则。** 当 $\Delta_{\min} \le 0$,或 $L_{\text{low}}$/$L_{\text{high}}$ 配置不合法(参见 `internal/fitting/calculator.go:effectiveMaxDeviation`),实现静默回退到**平顶** $\Delta(L) \equiv \Delta_{\max}$;启动时的配置校验会拒绝最常见的误配置(见 `AGENTS.md`)。斗形坡道只影响上限的**宽窄**,不影响上限的**对称性**—— 在双向上都采用同一 $\Delta(L_c)$。
 
-**防护 · 而非修正。** 在当前数据集上,绝大多数拟合值本就在斗形窗口内,$\Delta(L)$ 很少触发—— 它是拦住偶发灾难性离群值的护栏,不是用来拉近中段整体 bias 的工具。中段 bias 的真正杆杆是 α 与 κ—— 见 §4.2 与 §4.5。
+上限限制异常大的局部调整，§4.0 的总和约束另行控制整体尺度。α 与 κ 仍影响样本选择和收缩。上限不会要求每张谱面偏离官方。
 
 ## 5. 流水线总览
 
 ```
+calibration := 按 §4.0 首遍建立每谱每实力格的背景统计
 对每张官方定数为 L_c 的谱面 c:
     samples := { (p, s_{p,c}) : p ∈ P_c, s_{p,c} ≥ s_min }
     对每条样本:
         δ̂ := InverseRating(s_{p,c}, B_p)                      # §4.1
         若 δ̂ ∉ [0.1, 20.0] 则丢弃
+        若启用校准：
+            若满分或缺少其他谱面支持则丢弃
+            δ̂ -= b_{c,k}
         diff  := B_p - 10·L_c                                  # §4.2
         σ_eff := (diff > 0 ? α·σ_prox : σ_prox)
         若 |diff| > 2.5·σ_eff 则丢弃                           #  ← 硬截断
         w_prox := exp(-diff² / (2·σ_eff²))
         w_vol  := min(1, n_p / V_full)
-        w_pre  := w_prox * w_vol
+        w_pre  := w_prox * w_vol * score_quality * sample_age
     m_c  := weighted_median(δ̂; w_pre)                          # §4.3
     MAD  := weighted_median(|δ̂ - m_c|; w_pre)
     对每条样本:
-        u := (δ̂ - m_c) / (k · max(MAD, ε))
+        h := k·MAD 若 k·MAD > 1e-9，否则 k·0.01·(|L_c|+1)
+        u := (δ̂ - m_c) / h
         w_rob := (1 - u²)²  若 |u| < 1,否则 0
         w     := w_pre * w_rob
     μ_c     := Σ w·δ̂ / Σ w                                    # §4.4
@@ -297,15 +354,20 @@ $$
     若 N_eff_c < min_samples:
         标记 FittingLevel = NULL(诊断字段照常积累);继续
     dev     := μ_c - L_c                                       # §4.5
-    n_ref   := 2 · min_samples
+    n_ref   := max(1, 2 · min_samples)
     κ_eff   := κ · (1 + λ·dev²·n_ref / N_eff_c)
     L̂_c     := (N_eff_c·μ_c + κ_eff·L_c) / (N_eff_c + κ_eff)
+    若启用校准:
+        r := L̂_c - L_c; v := σ_c² / N_eff_c
+        a := r² / (r² + τ·v)  (分母为零时取 1)
+        L̂_c := L_c + a·r
     Δ       := effectiveMaxDeviation(L_c)                      # §4.6
     L̂_c     := L_c + clip(L̂_c - L_c, -Δ, Δ)
-    把 (c, L̂_c, 诊断字段) 积累进待写批次                          # 此时不写库
+    若启用校准: L̂_c := clip(L̂_c, 0.1, 20)
+    保存 (c, L̂_c, 诊断字段) 到完整结果集                          # 此时不写库
 
-每积累 chart_batch_size 张谱面(以及遍历结束)后,把整批结果放进一个短事务
-统一落库(§7):
+全部谱面完成计算后，若校准与 balance_total 均启用，按 §4.0 用一个公共偏移量平衡有效谱面的总和。
+然后按 chart_batch_size 分批放进短事务统一落库(§7):
     一条 UPDATE ... FROM (VALUES ...) 批量更新 charts.fitting_level
     一条带冲突处理的批量 UPSERT 写入 chart_statistics
         (c, sample_count, N_eff_c, μ_c, m_c, σ_c, MAD, L̂_c, L_c, now)
@@ -315,17 +377,22 @@ $$
 
 | 键                             | 符号                   | 默认值    | 作用                                                       |
 |-------------------------------|------------------------|-----------|-----------------------------------------------------------|
+| `fitting.skill_top_k` | K | `20` | 玩家实力所用最高单曲 rating 数。 |
+| `fitting.calibration_enabled` | — | `true` | 启用同类谱面校准、满分与无支持样本筛除及噪声衰减。 |
+| `fitting.calibration_noise_penalty` | τ | `1.0` | 有限非负的采样噪声惩罚系数；0 关闭。 |
+| `fitting.balance_total` | — | `true` | 有效谱面的拟合总和匹配同一批谱面的官方总和；仅用于校准模式。 |
+| `fitting.sample_halflife_days` | — | `0` | 可选成绩时间半衰期，0 关闭。 |
 | `fitting.enabled`             | —                      | `true`    | 微服务总开关。                                             |
 | `fitting.interval`            | —                      | `6h`      | Ticker 周期(Go duration 字符串)。                        |
 | `fitting.min_samples`         | min_samples            | `5.0`     | $N^{\text{eff}}$ 低于此值则弃算。                          |
 | `fitting.min_player_records`  | —                      | `20`      | 少于此记录数的玩家完全排除。                               |
 | `fitting.proximity_sigma`     | $\sigma_{\text{prox}}$ | `18.5`    | 邻近权重高斯带宽(围绕 $10L_c$)。                         |
-| `fitting.high_skill_sigma_ratio` | $\alpha$            | `0.2`     | over-skilled 一侧 σ 的缩放比(不对称高斯)。`1.0` 为对称高斯,更小值对大佬玩家折扣更重;样本离中心 2.5·σ 直接丢弃。`0.2` 为本库 sweep 最优。 |
+| `fitting.high_skill_sigma_ratio` | $\alpha$            | `0.2`     | over-skilled 一侧 σ 的缩放比(不对称高斯)。`1.0` 为对称高斯,更小值对大佬玩家折扣更重;样本离中心 2.5·σ 直接丢弃。 |
 | `fitting.volume_full_at`      | $V_{\text{full}}$      | `50`      | 数据量权重饱和到 1 的临界记录数。                          |
 | `fitting.prior_strength`      | $\kappa$               | `5.0`     | 官方定数的先验强度(收缩基准)。                         |
 | `fitting.deviation_penalty`   | $\lambda$              | `2.0`     | 偏差惩罚;让 $\kappa_{\text{eff}} = \kappa(1+\lambda\cdot\text{dev}^2\cdot n_{\text{ref}}/N^{\text{eff}})$。`0` 时回退到静态 $\kappa$。 |
-| `fitting.max_deviation`       | $\Delta_{\max}$        | `1.5`     | 高定数端(≥ $L_{\text{high}}$)上限;另作斗形坡道关闭时的平顶。 |
-| `fitting.max_deviation_low`   | $\Delta_{\min}$        | `0.6`     | 低定数端(≤ $L_{\text{low}}$)上限;设为 0 即关闭斗形坡道,回退到平顶 $\Delta_{\max}$。 |
+| `fitting.max_deviation`       | $\Delta_{\max}$        | `0.3`     | 高定数端(≥ $L_{\text{high}}$)最终上限;另作斗形坡道关闭时的平顶。 |
+| `fitting.max_deviation_low`   | $\Delta_{\min}$        | `0.15`    | 低定数端(≤ $L_{\text{low}}$)最终上限;设为 0 即关闭斗形坡道,回退到平顶 $\Delta_{\max}$。 |
 | `fitting.max_deviation_low_at`| $L_{\text{low}}$       | `12.0`    | cap 等于 $\Delta_{\min}$ 的端点;必须小于 $L_{\text{high}}$。 |
 | `fitting.max_deviation_high_at`| $L_{\text{high}}$     | `17.0`    | cap 等于 $\Delta_{\max}$ 的端点;两端点之间用对数线性插值 $\Delta(L) = \Delta_{\min}\cdot(\Delta_{\max}/\Delta_{\min})^t$。 |
 | `fitting.min_score`           | $s_{\min}$            | `500000`  | 成绩低于此阈值的样本直接丢弃。                             |
@@ -344,7 +411,7 @@ $$
 
 1. `charts.fitting_level`(`double precision`,可空)—— 发布的估计值 $\hat{L}_c$,
    弃算时写入 `NULL`。
-2. `chart_statistics`(新表,由 `cmd/fitting` 专属拥有)—— 每张谱面一行,主键为
+2. `chart_statistics`(由 `cmd/fitting` 专属拥有)—— 每张谱面一行,主键为
    `chart_id`,保存流水线各阶段的诊断信息:`official_level`、`fitting_level`、
    `sample_count`、`effective_sample_size`、`weighted_mean`、`weighted_median`、
    `std_dev`、`mad`、`last_computed_at`,以及 `BaseModel` 标准时间戳。该表**不
@@ -358,8 +425,7 @@ $$
 - 每批谱面使用一个短事务落库:`charts.fitting_level` 由一条
   `UPDATE ... FROM (VALUES ...)` 派生表语句批量更新,`chart_statistics` 由
   一条带冲突处理的批量 upsert 写入。
-- 查分服务的缓存不会被主动失效,依靠 TTL 自然过期;下一次用户上传会顺带刷新到
-  新的 `fitting_level`。
+- 查分服务的缓存不会被主动失效；相关缓存过期或失效后，读取到新写入的值。
 
 ## 8. 运维指南
 
@@ -370,9 +436,20 @@ go run ./cmd/fitting -config config/config.yaml
 # 一次性模式(适合 cron、调试、CI 冒烟测试)
 go run ./cmd/fitting --once -config config/config.yaml
 
-# 只时诊断某张谱面(只读,不写库)
+# 诊断某张谱面(只读,不写库)
 go run ./cmd/fitting analyze -chart 870 -config config/config.yaml
 ```
+
+两个子命令均遵循共享的 `logging.output` / `logging.format` 设置。
+启动日志打印实际生效的关键拟合配置，包括 `skill_top_k`、校准与总量约束开关、
+样本门槛，以及 `max_deviation` / `max_deviation_low` 和对应的定数区间端点。
+诊断结果以结构化日志输出分数桶、统计量、总体总和及估计值；JSON 日志保留数值类型，
+无法提供的定数输出为 null。
+
+`analyze` 使用 `ConnectDB` 查询已有结构，不执行迁移；`run` 和查分服务使用 `InitDB`。
+`AutoMigrate` 虽然幂等，但在表、列或索引与模型不一致时仍可能执行 DDL。
+跳过迁移可避免诊断改变数据库结构，也允许使用只读数据库账号；诊断前应由其他启动或
+迁移流程准备好数据库结构。
 
 进程收到 `SIGINT` / `SIGTERM` 时会干净退出。在持续模式下,单次迭代的数据库错误
 只会被记录到日志,**不会**导致循环退出——下一次 tick 会自动重试。
@@ -426,11 +503,8 @@ fitting:
 
 ## 9. 已知局限
 
-1. **闭环生态。** 玩家实力目标 $B_p$ 源于同一个官方定数生成的 rating。若官方
-   定数存在系统性偏差,$B_p$ 会弱相关地继承它。缓解措施:邻近权重限制了贡献者
-   的"实力带",使这种偏差至多是二阶的;鲁棒裁剪进一步压制离群值。
-2. **无时间衰减。** 我们平等对待所有成绩,不论 `record_time`。若游戏玩法发生
-   变动(例如判定改动),旧记录可能让估计值与新现实脱节。后续可加入 recency
-   kernel,实现简单直接。
-3. **新谱冷启动。** 记录极少的新谱会被特意写成 `fitting_level = NULL`。在
-   $N^{\text{eff}}$ 跨过 `min_samples` 之前,弃算是正确行为。
+1. 官方定数同时决定 rating 和校准参照轴。如果某一整组官方定数系统性偏差，局部校准无法识别绝对难度漂移。B20 还包含目标成绩，本方法不是完全独立的玩家实力估计。
+2. 最佳成绩包含反复练习和选曲自选择；单个实力数值无法表达偏科。鲁棒聚合不能消除这些系统误差。
+3. `sample_halflife_days` 默认 0，旧成绩与新成绩同权；可开启半衰期，但需重新验证结果。
+4. 满分、缺少其他谱面支持或目标有效样本不足时弃算。验证时应同时检查发布范围与误差。
+5. 多个读取批次不构成一致性快照；持久化期间取消或写入失败可能只提交部分已平衡结果。数据库总和约束要求一次完整成功的运行。估计阶段失败时不会写入任何结果。
