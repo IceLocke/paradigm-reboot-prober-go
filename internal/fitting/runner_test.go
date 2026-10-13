@@ -16,6 +16,65 @@ import (
 	"gorm.io/gorm"
 )
 
+func TestRunnerCanceledDuringEstimationDoesNotPersistPartialPopulation(t *testing.T) {
+	db := setupTestDB(t)
+	charts := seedCharts(t, db, 4)
+	seedUser(t, db, "cancel_player")
+	for _, chart := range charts {
+		seedRatedPlay(t, db, "cancel_player", chart, 16000, true)
+	}
+	assert.NoError(t, db.Model(&model.Chart{}).Where("id IN ?", charts).Update("fitting_level", 15.123).Error)
+	r := newTestRunner(db, RunnerConfig{ChartBatchSize: 2})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	reads := 0
+	r.nowFunc = func() time.Time {
+		reads++
+		if reads == 2 {
+			cancel()
+		}
+		return time.Now()
+	}
+	_, err := r.Run(ctx)
+	assert.ErrorIs(t, err, context.Canceled)
+	var rows []model.Chart
+	assert.NoError(t, db.Find(&rows).Error)
+	for _, chart := range rows {
+		if assert.NotNil(t, chart.FittingLevel) {
+			assert.Equal(t, 15.123, *chart.FittingLevel)
+		}
+	}
+	var stats int64
+	assert.NoError(t, db.Model(&model.ChartStatistic{}).Count(&stats).Error)
+	assert.Zero(t, stats, "no batch is written before the complete population is available")
+}
+
+func TestRunnerReturnsPersistenceErrorAndDoesNotReportRolledBackWrites(t *testing.T) {
+	db := setupTestDB(t)
+	charts := seedCharts(t, db, 2)
+	for u := 0; u < 5; u++ {
+		username := fmt.Sprintf("write_failure_%d", u)
+		seedUser(t, db, username)
+		for _, chart := range charts {
+			seedRatedPlay(t, db, username, chart, 16000, true)
+		}
+	}
+	assert.NoError(t, db.Model(&model.Chart{}).Where("id IN ?", charts).Update("fitting_level", 15.123).Error)
+	assert.NoError(t, db.Migrator().DropTable(&model.ChartStatistic{}))
+	r := newTestRunner(db, RunnerConfig{})
+	report, err := r.Run(context.Background())
+	assert.ErrorContains(t, err, "persist fitting batch")
+	assert.Zero(t, report.ChartsPublished)
+	assert.Equal(t, len(charts), report.ErrorsEncountered)
+	var rows []model.Chart
+	assert.NoError(t, db.Find(&rows).Error)
+	for _, chart := range rows {
+		if assert.NotNil(t, chart.FittingLevel) {
+			assert.Equal(t, 15.123, *chart.FittingLevel, "statistics and chart writes must roll back together")
+		}
+	}
+}
+
 var runnerTestDBCounter atomic.Int64
 
 // setupTestDB mirrors the repository-layer pattern: fresh in-memory SQLite
