@@ -1,10 +1,28 @@
 /**
  * Rating formatting utilities.
  *
- * Backend stores ratings as integers (rating × 100). All calculations here
- * stay in the integer domain and insert the decimal point manually so that
- * no floating-point errors can creep in.
+ * Backend stores ratings as integers (rating × 100). Formatting stays in the
+ * integer domain; single-chart calculations mirror pkg/rating.SingleRating.
  */
+
+/** Calculate an integer rating (×100), using the backend's formula and rounding. */
+export function calculateSingleRating(level: number, score: number): number {
+  score = Math.min(score, 1010000)
+  let rating: number
+
+  if (score >= 1009000) {
+    rating = level * 10 + 7 + 3 * ((score - 1009000) / 1000) ** 1.35
+  } else if (score >= 1000000) {
+    rating = 10 * (level + 2 * (score - 1000000) / 30000)
+  } else {
+    const bounds = [900000, 930000, 950000, 970000, 980000, 990000]
+    const rewards = [3, 1, 1, 1, 1, 1]
+    rating = bounds.reduce((sum, bound, i) => sum + (score >= bound ? rewards[i] : 0), 0)
+    rating += 10 * (level * (score / 1000000) ** 1.5 - 0.9)
+  }
+
+  return Math.trunc(Math.max(0, rating) * 100 + 0.00002)
+}
 
 /**
  * Format a single integer rating (×100) as a fixed-2-decimal string.

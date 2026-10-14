@@ -1,5 +1,6 @@
 import type { ChartInfo, PlayRecordInfo, PlayRecordResponse, User, AllChartsResponse } from './types'
 import { DIFFICULTY_ORDER } from '@/utils/difficulty'
+import { calculateSingleRating as calculateRating } from '@/utils/rating'
 
 // ---- Mock Song Data ----
 const difficulties = DIFFICULTY_ORDER
@@ -84,17 +85,6 @@ function generateChartInfoList(): ChartInfo[] {
   })
 
   return charts
-}
-
-function calculateRating(level: number, score: number): number {
-  if (score >= 1009000) return Math.round((level + 2) * 100)
-  if (score >= 1007000) return Math.round((level + 1.5 + (score - 1007000) / 4000) * 100)
-  if (score >= 1005000) return Math.round((level + 1 + (score - 1005000) / 4000) * 100)
-  if (score >= 1000000) return Math.round((level + (score - 1000000) / 5000) * 100)
-  if (score >= 990000) return Math.round((level - 1 + (score - 990000) / 10000) * 100)
-  if (score >= 970000) return Math.round((level - 3 + (score - 970000) / 10000) * 100)
-  if (score >= 900000) return Math.round((level - 5 + (score - 900000) * 2 / 70000) * 100)
-  return Math.round(Math.max(0, (level - 5) * (score / 900000)) * 100)
 }
 
 function generateRecords(charts: ChartInfo[], count: number): PlayRecordInfo[] {

@@ -250,7 +250,8 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 
 	// Use whitelist validation to prevent SQL injection
 	safeSortBy := validateSortBy(sortBy)
-	query = query.Order(safeSortBy + " " + orderStr)
+	// Break ties by record ID so paginating the full best-record pool is stable.
+	query = query.Order(safeSortBy + " " + orderStr + ", play_records.id " + orderStr)
 
 	// pageIndex is 0-indexed from the service layer
 	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
