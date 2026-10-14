@@ -1,5 +1,6 @@
 import client from './client'
-import type { PlayRecordResponse, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse, Difficulty } from './types'
+import i18n from '@/i18n'
+import type { PlayRecordResponse, PlayRecordInfo, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse, Difficulty } from './types'
 
 export interface RecordFilterParams {
   minLevel?: number | null
@@ -48,6 +49,28 @@ export const uploadRecords = (username: string, data: BatchCreatePlayRecordReque
 
 export const getAllChartsWithScores = (username: string) => {
   return client.get<AllChartsResponse>(`/records/${username}`, { params: { scope: 'all-charts' } })
+}
+
+/** Load the complete candidate pool so fitting ratings can change B50 membership. */
+export const getAllBestRecords = async (username: string): Promise<PlayRecordResponse> => {
+  const records: PlayRecordInfo[] = []
+  let pageSize = 200
+  let pageIndex = 1
+  let data: PlayRecordResponse
+
+  do {
+    const response = await getRecords(username, 'best', pageSize, pageIndex)
+    data = response.data
+    records.push(...data.records)
+    if (data.records.length === 0 && records.length < data.total) {
+      throw new Error(i18n.global.t('message.incomplete_best_records'))
+    }
+    // Respect a server-configured page-size cap when advancing the offset.
+    if (pageIndex === 1 && data.records.length > 0) pageSize = data.records.length
+    pageIndex++
+  } while (records.length < data.total)
+
+  return { ...data, records }
 }
 
 export const getSongRecords = (username: string, songAddr: string, scope: string = 'best') => {
