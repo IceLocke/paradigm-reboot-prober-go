@@ -67,7 +67,7 @@ web/
 │   │
 │   ├── api/                      # API layer
 │   │   ├── generated.d.ts        # Auto-generated types (DO NOT EDIT)
-│   │   ├── openapi3.json         # Converted OpenAPI 3.0 spec (gitignored)
+│   │   ├── openapi3.json         # Auto-generated OpenAPI 3.0 spec (committed)
 │   │   ├── types.ts              # Re-exports from generated.d.ts + DeepRequired
 │   │   ├── client.ts             # Axios instance (base URL, JWT interceptor, gzip request, global 401 toast)
 │   │   ├── user.ts               # User API (login, register, profile, token)
@@ -276,10 +276,10 @@ docs/swagger.json  ──swagger2openapi──▶  src/api/openapi3.json  ──
 ```
 
 - **`generated.d.ts`** is auto-generated and committed to the repo. DO NOT edit manually.
-- **`openapi3.json`** is a build intermediate, gitignored.
-- **`scripts/postprocess-openapi.mjs`** walks the intermediate OpenAPI 3 doc and promotes Swagger-2 `x-nullable` extensions (which `swagger2openapi` passes through verbatim) to OpenAPI 3's native `nullable: true`. This is what lets nullable Go fields (e.g. `FittingLevel *float64`, see the backend `AGENTS.md` “Nullable JSON fields” section) reach the frontend as `T | null`.
+- **`openapi3.json`** is auto-generated from the backend Swagger spec and committed to the repo alongside `generated.d.ts`. DO NOT edit manually or add it to `.gitignore`.
+- **`scripts/postprocess-openapi.mjs`** walks the converted OpenAPI 3 doc and promotes Swagger-2 `x-nullable` extensions (which `swagger2openapi` passes through verbatim) to OpenAPI 3's native `nullable: true`. This is what lets nullable Go fields (e.g. `FittingLevel *float64`, see the backend `AGENTS.md` “Nullable JSON fields” section) reach the frontend as `T | null`.
 - **`types.ts`** is a hand-maintained thin adapter that re-exports from `generated.d.ts` with `DeepRequired<>` wrappers for response models. `DeepRequired<T>` strips the optional marker but *preserves* `null` on nullable fields — callers are forced to handle the null case.
-- When the backend Swagger spec changes, run `pnpm generate:api` and fix any resulting type errors.
+- When the backend Swagger spec changes, run `pnpm generate:api`, fix any resulting type errors, and commit both `src/api/openapi3.json` and `src/api/generated.d.ts` alongside the backend changes.
 
 ### Dev Server Proxy
 
