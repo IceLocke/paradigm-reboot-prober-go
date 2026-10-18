@@ -1,17 +1,16 @@
 import type { ChartInfoSimple, PlayRecordInfo } from '@/api/types'
-import { calculateSingleRating } from './rating.ts'
 
 /** Use the published fitting level, falling back to the official level when absent. */
 export function getRatingLevel(chart: ChartInfoSimple, fitting = false): number {
   return fitting ? chart.fitting_level ?? chart.level : chart.level
 }
 
-/** Recalculate every candidate before ranking; leave API records and chart metadata intact. */
-export function recalculateFittingRecords(records: PlayRecordInfo[]): PlayRecordInfo[] {
+/** Display the server's fitted rating without mutating API records or reselecting B50. */
+export function withFittingRatings(records: PlayRecordInfo[]): PlayRecordInfo[] {
   return records.map((record) => ({
     ...record,
-    rating: calculateSingleRating(getRatingLevel(record.chart, true), record.score),
-  })).sort(compareRecords)
+    rating: record.fitting_rating,
+  }))
 }
 
 function compareRecords(a: PlayRecordInfo, b: PlayRecordInfo): number {

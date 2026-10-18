@@ -39,13 +39,13 @@ import { useI18n } from 'vue-i18n'
 import { NModal, NRadioGroup, NRadio } from 'naive-ui'
 import { saveAs } from 'file-saver'
 import BaseButton from '@/components/ui/BaseButton.vue'
-import { getRecords } from '@/api/record'
-import { USE_MOCK } from '@/api/mock'
+import { getRecords, getGlobalBest50Records } from '@/api/record'
+import { USE_MOCK, getMockB50, getMockRecords } from '@/api/mock'
 import { renderB50Image, type B50Section } from '@/utils/b50Canvas'
 import type { PlayRecordInfo } from '@/api/types'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { formatAvgRating } from '@/utils/rating'
-import { selectBest50 } from '@/utils/b50'
+import { selectBest50, withFittingRatings } from '@/utils/b50'
 
 const { t } = useI18n()
 
@@ -60,10 +60,8 @@ const props = withDefaults(defineProps<{
   b15Avg: string
   b35Avg: string
   fitting?: boolean
-  fittingRecords?: PlayRecordInfo[]
 }>(), {
   fitting: false,
-  fittingRecords: () => [],
 })
 
 const mode = ref<'standard' | 'overflow' | 'global'>('standard')
@@ -79,6 +77,8 @@ const handleExport = async () => {
   exporting.value = true
   const exportData = { ...props }
   const exportMode = mode.value
+  const sortBy = exportData.fitting ? 'fitting_rating' : 'rating'
+  const displayRecords = (records: PlayRecordInfo[]) => exportData.fitting ? withFittingRatings(records) : records
 
   try {
     let sections: B50Section[]
@@ -91,27 +91,22 @@ const handleExport = async () => {
         { label: 'Best 35', avg: exportData.b35Avg, records: exportData.b35Records },
       ]
     } else if (exportMode === 'overflow') {
-      if (USE_MOCK && !exportData.fitting) {
-        toastError('message.export_image_failed')
-        return
-      }
-      const { b15Records: b15, b35Records: b35 } = exportData.fitting
-        ? selectBest50(exportData.fittingRecords, 5)
-        : selectBest50((await getRecords(exportData.username, 'b50', 50, 1, 'rating', 'desc', undefined, 5)).data.records, 5)
+      const data = USE_MOCK
+        ? getMockB50(exportData.fitting, 5)
+        : (await getRecords(exportData.username, 'b50', 50, 1, sortBy, 'desc', undefined, 5)).data
+      const { b15Records: b15, b35Records: b35 } = selectBest50(displayRecords(data.records), 5)
       const best15 = b15.slice(0, 15)
       const best35 = b35.slice(0, 35)
       sections = [
-        { label: 'Best 15', avg: avgRating(best15, exportData.fitting ? 15 : best15.length), records: b15, cutoff: 15 },
-        { label: 'Best 35', avg: avgRating(best35, exportData.fitting ? 35 : best35.length), records: b35, cutoff: 35 },
+        { label: 'Best 15', avg: avgRating(best15, 15), records: b15, cutoff: 15 },
+        { label: 'Best 35', avg: avgRating(best35, 35), records: b35, cutoff: 35 },
       ]
+      rating = avgRating([...best15, ...best35], 50)
     } else {
-      if (USE_MOCK && !exportData.fitting) {
-        toastError('message.export_image_failed')
-        return
-      }
-      const records = exportData.fitting
-        ? exportData.fittingRecords.slice(0, 50)
-        : (await getRecords(exportData.username, 'best', 50, 1, 'rating', 'desc')).data.records
+      const data = USE_MOCK
+        ? getMockRecords('best', 50, 1, sortBy)
+        : await getGlobalBest50Records(exportData.username, sortBy)
+      const records = displayRecords(data.records)
       sections = [
         { label: 'Best 50', avg: avgRating(records), records: records.slice(0, 50) },
       ]

@@ -14,6 +14,7 @@ export interface paths {
         /**
          * Get play records
          * @description Retrieve play records for a user based on scope (b50, best, all, all-charts)
+         *     B50 selects the highest rating or fitting_rating per season before applying order; best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.
          */
         get: {
             parameters: {
@@ -26,9 +27,9 @@ export interface paths {
                     page_size?: number;
                     /** @description Page index */
                     page_index?: number;
-                    /** @description Sort by (rating, score, record_time, etc.) */
+                    /** @description Sort by: rating or fitting_rating for b50; rating, fitting_rating, score or record_time for best; rating, score or record_time for all */
                     sort_by?: string;
-                    /** @description Order (desc or asc) */
+                    /** @description Order (desc or asc); b50 membership always uses the highest ratings */
                     order?: string;
                     /** @description Minimum chart level (inclusive) */
                     min_level?: number;
@@ -1064,6 +1065,8 @@ export interface components {
         };
         "model.PlayRecordInfo": {
             chart?: components["schemas"]["model.ChartInfoSimple"];
+            /** @description FittingRating uses the current published fitting level, or the official level when absent. */
+            fitting_rating?: number;
             id?: number;
             rating?: number;
             record_time?: string;

@@ -140,7 +140,7 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	b35, b15, err := repo.GetBest50Records("user_b50", 0, model.RecordFilter{})
+	b35, b15, err := repo.GetBest50Records("user_b50", 0, "rating", true, model.RecordFilter{})
 	assert.NoError(t, err)
 	assert.Len(t, b15, 1)
 	assert.Len(t, b35, 1)
@@ -418,7 +418,7 @@ func TestRecordRepository_RecordFilter(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, int64(tt.wantAllCount), allCount, "CountAllRecords")
 
-			b35, b15, err := repo.GetBest50Records("filter_user", 0, tt.filter)
+			b35, b15, err := repo.GetBest50Records("filter_user", 0, "rating", true, tt.filter)
 			assert.NoError(t, err)
 			assert.Len(t, b35, tt.wantB35Count, "B35")
 			assert.Len(t, b15, tt.wantB15Count, "B15")

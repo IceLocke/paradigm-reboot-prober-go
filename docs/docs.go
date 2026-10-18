@@ -26,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/records/{username}": {
             "get": {
-                "description": "Retrieve play records for a user based on scope (b50, best, all, all-charts)",
+                "description": "Retrieve play records for a user based on scope (b50, best, all, all-charts)\nB50 selects the highest rating or fitting_rating per season before applying order; best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.",
                 "produces": [
                     "application/json"
                 ],
@@ -73,14 +73,14 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "default": "rating",
-                        "description": "Sort by (rating, score, record_time, etc.)",
+                        "description": "Sort by: rating or fitting_rating for b50; rating, fitting_rating, score or record_time for best; rating, score or record_time for all",
                         "name": "sort_by",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "default": "desc",
-                        "description": "Order (desc or asc)",
+                        "description": "Order (desc or asc); b50 membership always uses the highest ratings",
                         "name": "order",
                         "in": "query"
                     },
@@ -1217,6 +1217,10 @@ const docTemplate = `{
             "properties": {
                 "chart": {
                     "$ref": "#/definitions/model.ChartInfoSimple"
+                },
+                "fitting_rating": {
+                    "description": "FittingRating uses the current published fitting level, or the official level when absent.",
+                    "type": "integer"
                 },
                 "id": {
                     "type": "integer"

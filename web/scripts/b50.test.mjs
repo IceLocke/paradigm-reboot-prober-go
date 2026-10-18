@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { calculateSingleRating, formatAvgRating } from '../src/utils/rating.ts'
-import { getRatingLevel, recalculateFittingRecords, selectBest50 } from '../src/utils/b50.ts'
+import { getRatingLevel, withFittingRatings, selectBest50 } from '../src/utils/b50.ts'
 
 function record(id, b15 = false, level = 16, fittingLevel = level) {
   return {
     id,
     score: 1000000,
     rating: calculateSingleRating(level, 1000000),
+    fitting_rating: calculateSingleRating(fittingLevel ?? level, 1000000),
     record_time: '2026-01-01T00:00:00Z',
     chart: {
       id,
@@ -67,7 +68,7 @@ test('fitting levels change B35 and B15 membership beyond the official cutoffs',
   const official = selectBest50(source)
   assert.ok(!official.b35Records.some((r) => r.id === 36))
   assert.ok(!official.b15Records.some((r) => r.id === 116))
-  const fitted = selectBest50(recalculateFittingRecords(source))
+  const fitted = selectBest50(withFittingRatings(source))
   assert.equal(fitted.b35Records.length, 35)
   assert.equal(fitted.b15Records.length, 15)
   assert.equal(fitted.b35Records[0].id, 36)
@@ -79,15 +80,15 @@ test('fitting levels change B35 and B15 membership beyond the official cutoffs',
 
 test('missing fitting levels use official levels without treating zero as missing', () => {
   const source = [record(1, false, 16.4, null), record(2, false, 16.4, 0)]
-  const fitted = recalculateFittingRecords(source)
+  const fitted = withFittingRatings(source)
   assert.equal(getRatingLevel(source[0].chart, true), 16.4)
   assert.equal(getRatingLevel(source[1].chart, true), 0)
   assert.equal(fitted.find((r) => r.id === 1).rating, 16400)
   assert.equal(fitted.find((r) => r.id === 2).rating, 0)
 })
 
-test('overflow retains five extra fitted records per season; global ranking ignores seasons', () => {
-  const records = recalculateFittingRecords([
+test('overflow retains five extra fitted records per season', () => {
+  const records = withFittingRatings([
     ...Array.from({ length: 60 }, (_, i) => record(i + 1, false, 16, 16.2)),
     ...Array.from({ length: 30 }, (_, i) => record(i + 101, true, 15, 15.2)),
   ])
@@ -97,9 +98,7 @@ test('overflow retains five extra fitted records per season; global ranking igno
   assert.equal(overflow.b15Records.length, 20)
   assert.deepEqual(overflow.b35Records.slice(0, 35), standard.b35Records)
   assert.deepEqual(overflow.b15Records.slice(0, 15), standard.b15Records)
-  assert.equal(records.slice(0, 50).length, 50)
-  assert.ok(records.slice(0, 50).every((r) => !r.chart.b15))
-  assert.equal(records[0].id, 60)
+  assert.equal(overflow.b35Records[0].id, 60)
 })
 
 test('sparse B50 keeps season limits and fixed average denominators', () => {
@@ -110,4 +109,14 @@ test('sparse B50 keeps season limits and fixed average denominators', () => {
   assert.equal(formatAvgRating(sum, 35), '4.5714')
   assert.equal(formatAvgRating(0, 15), '0.0000')
   assert.deepEqual(selectBest50([]), { b35Records: [], b15Records: [] })
+})
+
+test('display uses the server fitting_rating and preserves its selected order', () => {
+  const source = [record(1, false, 16, 16.2), record(2, false, 17, 17.2)]
+  source[0].fitting_rating = 12345
+  const original = structuredClone(source)
+  const displayed = withFittingRatings(source)
+  assert.equal(displayed[0].rating, 12345)
+  assert.deepEqual(displayed.map((record) => record.id), [1, 2])
+  assert.deepEqual(source, original)
 })

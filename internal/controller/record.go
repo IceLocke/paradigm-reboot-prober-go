@@ -104,6 +104,7 @@ func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
 // GetPlayRecords godoc
 // @Summary Get play records
 // @Description Retrieve play records for a user based on scope (b50, best, all, all-charts)
+// @Description B50 selects the highest rating or fitting_rating per season before applying order; best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.
 // @Tags record
 // @Produce json
 // @Param username path string true "Username"
@@ -111,8 +112,8 @@ func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
 // @Param underflow query int false "Underflow for b50" default(0)
 // @Param page_size query int false "Page size" default(50)
 // @Param page_index query int false "Page index" default(1)
-// @Param sort_by query string false "Sort by (rating, score, record_time, etc.)" default(rating)
-// @Param order query string false "Order (desc or asc)" default(desc)
+// @Param sort_by query string false "Sort by: rating or fitting_rating for b50; rating, fitting_rating, score or record_time for best; rating, score or record_time for all" default(rating)
+// @Param order query string false "Order (desc or asc); b50 membership always uses the highest ratings" default(desc)
 // @Param min_level query number false "Minimum chart level (inclusive)"
 // @Param max_level query number false "Maximum chart level (inclusive)"
 // @Param difficulty query []string false "Filter by difficulty (detected, invaded, massive, reboot)" collectionFormat(multi)
@@ -129,6 +130,10 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	scope := c.DefaultQuery("scope", "b50")
 	underflow, _ := strconv.Atoi(c.DefaultQuery("underflow", "0"))
 	p := parsePaginationParams(c)
+	if p.sortBy == "fitting_rating" && scope != "b50" && scope != "best" {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "fitting_rating sorting is only supported for b50 and best scopes"})
+		return
+	}
 
 	// Parse record filter
 	filter, err := parseRecordFilter(c)
@@ -180,7 +185,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	switch scope {
 	case "b50":
-		records, err := ctrl.recordService.GetBest50Records(ctx, username, underflow, filter)
+		records, err := ctrl.recordService.GetBest50Records(ctx, username, underflow, p.sortBy, p.order, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return

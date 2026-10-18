@@ -1,11 +1,13 @@
 package repository
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/pkg/rating"
+	"slices"
 	"time"
 
 	"github.com/jellydator/ttlcache/v3"
@@ -55,6 +57,18 @@ func applyRecordFilter(query *gorm.DB, filter model.RecordFilter) *gorm.DB {
 		query = query.Where(`"Chart__Song".b15 = ?`, *filter.B15)
 	}
 	return query
+}
+
+// bestRecordsQuery keeps official and fitted rankings, and their counts, on the
+// same live per-chart candidate pool. GORM does not scope manually joined tables.
+func (r *RecordRepository) bestRecordsQuery(username string, filter model.RecordFilter) *gorm.DB {
+	query := r.db.Model(&model.PlayRecord{}).
+		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id AND best_play_records.deleted_at IS NULL").
+		Joins("Chart").
+		Joins("Chart.Song").
+		Where("best_play_records.username = ?", username).
+		Where(`"Chart".id IS NOT NULL AND "Chart__Song".id IS NOT NULL`)
+	return applyRecordFilter(query, filter)
 }
 
 // applyCountFilter applies optional level range, difficulty, and season (B15) filters
@@ -162,9 +176,37 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 	return record, nil
 }
 
-// GetBest50Records retrieves the best 35 (old) and 15 (new) records for B50 calculation
-func (r *RecordRepository) GetBest50Records(username string, underflow int, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
-	key := b50CacheKey(username, underflow, filter)
+// GetBest50Records selects the highest ratings in each season, then applies display order.
+// Fitting queries rank the full candidate pool before applying the season limits.
+func (r *RecordRepository) GetBest50Records(username string, underflow int, sortBy string, descending bool, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
+	if sortBy == "fitting_rating" {
+		// The fitting binary publishes directly to charts. Do not cache these results,
+		// since its writes cannot invalidate this process's repository cache.
+		records, err := r.getFittingBestRecords(username, filter)
+		if err != nil {
+			return nil, nil, err
+		}
+		var b35, b15 []model.PlayRecord
+		for _, record := range records {
+			if record.Chart == nil || record.Chart.Song == nil {
+				continue
+			}
+			if record.Chart.Song.B15 {
+				if len(b15) < config.GlobalConfig.Game.B15Limit+underflow {
+					b15 = append(b15, record)
+				}
+			} else if len(b35) < config.GlobalConfig.Game.B35Limit+underflow {
+				b35 = append(b35, record)
+			}
+		}
+		if !descending {
+			slices.Reverse(b35)
+			slices.Reverse(b15)
+		}
+		return b35, b15, nil
+	}
+
+	key := b50CacheKey(username, underflow, descending, filter)
 	if r.cache != nil {
 		if item := r.cache.Get(key); item != nil {
 			entry := item.Value().(*b50CacheEntry)
@@ -180,12 +222,7 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int, filt
 	var b15 []model.PlayRecord
 
 	// Base query for best records
-	baseQuery := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
-		Joins("Chart").
-		Joins("Chart.Song").
-		Where("best_play_records.username = ?", username)
-	baseQuery = applyRecordFilter(baseQuery, filter)
+	baseQuery := r.bestRecordsQuery(username, filter)
 
 	// B35: Not B15 songs
 	if err := baseQuery.Session(&gorm.Session{}).
@@ -205,6 +242,10 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int, filt
 		return nil, nil, err
 	}
 
+	if !descending {
+		slices.Reverse(b35)
+		slices.Reverse(b15)
+	}
 	if r.cache != nil {
 		r.cache.Set(key, &b50CacheEntry{B35: b35, B15: b15}, ttlcache.DefaultTTL)
 	}
@@ -235,13 +276,25 @@ func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex in
 
 // GetBestRecords retrieves the best records for a user with pagination and sorting
 func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy string, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
+	if sortBy == "fitting_rating" {
+		records, err := r.getFittingBestRecords(username, filter)
+		if err != nil {
+			return nil, err
+		}
+		if !order {
+			slices.Reverse(records)
+		}
+		// Paginate only after ranking the complete per-chart best-record pool.
+		if pageSize <= 0 || pageIndex < 0 || pageIndex > len(records)/pageSize {
+			return []model.PlayRecord{}, nil
+		}
+		start := pageSize * pageIndex
+		end := start + min(pageSize, len(records)-start)
+		return records[start:end], nil
+	}
+
 	var records []model.PlayRecord
-	query := r.db.Model(&model.PlayRecord{}).
-		Joins("JOIN best_play_records ON best_play_records.play_record_id = play_records.id").
-		Joins("Chart").
-		Joins("Chart.Song").
-		Where("play_records.username = ?", username)
-	query = applyRecordFilter(query, filter)
+	query := r.bestRecordsQuery(username, filter)
 
 	orderStr := "desc"
 	if !order {
@@ -256,6 +309,27 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 	// pageIndex is 0-indexed from the service layer
 	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
 	return records, err
+}
+
+// getFittingBestRecords reuses the Go rating formula so SQLite and PostgreSQL
+// return identical integer ratings without a second stored rating or SQL formula.
+func (r *RecordRepository) getFittingBestRecords(username string, filter model.RecordFilter) ([]model.PlayRecord, error) {
+	var records []model.PlayRecord
+	if err := r.bestRecordsQuery(username, filter).Find(&records).Error; err != nil {
+		return nil, err
+	}
+	// Compute once per candidate rather than once per sort comparison.
+	ratings := make(map[int]int, len(records))
+	for i := range records {
+		ratings[records[i].ID] = records[i].FittingRating()
+	}
+	slices.SortFunc(records, func(a, b model.PlayRecord) int {
+		if order := cmp.Compare(ratings[b.ID], ratings[a.ID]); order != 0 {
+			return order
+		}
+		return cmp.Compare(b.ID, a.ID)
+	})
+	return records, nil
 }
 
 // GetAllChartsWithBestScores retrieves all charts with the user's best score (if any)
@@ -307,10 +381,7 @@ func (r *RecordRepository) GetAllChartsWithBestScores(username string, filter mo
 // CountBestRecords counts the number of best records for a user
 func (r *RecordRepository) CountBestRecords(username string, filter model.RecordFilter) (int64, error) {
 	var count int64
-	query := r.db.Model(&model.BestPlayRecord{}).
-		Where("username = ?", username)
-	query = applyCountFilter(query, filter, "best_play_records.chart_id")
-	err := query.Count(&count).Error
+	err := r.bestRecordsQuery(username, filter).Count(&count).Error
 	return count, err
 }
 

@@ -51,26 +51,24 @@ export const getAllChartsWithScores = (username: string) => {
   return client.get<AllChartsResponse>(`/records/${username}`, { params: { scope: 'all-charts' } })
 }
 
-/** Load the complete candidate pool so fitting ratings can change B50 membership. */
-export const getAllBestRecords = async (username: string): Promise<PlayRecordResponse> => {
+/** Fetch the server-ranked global top 50, respecting a smaller server page-size cap. */
+export const getGlobalBest50Records = async (username: string, sortBy = 'rating'): Promise<PlayRecordResponse> => {
   const records: PlayRecordInfo[] = []
-  let pageSize = 200
+  let pageSize = 50
   let pageIndex = 1
   let data: PlayRecordResponse
 
   do {
-    const response = await getRecords(username, 'best', pageSize, pageIndex)
-    data = response.data
+    data = (await getRecords(username, 'best', pageSize, pageIndex, sortBy)).data
     records.push(...data.records)
-    if (data.records.length === 0 && records.length < data.total) {
+    if (data.records.length === 0 && records.length < Math.min(50, data.total)) {
       throw new Error(i18n.global.t('message.incomplete_best_records'))
     }
-    // Respect a server-configured page-size cap when advancing the offset.
     if (pageIndex === 1 && data.records.length > 0) pageSize = data.records.length
     pageIndex++
-  } while (records.length < data.total)
+  } while (records.length < Math.min(50, data.total))
 
-  return { ...data, records }
+  return { ...data, records: records.slice(0, 50) }
 }
 
 export const getSongRecords = (username: string, songAddr: string, scope: string = 'best') => {

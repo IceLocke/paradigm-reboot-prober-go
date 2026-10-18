@@ -40,8 +40,8 @@ func (s *RecordService) GetAllRecords(ctx context.Context, username string, page
 	return s.recordRepo.GetAllRecords(username, pageSize, pageIndex, sortBy, order == "desc", filter)
 }
 
-func (s *RecordService) GetBest50Records(ctx context.Context, username string, underflow int, filter model.RecordFilter) ([]*model.PlayRecord, error) {
-	b35, b15, err := s.recordRepo.GetBest50Records(username, underflow, filter)
+func (s *RecordService) GetBest50Records(ctx context.Context, username string, underflow int, sortBy, order string, filter model.RecordFilter) ([]*model.PlayRecord, error) {
+	b35, b15, err := s.recordRepo.GetBest50Records(username, underflow, sortBy, order == "desc", filter)
 	if err != nil {
 		return nil, err
 	}

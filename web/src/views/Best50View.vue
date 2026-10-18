@@ -110,7 +110,6 @@
     :b15-avg="b15Rating"
     :b35-avg="b35Rating"
     :fitting="fitting"
-    :fitting-records="ratedRecords"
   />
 </template>
 
@@ -128,13 +127,13 @@ import { CanvasRenderer } from 'echarts/renderers'
 
 import { toastSuccess, toastError } from '@/utils/toast'
 import { formatAvgRating, formatRating } from '@/utils/rating'
-import { getRatingLevel, recalculateFittingRecords, selectBest50 } from '@/utils/b50'
+import { getRatingLevel, withFittingRatings } from '@/utils/b50'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
-import { getRecords, getAllBestRecords } from '@/api/record'
+import { getRecords } from '@/api/record'
 import { getSingleSongInfo } from '@/api/song'
-import { USE_MOCK, getMockB50, getMockRecords } from '@/api/mock'
+import { USE_MOCK, getMockB50 } from '@/api/mock'
 import type { PlayRecordInfo, Song, Difficulty } from '@/api/types'
 import BaseCard from '@/components/ui/BaseCard.vue'
 import IconButton from '@/components/ui/IconButton.vue'
@@ -156,14 +155,12 @@ const sourceRecords = ref<PlayRecordInfo[]>([])
 const loading = ref(false)
 let loadVersion = 0
 const ratedRecords = computed(() => fitting.value
-  ? recalculateFittingRecords(sourceRecords.value)
+  ? withFittingRatings(sourceRecords.value)
   : sourceRecords.value)
-const best50 = computed(() => fitting.value
-  ? selectBest50(ratedRecords.value)
-  : {
-    b35Records: ratedRecords.value.filter((record) => !record.chart.b15),
-    b15Records: ratedRecords.value.filter((record) => record.chart.b15),
-  })
+const best50 = computed(() => ({
+  b35Records: ratedRecords.value.filter((record) => !record.chart.b15),
+  b15Records: ratedRecords.value.filter((record) => record.chart.b15),
+}))
 const allRecords = computed(() => [...best50.value.b35Records, ...best50.value.b15Records])
 const nickname = ref('')
 const showSongDetail = ref(false)
@@ -391,10 +388,8 @@ const loadData = async () => {
   loading.value = true
   try {
     const data = USE_MOCK
-      ? (fitting.value ? getMockRecords('best', Number.MAX_SAFE_INTEGER, 1) : getMockB50())
-      : fitting.value
-        ? await getAllBestRecords(userStore.username)
-        : (await getRecords(userStore.username, 'b50')).data
+      ? getMockB50(fitting.value)
+      : (await getRecords(userStore.username, 'b50', 50, 1, fitting.value ? 'fitting_rating' : 'rating')).data
     if (version !== loadVersion) return false
     sourceRecords.value = data.records
     nickname.value = data.nickname
