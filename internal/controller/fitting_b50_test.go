@@ -1,10 +1,12 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"paradigm-reboot-prober-go/config"
 	"paradigm-reboot-prober-go/internal/model"
+	"paradigm-reboot-prober-go/internal/model/request"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -69,6 +71,57 @@ func TestRecordController_FittingB50(t *testing.T) {
 			assert.Equal(t, tc.firstFitted, response.Records[0].FittingRating)
 		})
 	}
+	t.Run("replacement can lower the current best record", func(t *testing.T) {
+		w := performRequest(r, "GET", "/records/fituser?scope=b50&sort_by=fitting_rating", nil, nil)
+		require.Equal(t, 200, w.Code, w.Body.String())
+		var before model.PlayRecordResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &before))
+		require.NotEmpty(t, before.Records)
+		previous := before.Records[0]
+
+		body, err := json.Marshal(request.BatchCreatePlayRecordRequest{
+			UploadToken: "fittoken",
+			IsReplace:   true,
+			PlayRecords: []model.PlayRecordBase{{ChartID: previous.Chart.ID, Score: intPtr(900000)}},
+		})
+		require.NoError(t, err)
+		w = performRequest(r, "POST", "/records/fituser", bytes.NewBuffer(body), nil)
+		require.Equal(t, 201, w.Code, w.Body.String())
+
+		for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortFittingRating} {
+			w = performRequest(r, "GET", "/records/fituser?scope=best&sort_by="+string(sortBy), nil, nil)
+			require.Equal(t, 200, w.Code, w.Body.String())
+			var best model.PlayRecordResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &best))
+			require.Equal(t, 4, best.Total)
+			found := false
+			for _, record := range best.Records {
+				assert.NotEqual(t, previous.ID, record.ID, "the historical high score is no longer the current best")
+				if record.Chart.ID == previous.Chart.ID {
+					found = true
+					assert.Equal(t, 900000, record.Score)
+					assert.Less(t, record.Rating, previous.Rating)
+					assert.Less(t, record.FittingRating, previous.FittingRating)
+				}
+			}
+			assert.True(t, found, "the lower replacement is the chart's current best record")
+
+			w = performRequest(r, "GET", "/records/fituser?scope=b50&sort_by="+string(sortBy), nil, nil)
+			require.Equal(t, 200, w.Code, w.Body.String())
+			var b50 model.PlayRecordResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &b50))
+			require.Len(t, b50.Records, 2)
+			assert.Equal(t, 16000, b50.Records[0].Rating)
+			assert.NotEqual(t, previous.Chart.ID, b50.Records[0].Chart.ID, "B50 must rerank the current best records after replacement")
+		}
+
+		w = performRequest(r, "GET", "/records/fituser?scope=all", nil, nil)
+		require.Equal(t, 200, w.Code, w.Body.String())
+		var all model.PlayRecordResponse
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &all))
+		assert.Equal(t, 5, all.Total, "replacement retains historical attempts")
+		assert.Contains(t, all.Records, previous)
+	})
 	for _, scope := range []string{"all", "all-charts"} {
 		w := performRequest(r, "GET", "/records/fituser?scope="+scope+"&sort_by=fitting_rating", nil, nil)
 		assert.Equal(t, 400, w.Code)

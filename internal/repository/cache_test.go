@@ -395,7 +395,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.Len(t, b35, 1) // song is not b15
 		assert.Len(t, b15, 0)
 
-		key := b50CacheKey("recuser1", 0, true, model.RecordFilter{})
+		key := b50CacheKey("recuser1", 0, model.RecordSortRating, true, model.RecordFilter{})
 		assert.True(t, recordRepo.cache.Has(key), "B50 should be cached")
 
 		// Upload another record → cache invalidated
@@ -522,8 +522,8 @@ func TestRecordCacheConsistency(t *testing.T) {
 		_, _, err = recordRepo.GetBest50Records("xusrbbbb", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
 
-		keyA := b50CacheKey("xusraaaa", 0, true, model.RecordFilter{})
-		keyB := b50CacheKey("xusrbbbb", 0, true, model.RecordFilter{})
+		keyA := b50CacheKey("xusraaaa", 0, model.RecordSortRating, true, model.RecordFilter{})
+		keyB := b50CacheKey("xusrbbbb", 0, model.RecordSortRating, true, model.RecordFilter{})
 		assert.True(t, recordRepo.cache.Has(keyA))
 		assert.True(t, recordRepo.cache.Has(keyB))
 
@@ -586,11 +586,11 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// batchusr1 cache invalidated
-		assert.False(t, recordRepo.cache.Has(b50CacheKey("batchusr1", 0, true, model.RecordFilter{})),
+		assert.False(t, recordRepo.cache.Has(b50CacheKey("batchusr1", 0, model.RecordSortRating, true, model.RecordFilter{})),
 			"batchusr1 B50 cache should be invalidated after batch create")
 
 		// batchusr2 cache intact
-		assert.True(t, recordRepo.cache.Has(b50CacheKey("batchusr2", 0, true, model.RecordFilter{})),
+		assert.True(t, recordRepo.cache.Has(b50CacheKey("batchusr2", 0, model.RecordSortRating, true, model.RecordFilter{})),
 			"batchusr2 B50 cache should remain intact")
 	})
 

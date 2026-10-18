@@ -19,6 +19,53 @@ func recordIDs(records []model.PlayRecord) []int {
 	return ids
 }
 
+func TestRecordRepository_B50CacheSeparatesRatingSorts(t *testing.T) {
+	for _, sortOrder := range [][]model.RecordSort{
+		{model.RecordSortRating, model.RecordSortFittingRating},
+		{model.RecordSortFittingRating, model.RecordSortRating},
+	} {
+		t.Run(string(sortOrder[0])+" first", func(t *testing.T) {
+			db := setupTestDB(t)
+			repo := NewRecordRepository(db)
+			t.Cleanup(repo.cache.Stop)
+			song := model.Song{
+				SongBase: model.SongBase{WikiID: "cache_sort"},
+				Charts: []model.Chart{
+					{Difficulty: model.DifficultyMassive, Level: 16, FittingLevel: float64Ptr(15.7)},
+					{Difficulty: model.DifficultyReboot, Level: 15.9, FittingLevel: float64Ptr(16.2)},
+				},
+			}
+			require.NoError(t, db.Create(&song).Error)
+			for _, chart := range song.Charts {
+				_, err := repo.CreateRecord(&model.PlayRecord{
+					Username: "cache_user", PlayRecordBase: model.PlayRecordBase{ChartID: chart.ID, Score: intPtr(1000000)},
+				}, false)
+				require.NoError(t, err)
+			}
+
+			before := repo.cache.Metrics()
+			for _, sortBy := range sortOrder {
+				old, new, err := repo.GetBest50Records("cache_user", 0, sortBy, true, model.RecordFilter{})
+				require.NoError(t, err)
+				require.Len(t, old, 2)
+				assert.Empty(t, new)
+				wantChart := song.Charts[0].ID
+				if sortBy == model.RecordSortFittingRating {
+					wantChart = song.Charts[1].ID
+				}
+				assert.Equal(t, wantChart, old[0].ChartID)
+			}
+			after := repo.cache.Metrics()
+			assert.Equal(t, before.Misses+2, after.Misses, "each rating sort must miss independently")
+			assert.Equal(t, before.Hits, after.Hits, "the other rating sort must not reuse the cached ranking")
+
+			_, _, err := repo.GetBest50Records("cache_user", 0, model.RecordSortRating, true, model.RecordFilter{})
+			require.NoError(t, err)
+			assert.Equal(t, after.Hits+1, repo.cache.Metrics().Hits, "the official ranking remains cached")
+		})
+	}
+}
+
 func TestRecordRepository_FittingRanking(t *testing.T) {
 	db := setupTestDB(t)
 	repo := NewRecordRepository(db)
@@ -87,7 +134,7 @@ func TestRecordRepository_FittingRanking(t *testing.T) {
 		require.Len(t, new, 20)
 		assert.Equal(t, recordIDs(fittedOld), recordIDs(old[:35]))
 		assert.Equal(t, recordIDs(fittedNew), recordIDs(new[:15]))
-		for _, sortBy := range []string{"rating", "fitting_rating"} {
+		for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortFittingRating} {
 			descOld, descNew, err := repo.GetBest50Records("fitted_user", 0, sortBy, true, model.RecordFilter{})
 			require.NoError(t, err)
 			ascOld, ascNew, err := repo.GetBest50Records("fitted_user", 0, sortBy, false, model.RecordFilter{})
@@ -188,7 +235,7 @@ func TestRecordRepository_FittingRanking(t *testing.T) {
 		require.NoError(t, db.Delete(&model.Song{}, chart.SongID).Error)
 		require.NoError(t, db.Delete(&model.PlayRecord{}, allIDs[2]).Error)
 		repo.invalidateUserRecords("fitted_user")
-		for _, sortBy := range []string{"rating", "fitting_rating"} {
+		for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortFittingRating} {
 			records, err := repo.GetBestRecords("fitted_user", 100, 0, sortBy, true, model.RecordFilter{})
 			require.NoError(t, err)
 			assert.Len(t, records, len(allIDs)-4)

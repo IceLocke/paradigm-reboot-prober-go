@@ -42,9 +42,9 @@ func TestRecordRepository_GetBestRecordsStablePagination(t *testing.T) {
 		return
 	}
 
-	for _, sortBy := range []string{"rating", "score", "record_time", "invalid"} {
+	for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortScore, model.RecordSortRecordTime, "invalid"} {
 		for _, descending := range []bool{true, false} {
-			t.Run(sortBy+map[bool]string{true: "_desc", false: "_asc"}[descending], func(t *testing.T) {
+			t.Run(string(sortBy)+map[bool]string{true: "_desc", false: "_asc"}[descending], func(t *testing.T) {
 				var got []int
 				for page := 0; page < 2; page++ {
 					records, err := repo.GetBestRecords("pagination_user", 2, page, sortBy, descending, model.RecordFilter{})

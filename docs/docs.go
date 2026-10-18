@@ -26,7 +26,7 @@ const docTemplate = `{
     "paths": {
         "/records/{username}": {
             "get": {
-                "description": "Retrieve play records for a user based on scope (b50, best, all, all-charts)\nB50 selects the highest rating or fitting_rating per season before applying order; best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.",
+                "description": "Retrieve play records for a user based on scope (b50, best, all, all-charts)\nB50 ranks the current per-chart best records by rating or fitting_rating within each season before applying display order. Uploads with is_replace=true can replace a chart's best record with a lower score. Best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.",
                 "produces": [
                     "application/json"
                 ],
@@ -43,9 +43,15 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "b50",
+                            "best",
+                            "all",
+                            "all-charts"
+                        ],
                         "type": "string",
                         "default": "b50",
-                        "description": "Scope (b50, best, all, all-charts)",
+                        "description": "Record scope",
                         "name": "scope",
                         "in": "query"
                     },
@@ -71,6 +77,12 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "rating",
+                            "fitting_rating",
+                            "score",
+                            "record_time"
+                        ],
                         "type": "string",
                         "default": "rating",
                         "description": "Sort by: rating or fitting_rating for b50; rating, fitting_rating, score or record_time for best; rating, score or record_time for all",
@@ -78,9 +90,13 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "desc",
+                            "asc"
+                        ],
                         "type": "string",
                         "default": "desc",
-                        "description": "Order (desc or asc); b50 membership always uses the highest ratings",
+                        "description": "Display order; B50 selection uses the current per-chart best records",
                         "name": "order",
                         "in": "query"
                     },
@@ -221,6 +237,10 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "best",
+                            "all"
+                        ],
                         "type": "string",
                         "default": "best",
                         "description": "Scope (best, all)",
@@ -242,6 +262,11 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "rating",
+                            "score",
+                            "record_time"
+                        ],
                         "type": "string",
                         "default": "rating",
                         "description": "Sort by (rating, score, record_time)",
@@ -249,9 +274,13 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "desc",
+                            "asc"
+                        ],
                         "type": "string",
                         "default": "desc",
-                        "description": "Order (desc or asc)",
+                        "description": "Display order",
                         "name": "order",
                         "in": "query"
                     }
@@ -310,6 +339,10 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "enum": [
+                            "best",
+                            "all"
+                        ],
                         "type": "string",
                         "default": "best",
                         "description": "Scope (best, all)",
@@ -331,6 +364,11 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "rating",
+                            "score",
+                            "record_time"
+                        ],
                         "type": "string",
                         "default": "rating",
                         "description": "Sort by (rating, score, record_time)",
@@ -338,9 +376,13 @@ const docTemplate = `{
                         "in": "query"
                     },
                     {
+                        "enum": [
+                            "desc",
+                            "asc"
+                        ],
                         "type": "string",
                         "default": "desc",
-                        "description": "Order (desc or asc)",
+                        "description": "Display order",
                         "name": "order",
                         "in": "query"
                     }

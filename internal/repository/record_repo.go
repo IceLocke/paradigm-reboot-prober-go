@@ -15,18 +15,18 @@ import (
 )
 
 // allowedSortColumns defines the whitelist of columns that can be used for sorting
-var allowedSortColumns = map[string]string{
-	"rating":      "rating",
-	"score":       "score",
-	"record_time": "record_time",
+var allowedSortColumns = map[model.RecordSort]string{
+	model.RecordSortRating:     "rating",
+	model.RecordSortScore:      "score",
+	model.RecordSortRecordTime: "record_time",
 }
 
 // validateSortBy returns a safe column name for ORDER BY, defaulting to "rating" if not allowed
-func validateSortBy(sortBy string) string {
+func validateSortBy(sortBy model.RecordSort) string {
 	if col, ok := allowedSortColumns[sortBy]; ok {
 		return col
 	}
-	return "rating" // default
+	return allowedSortColumns[model.RecordSortRating]
 }
 
 type RecordRepository struct {
@@ -176,10 +176,25 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 	return record, nil
 }
 
-// GetBest50Records selects the highest ratings in each season, then applies display order.
+// GetBest50Records ranks the current per-chart best records in each season, then applies display order.
 // Fitting queries rank the full candidate pool before applying the season limits.
-func (r *RecordRepository) GetBest50Records(username string, underflow int, sortBy string, descending bool, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
-	if sortBy == "fitting_rating" {
+func (r *RecordRepository) GetBest50Records(username string, underflow int, sortBy model.RecordSort, descending bool, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
+	if sortBy != model.RecordSortFittingRating {
+		sortBy = model.RecordSortRating
+	}
+	key := b50CacheKey(username, underflow, sortBy, descending, filter)
+	if r.cache != nil {
+		if item := r.cache.Get(key); item != nil {
+			entry := item.Value().(*b50CacheEntry)
+			b35 := make([]model.PlayRecord, len(entry.B35))
+			copy(b35, entry.B35)
+			b15 := make([]model.PlayRecord, len(entry.B15))
+			copy(b15, entry.B15)
+			return b35, b15, nil
+		}
+	}
+
+	if sortBy == model.RecordSortFittingRating {
 		// The fitting binary publishes directly to charts. Do not cache these results,
 		// since its writes cannot invalidate this process's repository cache.
 		records, err := r.getFittingBestRecords(username, filter)
@@ -204,18 +219,6 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int, sort
 			slices.Reverse(b15)
 		}
 		return b35, b15, nil
-	}
-
-	key := b50CacheKey(username, underflow, descending, filter)
-	if r.cache != nil {
-		if item := r.cache.Get(key); item != nil {
-			entry := item.Value().(*b50CacheEntry)
-			b35 := make([]model.PlayRecord, len(entry.B35))
-			copy(b35, entry.B35)
-			b15 := make([]model.PlayRecord, len(entry.B15))
-			copy(b15, entry.B15)
-			return b35, b15, nil
-		}
 	}
 
 	var b35 []model.PlayRecord
@@ -253,16 +256,16 @@ func (r *RecordRepository) GetBest50Records(username string, underflow int, sort
 }
 
 // GetAllRecords retrieves all records for a user with pagination and sorting
-func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex int, sortBy string, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
+func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex int, sortBy model.RecordSort, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Where("username = ?", username).
 		Joins("Chart").
 		Joins("Chart.Song")
 	query = applyRecordFilter(query, filter)
 
-	orderStr := "desc"
+	orderStr := string(model.SortOrderDesc)
 	if !order {
-		orderStr = "asc"
+		orderStr = string(model.SortOrderAsc)
 	}
 
 	// Use whitelist validation to prevent SQL injection
@@ -275,8 +278,8 @@ func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex in
 }
 
 // GetBestRecords retrieves the best records for a user with pagination and sorting
-func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy string, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
-	if sortBy == "fitting_rating" {
+func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex int, sortBy model.RecordSort, order bool, filter model.RecordFilter) ([]model.PlayRecord, error) {
+	if sortBy == model.RecordSortFittingRating {
 		records, err := r.getFittingBestRecords(username, filter)
 		if err != nil {
 			return nil, err
@@ -296,9 +299,9 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 	var records []model.PlayRecord
 	query := r.bestRecordsQuery(username, filter)
 
-	orderStr := "desc"
+	orderStr := string(model.SortOrderDesc)
 	if !order {
-		orderStr = "asc"
+		orderStr = string(model.SortOrderAsc)
 	}
 
 	// Use whitelist validation to prevent SQL injection
@@ -426,16 +429,16 @@ func (r *RecordRepository) GetBestRecordsBySong(username string, songID int) ([]
 }
 
 // GetAllRecordsBySong retrieves all records for a specific song with pagination and sorting
-func (r *RecordRepository) GetAllRecordsBySong(username string, songID int, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+func (r *RecordRepository) GetAllRecordsBySong(username string, songID int, pageSize, pageIndex int, sortBy model.RecordSort, order bool) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Where("play_records.username = ?", username).
 		Joins("Chart").
 		Joins("Chart.Song").
 		Where(`"Chart".song_id = ?`, songID)
 
-	orderStr := "desc"
+	orderStr := string(model.SortOrderDesc)
 	if !order {
-		orderStr = "asc"
+		orderStr = string(model.SortOrderAsc)
 	}
 
 	safeSortBy := validateSortBy(sortBy)
@@ -489,15 +492,15 @@ func (r *RecordRepository) GetBestRecordByChart(username string, chartID int) (*
 }
 
 // GetAllRecordsByChart retrieves all records for a specific chart with pagination and sorting
-func (r *RecordRepository) GetAllRecordsByChart(username string, chartID int, pageSize, pageIndex int, sortBy string, order bool) ([]model.PlayRecord, error) {
+func (r *RecordRepository) GetAllRecordsByChart(username string, chartID int, pageSize, pageIndex int, sortBy model.RecordSort, order bool) ([]model.PlayRecord, error) {
 	var records []model.PlayRecord
 	query := r.db.Where("play_records.username = ? AND play_records.chart_id = ?", username, chartID).
 		Joins("Chart").
 		Joins("Chart.Song")
 
-	orderStr := "desc"
+	orderStr := string(model.SortOrderDesc)
 	if !order {
-		orderStr = "asc"
+		orderStr = string(model.SortOrderAsc)
 	}
 
 	safeSortBy := validateSortBy(sortBy)

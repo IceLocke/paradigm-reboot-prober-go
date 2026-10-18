@@ -72,8 +72,8 @@ func chartWikiDiffCacheKey(wikiID string, diff model.Difficulty) string {
 }
 
 // Record keys (all prefixed with username for per-user invalidation)
-func b50CacheKey(username string, underflow int, descending bool, filter model.RecordFilter) string {
-	return fmt.Sprintf("%s:b50:%d:%t:%s", username, underflow, descending, filterCacheKey(filter))
+func b50CacheKey(username string, underflow int, sortBy model.RecordSort, descending bool, filter model.RecordFilter) string {
+	return fmt.Sprintf("%s:b50:%d:%s:%t:%s", username, underflow, sortBy, descending, filterCacheKey(filter))
 }
 func bestSongCacheKey(username string, songID int) string {
 	return fmt.Sprintf("%s:best_song:%d", username, songID)
