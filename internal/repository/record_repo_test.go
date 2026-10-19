@@ -4,9 +4,67 @@ import (
 	"paradigm-reboot-prober-go/internal/model"
 	"paradigm-reboot-prober-go/pkg/rating"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestRecordRepository_GetBestRecordsStablePagination(t *testing.T) {
+	db := setupTestDB(t)
+	repo := NewRecordRepository(db)
+	song, err := NewSongRepository(db).CreateSong(&model.Song{
+		SongBase: model.SongBase{WikiID: "stable_pagination", Title: "Stable Pagination"},
+		Charts: []model.Chart{
+			{Difficulty: model.DifficultyDetected, Level: 15},
+			{Difficulty: model.DifficultyInvaded, Level: 15},
+			{Difficulty: model.DifficultyMassive, Level: 15},
+			{Difficulty: model.DifficultyReboot, Level: 15},
+		},
+	})
+	if !assert.NoError(t, err) {
+		return
+	}
+	var ids []int
+	for _, chart := range song.Charts {
+		record, err := repo.CreateRecord(&model.PlayRecord{
+			PlayRecordBase: model.PlayRecordBase{ChartID: chart.ID, Score: intPtr(1000000)},
+			Username:       "pagination_user",
+		}, false)
+		if !assert.NoError(t, err) {
+			return
+		}
+		ids = append(ids, record.ID)
+	}
+	// CreateRecord assigns the current time; force a tie for every tested column.
+	err = db.Model(&model.PlayRecord{}).Where("id IN ?", ids).
+		Update("record_time", time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)).Error
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortScore, model.RecordSortRecordTime, "invalid", "rating desc; DROP TABLE play_records;--"} {
+		for _, descending := range []bool{true, false} {
+			t.Run(string(sortBy)+map[bool]string{true: "_desc", false: "_asc"}[descending], func(t *testing.T) {
+				var got []int
+				for page := 0; page < 2; page++ {
+					records, err := repo.GetBestRecords("pagination_user", 2, page, sortBy, descending, model.RecordFilter{})
+					assert.NoError(t, err)
+					assert.Len(t, records, 2)
+					for _, record := range records {
+						got = append(got, record.ID)
+					}
+				}
+				want := append([]int(nil), ids...)
+				if descending {
+					for i, j := 0, len(want)-1; i < j; i, j = i+1, j-1 {
+						want[i], want[j] = want[j], want[i]
+					}
+				}
+				assert.Equal(t, want, got)
+			})
+		}
+	}
+}
 
 func TestRecordRepository_CreateRecord(t *testing.T) {
 	db := setupTestDB(t)
@@ -82,7 +140,7 @@ func TestRecordRepository_GetBest50Records(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	b35, b15, err := repo.GetBest50Records("user_b50", 0, model.RecordFilter{})
+	b35, b15, err := repo.GetBest50Records("user_b50", 0, "rating", true, model.RecordFilter{})
 	assert.NoError(t, err)
 	assert.Len(t, b15, 1)
 	assert.Len(t, b35, 1)
@@ -360,7 +418,7 @@ func TestRecordRepository_RecordFilter(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, int64(tt.wantAllCount), allCount, "CountAllRecords")
 
-			b35, b15, err := repo.GetBest50Records("filter_user", 0, tt.filter)
+			b35, b15, err := repo.GetBest50Records("filter_user", 0, "rating", true, tt.filter)
 			assert.NoError(t, err)
 			assert.Len(t, b35, tt.wantB35Count, "B35")
 			assert.Len(t, b15, tt.wantB15Count, "B15")

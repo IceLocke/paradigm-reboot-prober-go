@@ -247,6 +247,10 @@ definitions:
     properties:
       chart:
         $ref: '#/definitions/model.ChartInfoSimple'
+      fitting_rating:
+        description: FittingRating uses the current published fitting level, or the
+          official level when absent.
+        type: integer
       id:
         type: integer
       rating:
@@ -611,8 +615,9 @@ info:
 paths:
   /records/{username}:
     get:
-      description: Retrieve play records for a user based on scope (b50, best, all,
-        all-charts)
+      description: |-
+        Retrieve play records for a user based on scope (b50, best, all, all-charts)
+        B50 ranks the current per-chart best records by rating or fitting_rating within each season before applying display order. Uploads with is_replace=true can replace a chart's best record with a lower score. Best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.
       parameters:
       - description: Username
         in: path
@@ -620,7 +625,12 @@ paths:
         required: true
         type: string
       - default: b50
-        description: Scope (b50, best, all, all-charts)
+        description: Record scope
+        enum:
+        - b50
+        - best
+        - all
+        - all-charts
         in: query
         name: scope
         type: string
@@ -640,12 +650,22 @@ paths:
         name: page_index
         type: integer
       - default: rating
-        description: Sort by (rating, score, record_time, etc.)
+        description: 'Sort by: rating or fitting_rating for b50; rating, fitting_rating,
+          score or record_time for best; rating, score or record_time for all'
+        enum:
+        - rating
+        - fitting_rating
+        - score
+        - record_time
         in: query
         name: sort_by
         type: string
       - default: desc
-        description: Order (desc or asc)
+        description: Display order; B50 selection uses the current per-chart best
+          records
+        enum:
+        - desc
+        - asc
         in: query
         name: order
         type: string
@@ -743,6 +763,9 @@ paths:
         type: string
       - default: best
         description: Scope (best, all)
+        enum:
+        - best
+        - all
         in: query
         name: scope
         type: string
@@ -758,11 +781,18 @@ paths:
         type: integer
       - default: rating
         description: Sort by (rating, score, record_time)
+        enum:
+        - rating
+        - score
+        - record_time
         in: query
         name: sort_by
         type: string
       - default: desc
-        description: Order (desc or asc)
+        description: Display order
+        enum:
+        - desc
+        - asc
         in: query
         name: order
         type: string
@@ -805,6 +835,9 @@ paths:
         type: string
       - default: best
         description: Scope (best, all)
+        enum:
+        - best
+        - all
         in: query
         name: scope
         type: string
@@ -820,11 +853,18 @@ paths:
         type: integer
       - default: rating
         description: Sort by (rating, score, record_time)
+        enum:
+        - rating
+        - score
+        - record_time
         in: query
         name: sort_by
         type: string
       - default: desc
-        description: Order (desc or asc)
+        description: Display order
+        enum:
+        - desc
+        - asc
         in: query
         name: order
         type: string

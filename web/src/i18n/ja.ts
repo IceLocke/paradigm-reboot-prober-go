@@ -45,6 +45,11 @@ const ja = {
   },
   term: {
     b50: 'Best 50',
+    use_fitting_level: '推定定数を使用',
+    b35_avg: 'B35 平均レーティング',
+    b15_avg: 'B15 平均レーティング',
+    fitting_b50_image_title: 'Paradigm: Reboot 推定定数 B50',
+    fitting_b50_global_image_title: 'Paradigm: Reboot 推定定数グローバル B50',
     records: 'プレイ記録',
     best_records: 'ベスト記録',
     charts: '定数表',
@@ -96,6 +101,9 @@ const ja = {
     my_score: 'マイスコア',
   },
   message: {
+    fitting_b50_description: '推定定数でレーティングを再計算し、旧曲 B35 + 新曲 B15 を選びます。* の譜面は推定定数がないため、公式定数を使用します。',
+    fitting_b50_fallback_image: '* 推定定数なし、公式定数を使用',
+    incomplete_best_records: 'ベスト記録が不足しています。更新してもう一度お試しください。',
     welcome: 'ようこそ、{username}！',
     search_placeholder: '楽曲名 / アーティスト / アルバム / ジャンル...',
     required: 'この項目は必須です',

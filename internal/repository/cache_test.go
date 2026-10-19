@@ -390,12 +390,12 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Query B50 → cached
-		b35, b15, err := recordRepo.GetBest50Records("recuser1", 0, model.RecordFilter{})
+		b35, b15, err := recordRepo.GetBest50Records("recuser1", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.Len(t, b35, 1) // song is not b15
 		assert.Len(t, b15, 0)
 
-		key := b50CacheKey("recuser1", 0, model.RecordFilter{})
+		key := b50CacheKey("recuser1", 0, model.RecordSortRating, true, model.RecordFilter{})
 		assert.True(t, recordRepo.cache.Has(key), "B50 should be cached")
 
 		// Upload another record → cache invalidated
@@ -409,7 +409,7 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.False(t, recordRepo.cache.Has(key), "B50 cache should be invalidated after CreateRecord")
 
 		// Re-query → should have 2 records
-		b35v2, _, err := recordRepo.GetBest50Records("recuser1", 0, model.RecordFilter{})
+		b35v2, _, err := recordRepo.GetBest50Records("recuser1", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.Len(t, b35v2, 2)
 	})
@@ -517,13 +517,13 @@ func TestRecordCacheConsistency(t *testing.T) {
 		}
 
 		// Cache B50 for both users
-		_, _, err = recordRepo.GetBest50Records("xusraaaa", 0, model.RecordFilter{})
+		_, _, err = recordRepo.GetBest50Records("xusraaaa", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
-		_, _, err = recordRepo.GetBest50Records("xusrbbbb", 0, model.RecordFilter{})
+		_, _, err = recordRepo.GetBest50Records("xusrbbbb", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
 
-		keyA := b50CacheKey("xusraaaa", 0, model.RecordFilter{})
-		keyB := b50CacheKey("xusrbbbb", 0, model.RecordFilter{})
+		keyA := b50CacheKey("xusraaaa", 0, model.RecordSortRating, true, model.RecordFilter{})
+		keyB := b50CacheKey("xusrbbbb", 0, model.RecordSortRating, true, model.RecordFilter{})
 		assert.True(t, recordRepo.cache.Has(keyA))
 		assert.True(t, recordRepo.cache.Has(keyB))
 
@@ -573,9 +573,9 @@ func TestRecordCacheConsistency(t *testing.T) {
 		}
 
 		// Cache B50 for both
-		_, _, err = recordRepo.GetBest50Records("batchusr1", 0, model.RecordFilter{})
+		_, _, err = recordRepo.GetBest50Records("batchusr1", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
-		_, _, err = recordRepo.GetBest50Records("batchusr2", 0, model.RecordFilter{})
+		_, _, err = recordRepo.GetBest50Records("batchusr2", 0, "rating", true, model.RecordFilter{})
 		assert.NoError(t, err)
 
 		// Batch create for user batchusr1 only
@@ -586,11 +586,11 @@ func TestRecordCacheConsistency(t *testing.T) {
 		assert.NoError(t, err)
 
 		// batchusr1 cache invalidated
-		assert.False(t, recordRepo.cache.Has(b50CacheKey("batchusr1", 0, model.RecordFilter{})),
+		assert.False(t, recordRepo.cache.Has(b50CacheKey("batchusr1", 0, model.RecordSortRating, true, model.RecordFilter{})),
 			"batchusr1 B50 cache should be invalidated after batch create")
 
 		// batchusr2 cache intact
-		assert.True(t, recordRepo.cache.Has(b50CacheKey("batchusr2", 0, model.RecordFilter{})),
+		assert.True(t, recordRepo.cache.Has(b50CacheKey("batchusr2", 0, model.RecordSortRating, true, model.RecordFilter{})),
 			"batchusr2 B50 cache should remain intact")
 	})
 

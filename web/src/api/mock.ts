@@ -1,5 +1,6 @@
 import type { ChartInfo, PlayRecordInfo, PlayRecordResponse, User, AllChartsResponse } from './types'
 import { DIFFICULTY_ORDER } from '@/utils/difficulty'
+import { calculateSingleRating as calculateRating } from '@/utils/rating'
 
 // ---- Mock Song Data ----
 const difficulties = DIFFICULTY_ORDER
@@ -86,17 +87,6 @@ function generateChartInfoList(): ChartInfo[] {
   return charts
 }
 
-function calculateRating(level: number, score: number): number {
-  if (score >= 1009000) return Math.round((level + 2) * 100)
-  if (score >= 1007000) return Math.round((level + 1.5 + (score - 1007000) / 4000) * 100)
-  if (score >= 1005000) return Math.round((level + 1 + (score - 1005000) / 4000) * 100)
-  if (score >= 1000000) return Math.round((level + (score - 1000000) / 5000) * 100)
-  if (score >= 990000) return Math.round((level - 1 + (score - 990000) / 10000) * 100)
-  if (score >= 970000) return Math.round((level - 3 + (score - 970000) / 10000) * 100)
-  if (score >= 900000) return Math.round((level - 5 + (score - 900000) * 2 / 70000) * 100)
-  return Math.round(Math.max(0, (level - 5) * (score / 900000)) * 100)
-}
-
 function generateRecords(charts: ChartInfo[], count: number): PlayRecordInfo[] {
   const records: PlayRecordInfo[] = []
   for (let i = 0; i < count; i++) {
@@ -111,6 +101,7 @@ function generateRecords(charts: ChartInfo[], count: number): PlayRecordInfo[] {
       id: i + 1,
       score,
       rating,
+      fitting_rating: calculateRating(chart.fitting_level ?? chart.level, score),
       record_time: date.toISOString(),
       chart: {
         id: chart.id,
@@ -129,138 +120,53 @@ function generateRecords(charts: ChartInfo[], count: number): PlayRecordInfo[] {
   return records
 }
 
-function generateBest50(charts: ChartInfo[]): PlayRecordInfo[] {
-  const oldCharts = charts.filter((c) => !c.b15)
-  const newCharts = charts.filter((c) => c.b15)
-
-  const b35Records: PlayRecordInfo[] = []
-  const b15Records: PlayRecordInfo[] = []
-
-  // Unique charts for best records
-  const usedOld = new Set<number>()
-  const usedNew = new Set<number>()
-
-  for (const chart of oldCharts) {
-    if (usedOld.has(chart.id)) continue
-    usedOld.add(chart.id)
-    const score = 950000 + Math.floor(Math.random() * 60000)
-    const daysAgo = Math.floor(Math.random() * 60)
-    const date = new Date()
-    date.setDate(date.getDate() - daysAgo)
-    b35Records.push({
-      id: 1000 + b35Records.length,
-      score,
-      rating: calculateRating(chart.level, score),
-      record_time: date.toISOString(),
-      chart: {
-        id: chart.id,
-        song_id: chart.song_id,
-        title: chart.title,
-        cover: chart.cover,
-        version: chart.version,
-        b15: chart.b15,
-        wiki_id: chart.wiki_id,
-        difficulty: chart.difficulty,
-        level: chart.level,
-        fitting_level: chart.fitting_level,
-      },
-    })
-    if (b35Records.length >= 35) break
-  }
-
-  for (const chart of newCharts) {
-    if (usedNew.has(chart.id)) continue
-    usedNew.add(chart.id)
-    const score = 950000 + Math.floor(Math.random() * 60000)
-    const daysAgo = Math.floor(Math.random() * 30)
-    const date = new Date()
-    date.setDate(date.getDate() - daysAgo)
-    b15Records.push({
-      id: 2000 + b15Records.length,
-      score,
-      rating: calculateRating(chart.level, score),
-      record_time: date.toISOString(),
-      chart: {
-        id: chart.id,
-        song_id: chart.song_id,
-        title: chart.title,
-        cover: chart.cover,
-        version: chart.version,
-        b15: chart.b15,
-        wiki_id: chart.wiki_id,
-        difficulty: chart.difficulty,
-        level: chart.level,
-        fitting_level: chart.fitting_level,
-      },
-    })
-    if (b15Records.length >= 15) break
-  }
-
-  // Sort by rating desc
-  b35Records.sort((a, b) => b.rating - a.rating)
-  b15Records.sort((a, b) => b.rating - a.rating)
-
-  return [...b35Records, ...b15Records]
-}
-
 // Cached mock data
 let _charts: ChartInfo[] | null = null
-let _b50Records: PlayRecordInfo[] | null = null
+let _records: PlayRecordInfo[] | null = null
 
 export function getMockCharts(): ChartInfo[] {
   if (!_charts) _charts = generateChartInfoList()
   return _charts
 }
 
-export function getMockB50(): PlayRecordResponse {
-  const charts = getMockCharts()
-  if (!_b50Records) _b50Records = generateBest50(charts)
-  return {
-    username: 'demo_user',
-    nickname: 'Demo',
-    total: _b50Records.length,
-    records: _b50Records,
-  }
+export function getMockB50(fitting = false, underflow = 0): PlayRecordResponse {
+  const data = getMockRecords('best', Number.MAX_SAFE_INTEGER, 1, fitting ? 'fitting_rating' : 'rating')
+  const records = [
+    ...data.records.filter((record) => !record.chart.b15).slice(0, 35 + underflow),
+    ...data.records.filter((record) => record.chart.b15).slice(0, 15 + underflow),
+  ]
+  return { ...data, total: records.length, records }
 }
 
 export function getMockRecords(
   scope: string,
   pageSize: number,
-  pageIndex: number
+  pageIndex: number,
+  sortBy = 'rating',
+  order = 'desc',
 ): PlayRecordResponse {
-  const charts = getMockCharts()
-
-  if (scope === 'b50') return getMockB50()
-
-  const allRecords = generateRecords(charts, 200)
-  allRecords.sort((a, b) => b.rating - a.rating)
+  if (scope === 'b50') return getMockB50(sortBy === 'fitting_rating')
+  if (!_records) _records = generateRecords(getMockCharts(), 200)
+  let records = [..._records]
 
   if (scope === 'best') {
-    // One record per chart, highest score
     const bestMap = new Map<number, PlayRecordInfo>()
-    for (const rec of allRecords) {
-      const existing = bestMap.get(rec.chart.id)
-      if (!existing || rec.score > existing.score) {
-        bestMap.set(rec.chart.id, rec)
-      }
+    for (const record of records) {
+      const existing = bestMap.get(record.chart.id)
+      if (!existing || record.score > existing.score) bestMap.set(record.chart.id, record)
     }
-    const bestRecords = Array.from(bestMap.values()).sort((a, b) => b.rating - a.rating)
-    const start = (pageIndex - 1) * pageSize
-    return {
-      username: 'demo_user',
-      nickname: 'Demo',
-      total: bestRecords.length,
-      records: bestRecords.slice(start, start + pageSize),
-    }
+    records = Array.from(bestMap.values())
   }
 
-  // scope === 'all'
+  const ratingKey = sortBy === 'fitting_rating' ? 'fitting_rating' : 'rating'
+  const direction = order === 'asc' ? -1 : 1
+  records.sort((a, b) => direction * (b[ratingKey] - a[ratingKey] || b.id - a.id))
   const start = (pageIndex - 1) * pageSize
   return {
     username: 'demo_user',
     nickname: 'Demo',
-    total: allRecords.length,
-    records: allRecords.slice(start, start + pageSize),
+    total: records.length,
+    records: records.slice(start, start + pageSize),
   }
 }
 

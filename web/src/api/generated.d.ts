@@ -14,22 +14,23 @@ export interface paths {
         /**
          * Get play records
          * @description Retrieve play records for a user based on scope (b50, best, all, all-charts)
+         *     B50 ranks the current per-chart best records by rating or fitting_rating within each season before applying display order. Uploads with is_replace=true can replace a chart's best record with a lower score. Best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.
          */
         get: {
             parameters: {
                 query?: {
-                    /** @description Scope (b50, best, all, all-charts) */
-                    scope?: string;
+                    /** @description Record scope */
+                    scope?: "b50" | "best" | "all" | "all-charts";
                     /** @description Underflow for b50 */
                     underflow?: number;
                     /** @description Page size */
                     page_size?: number;
                     /** @description Page index */
                     page_index?: number;
-                    /** @description Sort by (rating, score, record_time, etc.) */
-                    sort_by?: string;
-                    /** @description Order (desc or asc) */
-                    order?: string;
+                    /** @description Sort by: rating or fitting_rating for b50; rating, fitting_rating, score or record_time for best; rating, score or record_time for all */
+                    sort_by?: "rating" | "fitting_rating" | "score" | "record_time";
+                    /** @description Display order; B50 selection uses the current per-chart best records */
+                    order?: "desc" | "asc";
                     /** @description Minimum chart level (inclusive) */
                     min_level?: number;
                     /** @description Maximum chart level (inclusive) */
@@ -158,15 +159,15 @@ export interface paths {
             parameters: {
                 query?: {
                     /** @description Scope (best, all) */
-                    scope?: string;
+                    scope?: "best" | "all";
                     /** @description Page size (scope=all only) */
                     page_size?: number;
                     /** @description Page index (scope=all only) */
                     page_index?: number;
                     /** @description Sort by (rating, score, record_time) */
-                    sort_by?: string;
-                    /** @description Order (desc or asc) */
-                    order?: string;
+                    sort_by?: "rating" | "score" | "record_time";
+                    /** @description Display order */
+                    order?: "desc" | "asc";
                 };
                 header?: never;
                 path: {
@@ -240,15 +241,15 @@ export interface paths {
             parameters: {
                 query?: {
                     /** @description Scope (best, all) */
-                    scope?: string;
+                    scope?: "best" | "all";
                     /** @description Page size (scope=all only) */
                     page_size?: number;
                     /** @description Page index (scope=all only) */
                     page_index?: number;
                     /** @description Sort by (rating, score, record_time) */
-                    sort_by?: string;
-                    /** @description Order (desc or asc) */
-                    order?: string;
+                    sort_by?: "rating" | "score" | "record_time";
+                    /** @description Display order */
+                    order?: "desc" | "asc";
                 };
                 header?: never;
                 path: {
@@ -1064,6 +1065,8 @@ export interface components {
         };
         "model.PlayRecordInfo": {
             chart?: components["schemas"]["model.ChartInfoSimple"];
+            /** @description FittingRating uses the current published fitting level, or the official level when absent. */
+            fitting_rating?: number;
             id?: number;
             rating?: number;
             record_time?: string;

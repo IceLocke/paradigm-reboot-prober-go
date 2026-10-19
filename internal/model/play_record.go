@@ -1,6 +1,7 @@
 package model
 
 import (
+	"paradigm-reboot-prober-go/pkg/rating"
 	"time"
 )
 
@@ -43,20 +44,35 @@ type PlayRecordBase struct {
 
 // PlayRecordInfo represents play record details including chart information
 type PlayRecordInfo struct {
-	ID         int             `json:"id"`
-	RecordTime time.Time       `json:"record_time"`
-	Score      int             `json:"score"`
-	Rating     int             `json:"rating"`
-	Chart      ChartInfoSimple `json:"chart"`
+	ID         int       `json:"id"`
+	RecordTime time.Time `json:"record_time"`
+	Score      int       `json:"score"`
+	Rating     int       `json:"rating"`
+	// FittingRating uses the current published fitting level, or the official level when absent.
+	FittingRating int             `json:"fitting_rating"`
+	Chart         ChartInfoSimple `json:"chart"`
+}
+
+// FittingRating calculates a derived rating without changing the stored official rating.
+func (record *PlayRecord) FittingRating() int {
+	if record.Chart == nil || record.Score == nil {
+		return record.Rating
+	}
+	level := record.Chart.Level
+	if record.Chart.FittingLevel != nil {
+		level = *record.Chart.FittingLevel
+	}
+	return rating.SingleRating(level, *record.Score)
 }
 
 // ToPlayRecordInfo converts a PlayRecord (with preloaded Chart.Song) to PlayRecordInfo
 func ToPlayRecordInfo(record *PlayRecord) PlayRecordInfo {
 	info := PlayRecordInfo{
-		ID:         record.ID,
-		RecordTime: record.RecordTime,
-		Score:      *record.Score,
-		Rating:     record.Rating,
+		ID:            record.ID,
+		RecordTime:    record.RecordTime,
+		Score:         *record.Score,
+		Rating:        record.Rating,
+		FittingRating: record.FittingRating(),
 	}
 	if record.Chart != nil {
 		info.Chart = ChartInfoSimple{

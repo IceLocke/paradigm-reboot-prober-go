@@ -1,5 +1,6 @@
 import client from './client'
-import type { PlayRecordResponse, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse, Difficulty } from './types'
+import i18n from '@/i18n'
+import type { PlayRecordResponse, PlayRecordInfo, BatchCreatePlayRecordRequest, PlayRecord, AllChartsResponse, Difficulty } from './types'
 
 export interface RecordFilterParams {
   minLevel?: number | null
@@ -48,6 +49,26 @@ export const uploadRecords = (username: string, data: BatchCreatePlayRecordReque
 
 export const getAllChartsWithScores = (username: string) => {
   return client.get<AllChartsResponse>(`/records/${username}`, { params: { scope: 'all-charts' } })
+}
+
+/** Fetch the server-ranked global top 50, respecting a smaller server page-size cap. */
+export const getGlobalBest50Records = async (username: string, sortBy = 'rating'): Promise<PlayRecordResponse> => {
+  const records: PlayRecordInfo[] = []
+  let pageSize = 50
+  let pageIndex = 1
+  let data: PlayRecordResponse
+
+  do {
+    data = (await getRecords(username, 'best', pageSize, pageIndex, sortBy)).data
+    records.push(...data.records)
+    if (data.records.length === 0 && records.length < Math.min(50, data.total)) {
+      throw new Error(i18n.global.t('message.incomplete_best_records'))
+    }
+    if (pageIndex === 1 && data.records.length > 0) pageSize = data.records.length
+    pageIndex++
+  } while (records.length < Math.min(50, data.total))
+
+  return { ...data, records: records.slice(0, 50) }
 }
 
 export const getSongRecords = (username: string, songAddr: string, scope: string = 'best') => {

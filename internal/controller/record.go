@@ -34,8 +34,8 @@ func NewRecordController(recordService *service.RecordService, userService *serv
 type paginationParams struct {
 	pageSize  int
 	pageIndex int
-	sortBy    string
-	order     string
+	sortBy    model.RecordSort
+	order     model.SortOrder
 }
 
 // parsePaginationParams extracts and validates pagination parameters from the request
@@ -54,11 +54,20 @@ func parsePaginationParams(c *gin.Context) paginationParams {
 		pageIndex = 1
 	}
 
+	sortBy := model.RecordSort(c.DefaultQuery("sort_by", string(model.RecordSortRating)))
+	if !sortBy.IsValid() {
+		sortBy = model.RecordSortRating
+	}
+	order := model.SortOrder(c.DefaultQuery("order", string(model.SortOrderDesc)))
+	if !order.IsValid() {
+		order = model.SortOrderAsc
+	}
+
 	return paginationParams{
 		pageSize:  pageSize,
 		pageIndex: pageIndex,
-		sortBy:    c.DefaultQuery("sort_by", "rating"),
-		order:     c.DefaultQuery("order", "desc"),
+		sortBy:    sortBy,
+		order:     order,
 	}
 }
 
@@ -104,15 +113,16 @@ func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
 // GetPlayRecords godoc
 // @Summary Get play records
 // @Description Retrieve play records for a user based on scope (b50, best, all, all-charts)
+// @Description B50 ranks the current per-chart best records by rating or fitting_rating within each season before applying display order. Uploads with is_replace=true can replace a chart's best record with a lower score. Best supports fitting_rating sorting before pagination. Fitting ratings use the published fitting level, falling back to the official level. The rating field always retains the official rating.
 // @Tags record
 // @Produce json
 // @Param username path string true "Username"
-// @Param scope query string false "Scope (b50, best, all, all-charts)" default(b50)
+// @Param scope query model.RecordScope false "Record scope" default(b50)
 // @Param underflow query int false "Underflow for b50" default(0)
 // @Param page_size query int false "Page size" default(50)
 // @Param page_index query int false "Page index" default(1)
-// @Param sort_by query string false "Sort by (rating, score, record_time, etc.)" default(rating)
-// @Param order query string false "Order (desc or asc)" default(desc)
+// @Param sort_by query model.RecordSort false "Sort by: rating or fitting_rating for b50; rating, fitting_rating, score or record_time for best; rating, score or record_time for all" default(rating)
+// @Param order query model.SortOrder false "Display order; B50 selection uses the current per-chart best records" default(desc)
 // @Param min_level query number false "Minimum chart level (inclusive)"
 // @Param max_level query number false "Maximum chart level (inclusive)"
 // @Param difficulty query []string false "Filter by difficulty (detected, invaded, massive, reboot)" collectionFormat(multi)
@@ -126,9 +136,13 @@ func parseRecordFilter(c *gin.Context) (model.RecordFilter, error) {
 func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	username := c.Param("username")
 	username = strings.ToLower(username)
-	scope := c.DefaultQuery("scope", "b50")
+	scope := model.RecordScope(c.DefaultQuery("scope", string(model.RecordScopeB50)))
 	underflow, _ := strconv.Atoi(c.DefaultQuery("underflow", "0"))
 	p := parsePaginationParams(c)
+	if p.sortBy == model.RecordSortFittingRating && !p.sortBy.IsValidForScope(scope) {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "fitting_rating sorting is only supported for b50 and best scopes"})
+		return
+	}
 
 	// Parse record filter
 	filter, err := parseRecordFilter(c)
@@ -147,7 +161,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 
 	ctx := logging.AppendCtx(c.Request.Context(),
 		slog.String("target_user", username),
-		slog.String("scope", scope),
+		slog.String("scope", string(scope)),
 	)
 
 	// Get current user from context (if authenticated)
@@ -177,10 +191,14 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
+	if !scope.IsValid() {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter"})
+		return
+	}
 
 	switch scope {
-	case "b50":
-		records, err := ctrl.recordService.GetBest50Records(ctx, username, underflow, filter)
+	case model.RecordScopeB50:
+		records, err := ctrl.recordService.GetBest50Records(ctx, username, underflow, p.sortBy, p.order, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
 			return
@@ -196,7 +214,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			Records:  recordInfos,
 		})
 
-	case "best":
+	case model.RecordScopeBest:
 		records, err := ctrl.recordService.GetBestRecords(ctx, username, p.pageSize, p.pageIndex-1, p.sortBy, p.order, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -218,7 +236,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			Records:  recordInfos,
 		})
 
-	case "all":
+	case model.RecordScopeAll:
 		records, err := ctrl.recordService.GetAllRecords(ctx, username, p.pageSize, p.pageIndex-1, p.sortBy, p.order, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -240,7 +258,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			Records:  recordInfos,
 		})
 
-	case "all-charts":
+	case model.RecordScopeAllCharts:
 		charts, err := ctrl.recordService.GetAllChartsWithBestScores(ctx, username, filter)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -251,10 +269,6 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			Nickname: targetUser.Nickname,
 			Charts:   charts,
 		})
-
-	default:
-		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter"})
-		return
 	}
 }
 
@@ -331,11 +345,11 @@ func (ctrl *RecordController) checkProbeAuthority(c *gin.Context, username strin
 // @Produce json
 // @Param username path string true "Username"
 // @Param song_addr path string true "Song address (numeric song_id or wiki_id)"
-// @Param scope query string false "Scope (best, all)" default(best)
+// @Param scope query string false "Scope (best, all)" default(best) Enums(best, all)
 // @Param page_size query int false "Page size (scope=all only)" default(50)
 // @Param page_index query int false "Page index (scope=all only)" default(1)
-// @Param sort_by query string false "Sort by (rating, score, record_time)" default(rating)
-// @Param order query string false "Order (desc or asc)" default(desc)
+// @Param sort_by query string false "Sort by (rating, score, record_time)" default(rating) Enums(rating, score, record_time)
+// @Param order query model.SortOrder false "Display order" default(desc)
 // @Success 200 {object} model.PlayRecordResponse
 // @Failure 400 {object} model.Response
 // @Failure 403 {object} model.Response
@@ -344,12 +358,12 @@ func (ctrl *RecordController) checkProbeAuthority(c *gin.Context, username strin
 func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 	username := strings.ToLower(c.Param("username"))
 	songAddr := c.Param("song_addr")
-	scope := c.DefaultQuery("scope", "best")
+	scope := model.RecordScope(c.DefaultQuery("scope", string(model.RecordScopeBest)))
 
 	ctx := logging.AppendCtx(c.Request.Context(),
 		slog.String("target_user", username),
 		slog.String("song_addr", songAddr),
-		slog.String("scope", scope),
+		slog.String("scope", string(scope)),
 	)
 
 	songID, err := ctrl.songService.ResolveSongID(ctx, songAddr)
@@ -372,9 +386,13 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
+	if !scope.IsValidForSongOrChart() {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
+		return
+	}
 
 	switch scope {
-	case "best":
+	case model.RecordScopeBest:
 		records, err := ctrl.recordService.GetBestRecordsBySong(ctx, username, songID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -391,7 +409,7 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 			Records:  recordInfos,
 		})
 
-	case "all":
+	case model.RecordScopeAll:
 		p := parsePaginationParams(c)
 		records, err := ctrl.recordService.GetAllRecordsBySong(ctx, username, songID, p.pageSize, p.pageIndex-1, p.sortBy, p.order)
 		if err != nil {
@@ -413,9 +431,6 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 			Total:    int(total),
 			Records:  recordInfos,
 		})
-
-	default:
-		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
 	}
 }
 
@@ -426,11 +441,11 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 // @Produce json
 // @Param username path string true "Username"
 // @Param chart_addr path string true "Chart address (numeric chart_id or wiki_id:difficulty)"
-// @Param scope query string false "Scope (best, all)" default(best)
+// @Param scope query string false "Scope (best, all)" default(best) Enums(best, all)
 // @Param page_size query int false "Page size (scope=all only)" default(50)
 // @Param page_index query int false "Page index (scope=all only)" default(1)
-// @Param sort_by query string false "Sort by (rating, score, record_time)" default(rating)
-// @Param order query string false "Order (desc or asc)" default(desc)
+// @Param sort_by query string false "Sort by (rating, score, record_time)" default(rating) Enums(rating, score, record_time)
+// @Param order query model.SortOrder false "Display order" default(desc)
 // @Success 200 {object} model.PlayRecordResponse
 // @Failure 400 {object} model.Response
 // @Failure 403 {object} model.Response
@@ -439,12 +454,12 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 	username := strings.ToLower(c.Param("username"))
 	chartAddr := c.Param("chart_addr")
-	scope := c.DefaultQuery("scope", "best")
+	scope := model.RecordScope(c.DefaultQuery("scope", string(model.RecordScopeBest)))
 
 	ctx := logging.AppendCtx(c.Request.Context(),
 		slog.String("target_user", username),
 		slog.String("chart_addr", chartAddr),
-		slog.String("scope", scope),
+		slog.String("scope", string(scope)),
 	)
 
 	chartID, err := ctrl.songService.ResolveChartID(ctx, chartAddr)
@@ -467,9 +482,13 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
+	if !scope.IsValidForSongOrChart() {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
+		return
+	}
 
 	switch scope {
-	case "best":
+	case model.RecordScopeBest:
 		record, err := ctrl.recordService.GetBestRecordByChart(ctx, username, chartID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{Error: err.Error()})
@@ -486,7 +505,7 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 			Records:  recordInfos,
 		})
 
-	case "all":
+	case model.RecordScopeAll:
 		p := parsePaginationParams(c)
 		records, err := ctrl.recordService.GetAllRecordsByChart(ctx, username, chartID, p.pageSize, p.pageIndex-1, p.sortBy, p.order)
 		if err != nil {
@@ -508,8 +527,5 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 			Total:    int(total),
 			Records:  recordInfos,
 		})
-
-	default:
-		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
 	}
 }

@@ -48,7 +48,7 @@ func TestRecordService(t *testing.T) {
 	})
 
 	t.Run("GetBest50Records", func(t *testing.T) {
-		records, err := recordService.GetBest50Records(ctx, "testuser", 0, model.RecordFilter{})
+		records, err := recordService.GetBest50Records(ctx, "testuser", 0, "rating", "desc", model.RecordFilter{})
 		assert.NoError(t, err)
 		assert.NotEmpty(t, records)
 	})
