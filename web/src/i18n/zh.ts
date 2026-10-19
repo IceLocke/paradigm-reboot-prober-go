@@ -47,11 +47,6 @@ const zh = {
   },
   term: {
     b50: 'Best 50',
-    use_fitting_level: '使用拟合定数',
-    b35_avg: 'B35 平均 Rating',
-    b15_avg: 'B15 平均 Rating',
-    fitting_b50_image_title: 'Paradigm: Reboot 拟合定数 B50',
-    fitting_b50_global_image_title: 'Paradigm: Reboot 拟合定数全局 B50',
     records: '成绩记录',
     best_records: '最佳记录',
     charts: '定数表',
@@ -104,9 +99,6 @@ const zh = {
     best_score: '最佳成绩',
   },
   message: {
-    fitting_b50_description: '使用拟合定数重新计算 Rating，并选取旧曲 B35 + 新曲 B15。标注 * 的谱面暂无拟合定数，使用官方定数计算。',
-    fitting_b50_fallback_image: '* 暂无拟合定数，使用官方定数',
-    incomplete_best_records: '最佳成绩数据不完整，请刷新重试',
     welcome: '欢迎，{username}！',
     search_placeholder: '搜索曲名 / 曲师 / 专辑 / 流派...',
     required: '请填写此字段',
