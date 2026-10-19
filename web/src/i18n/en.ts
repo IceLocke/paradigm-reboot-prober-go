@@ -47,6 +47,11 @@ const en = {
   },
   term: {
     b50: 'Best 50',
+    use_fitting_level: 'Use fitting levels',
+    b35_avg: 'B35 Avg Rating',
+    b15_avg: 'B15 Avg Rating',
+    fitting_b50_image_title: 'Paradigm: Reboot Fitted B50',
+    fitting_b50_global_image_title: 'Paradigm: Reboot Fitted Global B50',
     records: 'Records',
     best_records: 'Best Records',
     charts: 'Charts',
@@ -99,6 +104,9 @@ const en = {
     best_score: 'Best Score',
   },
   message: {
+    fitting_b50_description: 'Ratings are recalculated with fitting levels to select old-song B35 + new-song B15. Charts marked * have no fitting level and use the official level.',
+    fitting_b50_fallback_image: '* No fitting level; official level used',
+    incomplete_best_records: 'Best records are incomplete. Please refresh and try again.',
     welcome: 'Welcome, {username}!',
     search_placeholder: 'Search title / artist / album / genre...',
     required: 'This field is required',

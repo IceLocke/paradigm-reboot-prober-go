@@ -5,7 +5,7 @@
       <div class="page-actions">
         <IconButton
           :title="t('common.export_image')"
-          :disabled="allRecords.length === 0"
+          :disabled="loading || allRecords.length === 0"
           @click="showExportModal = true"
         >
           <ImageDown :size="18" />
@@ -14,69 +14,80 @@
           :icon="RefreshCw"
           :size="18"
           :title="t('common.refresh')"
+          :disabled="loading"
           @click="refreshData"
         />
       </div>
     </div>
 
+    <div class="b50-options">
+      <n-checkbox v-model:checked="fitting" class="fitting-option">
+        {{ t('term.use_fitting_level') }}
+      </n-checkbox>
+    </div>
+
     <!-- Version announcement -->
     <VersionAnnounceBanner />
 
-    <!-- Stats overview -->
-    <div class="stats-row">
-      <StatCard label="Rating" :value="b50Rating" :precision="4" />
-      <StatCard label="B35 Avg" :value="b35Rating" :precision="4" />
-      <StatCard label="B15 Avg" :value="b15Rating" :precision="4" />
-    </div>
+    <p v-if="fitting" class="fitting-description">{{ t('message.fitting_b50_description') }}</p>
 
-    <!-- Charts section -->
-    <div class="b50-grid">
-      <!-- B15 -->
-      <BaseCard>
-        <template #header>
-          <div class="section-header">
-            <h3>{{ t('term.current') }} <span class="record-count">({{ b15Records.length }})</span></h3>
-          </div>
-        </template>
-        <div class="chart-wrapper" v-if="b15Records.length > 0">
-          <VChart :option="scatterOption(b15Records)" :autoresize="true" class="scatter-chart" />
-        </div>
-        <div class="table-wrapper">
-          <n-data-table
-            :columns="recordColumns"
-            :data="b15Records"
-            :pagination="false"
-            :bordered="false"
-            :scroll-x="500"
-            size="small"
-            striped
-          />
-        </div>
-      </BaseCard>
+    <n-spin :show="loading">
+      <!-- Stats overview -->
+      <div class="stats-row">
+        <StatCard :label="t('term.rating')" :value="b50Rating" :precision="4" />
+        <StatCard :label="t('term.b35_avg')" :value="b35Rating" :precision="4" />
+        <StatCard :label="t('term.b15_avg')" :value="b15Rating" :precision="4" />
+      </div>
 
-      <!-- B35 -->
-      <BaseCard>
-        <template #header>
-          <div class="section-header">
-            <h3>{{ t('term.past') }} <span class="record-count">({{ b35Records.length }})</span></h3>
+      <!-- Charts section -->
+      <div class="b50-grid">
+        <!-- B15 -->
+        <BaseCard>
+          <template #header>
+            <div class="section-header">
+              <h3>{{ t('term.current') }} <span class="record-count">({{ b15Records.length }})</span></h3>
+            </div>
+          </template>
+          <div class="chart-wrapper" v-if="b15Records.length > 0">
+            <VChart :option="scatterOption(b15Records)" :autoresize="true" class="scatter-chart" />
           </div>
-        </template>
-        <div class="chart-wrapper" v-if="b35Records.length > 0">
-          <VChart :option="scatterOption(b35Records)" :autoresize="true" class="scatter-chart" />
-        </div>
-        <div class="table-wrapper">
-          <n-data-table
-            :columns="recordColumns"
-            :data="b35Records"
-            :pagination="false"
-            :bordered="false"
-            :scroll-x="500"
-            size="small"
-            striped
-          />
-        </div>
-      </BaseCard>
-    </div>
+          <div class="table-wrapper">
+            <n-data-table
+              :columns="recordColumns"
+              :data="b15Records"
+              :pagination="false"
+              :bordered="false"
+              :scroll-x="fitting ? 620 : 500"
+              size="small"
+              striped
+            />
+          </div>
+        </BaseCard>
+
+        <!-- B35 -->
+        <BaseCard>
+          <template #header>
+            <div class="section-header">
+              <h3>{{ t('term.past') }} <span class="record-count">({{ b35Records.length }})</span></h3>
+            </div>
+          </template>
+          <div class="chart-wrapper" v-if="b35Records.length > 0">
+            <VChart :option="scatterOption(b35Records)" :autoresize="true" class="scatter-chart" />
+          </div>
+          <div class="table-wrapper">
+            <n-data-table
+              :columns="recordColumns"
+              :data="b35Records"
+              :pagination="false"
+              :bordered="false"
+              :scroll-x="fitting ? 620 : 500"
+              size="small"
+              striped
+            />
+          </div>
+        </BaseCard>
+      </div>
+    </n-spin>
   </div>
 
   <SongDetailModal v-model:show="showSongDetail" :song="selectedSong" :username="userStore.username" />
@@ -98,13 +109,14 @@
     :b35-records="b35Records"
     :b15-avg="b15Rating"
     :b35-avg="b35Rating"
+    :fitting="fitting"
   />
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, h } from 'vue'
+import { ref, computed, onUnmounted, watch, h } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { NDataTable } from 'naive-ui'
+import { NCheckbox, NDataTable, NSpin } from 'naive-ui'
 import type { DataTableColumns } from 'naive-ui'
 import { ImageDown, RefreshCw, Plus, Upload } from '@lucide/vue';
 import VChart from 'vue-echarts'
@@ -115,6 +127,7 @@ import { CanvasRenderer } from 'echarts/renderers'
 
 import { toastSuccess, toastError } from '@/utils/toast'
 import { formatAvgRating, formatRating } from '@/utils/rating'
+import { getRatingLevel, withFittingRatings } from '@/utils/b50'
 
 import { useUserStore } from '@/stores/user'
 import { useAppStore } from '@/stores/app'
@@ -133,11 +146,22 @@ import VersionAnnounceBanner from '@/components/business/VersionAnnounceBanner.v
 
 use([ScatterChart, GridComponent, TooltipComponent, CanvasRenderer])
 
+const fitting = ref(false)
 const { t } = useI18n()
 const userStore = useUserStore()
 const appStore = useAppStore()
 
-const allRecords = ref<PlayRecordInfo[]>([])
+const sourceRecords = ref<PlayRecordInfo[]>([])
+const loading = ref(false)
+let loadVersion = 0
+const ratedRecords = computed(() => fitting.value
+  ? withFittingRatings(sourceRecords.value)
+  : sourceRecords.value)
+const best50 = computed(() => ({
+  b35Records: ratedRecords.value.filter((record) => !record.chart.b15),
+  b15Records: ratedRecords.value.filter((record) => record.chart.b15),
+}))
+const allRecords = computed(() => [...best50.value.b35Records, ...best50.value.b15Records])
 const nickname = ref('')
 const showSongDetail = ref(false)
 const selectedSong = ref<Song | null>(null)
@@ -147,11 +171,11 @@ const showExportModal = ref(false)
 const uploadTarget = ref({ title: '', difficulty: 'detected' as Difficulty, level: 0, chartId: 0, cover: '' })
 
 const b35Records = computed(() =>
-  allRecords.value.filter((r) => !r.chart.b15).map((r, i) => ({ ...r, _index: i + 1 }))
+  best50.value.b35Records.map((r, i) => ({ ...r, _index: i + 1 }))
 )
 
 const b15Records = computed(() =>
-  allRecords.value.filter((r) => r.chart.b15).map((r, i) => ({ ...r, _index: i + 1 }))
+  best50.value.b15Records.map((r, i) => ({ ...r, _index: i + 1 }))
 )
 
 const b50Rating = computed(() => {
@@ -244,11 +268,24 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     render(row) {
       return h(DifficultyBadge, {
         difficulty: row.chart.difficulty,
-        level: row.chart.level,
+        level: fitting.value ? null : row.chart.level,
         short: true,
       })
     },
   },
+  ...(fitting.value ? [{
+    title: t('term.fitting_level'),
+    key: 'fitting_level',
+    width: 110,
+    sorter: (a: PlayRecordInfo, b: PlayRecordInfo) => getRatingLevel(a.chart, true) - getRatingLevel(b.chart, true),
+    render(row: PlayRecordInfo) {
+      const missing = row.chart.fitting_level == null
+      return h('span', {
+        class: 'mono',
+        title: missing ? t('message.fitting_b50_fallback_image') : undefined,
+      }, `${getRatingLevel(row.chart, true).toFixed(2)}${missing ? '*' : ''}`)
+    },
+  }] : []),
   {
     title: t('term.score'),
     key: 'score',
@@ -259,7 +296,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
     },
   },
   {
-    title: 'Rating',
+    title: t('term.rating'),
     key: 'rating',
     width: 80,
     sorter: (a, b) => a.rating - b.rating,
@@ -293,7 +330,7 @@ const recordColumns = computed<DataTableColumns<PlayRecordInfo & { _index: numbe
 ])
 
 const scatterOption = (records: PlayRecordInfo[]) => {
-  const data = records.map((r) => [r.chart.level, r.rating / 100])
+  const data = records.map((r) => [getRatingLevel(r.chart, fitting.value), r.rating / 100])
   const levels = data.map((d) => d[0])
   const ratings = data.map((d) => d[1])
   const lvMin = Math.floor(Math.min(...levels) - 0.5)
@@ -305,7 +342,7 @@ const scatterOption = (records: PlayRecordInfo[]) => {
     grid: { left: 50, right: 30, top: 36, bottom: 45 },
     xAxis: {
       type: 'value',
-      name: 'Level',
+      name: t(fitting.value ? 'term.fitting_level' : 'term.level'),
       min: lvMin,
       max: lvMax,
       nameLocation: 'center',
@@ -316,7 +353,7 @@ const scatterOption = (records: PlayRecordInfo[]) => {
     },
     yAxis: {
       type: 'value',
-      name: 'Rating',
+      name: t('term.rating'),
       min: rtMin,
       max: rtMax,
       nameLocation: 'center',
@@ -331,7 +368,7 @@ const scatterOption = (records: PlayRecordInfo[]) => {
       borderColor: '#27272a',
       textStyle: { color: '#e4e4e7' },
       formatter: (params: { value: number[] }) =>
-        `Level: ${params.value[0]}<br>Rating: ${params.value[1].toFixed(2)}`,
+        `${t(fitting.value ? 'term.fitting_level' : 'term.level')}: ${params.value[0].toFixed(fitting.value ? 2 : 1)}<br>${t('term.rating')}: ${params.value[1].toFixed(2)}`,
     },
     series: [{
       type: 'scatter',
@@ -343,22 +380,25 @@ const scatterOption = (records: PlayRecordInfo[]) => {
 }
 
 const loadData = async () => {
-  if (USE_MOCK) {
-    const mock = getMockB50()
-    allRecords.value = mock.records
-    nickname.value = mock.nickname
-    return true
+  const version = ++loadVersion
+  if (!USE_MOCK && !userStore.logged_in) {
+    loading.value = false
+    return false
   }
-
-  if (!userStore.logged_in) return false
+  loading.value = true
   try {
-    const res = await getRecords(userStore.username, 'b50')
-    allRecords.value = res.data.records
-    nickname.value = res.data.nickname
+    const data = USE_MOCK
+      ? getMockB50(fitting.value)
+      : (await getRecords(userStore.username, 'b50', 50, 1, fitting.value ? 'fitting_rating' : 'rating')).data
+    if (version !== loadVersion) return false
+    sourceRecords.value = data.records
+    nickname.value = data.nickname
     return true
   } catch (err: unknown) {
-    toastError('message.get_record_failed', err)
+    if (version === loadVersion) toastError('message.get_record_failed', err)
     return false
+  } finally {
+    if (version === loadVersion) loading.value = false
   }
 }
 
@@ -367,14 +407,36 @@ const refreshData = async () => {
   if (ok) toastSuccess('message.refresh_record_success')
 }
 
-watch(() => userStore.logged_in, (loggedIn) => {
-  if (loggedIn) loadData()
-})
+watch(() => [fitting.value, userStore.username, userStore.logged_in], () => {
+  sourceRecords.value = []
+  nickname.value = ''
+  showExportModal.value = false
+  showSongDetail.value = false
+  showQuickUpload.value = false
+  loadData()
+}, { immediate: true })
 
-onMounted(loadData)
+onUnmounted(() => { loadVersion++ })
 </script>
 
 <style scoped>
+.page-header h2 {
+  min-width: 0;
+  white-space: normal;
+}
+.b50-options {
+  margin-bottom: var(--space-4);
+}
+.fitting-option {
+  min-height: 44px;
+  align-items: center;
+}
+.fitting-description {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  margin-bottom: var(--space-5);
+}
 .stats-row {
   display: flex;
   gap: var(--space-4);
