@@ -51,6 +51,9 @@ func TestRecordController_FittingB50(t *testing.T) {
 		firstFitted int
 	}{
 		{"scope=b50", 2, 16000, 15700},
+		{"scope=b50&sort_by=score", 2, 16000, 15700},
+		{"scope=best&sort_by=invalid&page_size=1", 4, 17000, 16700},
+		{"scope=best&sort_by=invalid&page_size=1&order=invalid", 4, 15900, 16200},
 		{"scope=b50&sort_by=fitting_rating", 2, 15900, 16200},
 		{"scope=b50&sort_by=fitting_rating&underflow=999", 4, 15900, 16200},
 		{"scope=b50&sort_by=fitting_rating&underflow=-1", 2, 15900, 16200},
@@ -122,10 +125,12 @@ func TestRecordController_FittingB50(t *testing.T) {
 		assert.Equal(t, 5, all.Total, "replacement retains historical attempts")
 		assert.Contains(t, all.Records, previous)
 	})
-	for _, scope := range []string{"all", "all-charts"} {
+	for _, scope := range []string{"all", "all-charts", "invalid"} {
 		w := performRequest(r, "GET", "/records/fituser?scope="+scope+"&sort_by=fitting_rating", nil, nil)
 		assert.Equal(t, 400, w.Code)
 	}
-	w := performRequest(r, "GET", "/records/privateuser?scope=b50&sort_by=fitting_rating", nil, nil)
+	w := performRequest(r, "GET", "/records/fituser?scope=invalid", nil, nil)
+	assert.Equal(t, 400, w.Code)
+	w = performRequest(r, "GET", "/records/privateuser?scope=b50&sort_by=fitting_rating", nil, nil)
 	assert.Equal(t, 403, w.Code)
 }

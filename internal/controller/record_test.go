@@ -116,6 +116,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		{"Song scope=all", "/records/recuser/song/felys?scope=all", 200, 3, 0, "records"},
 		{"Song not found", "/records/recuser/song/nonexistent", 404, -1, 0, "error"},
 		{"Song invalid scope", "/records/recuser/song/felys?scope=invalid", 400, -1, 0, "error"},
+		{"Song rejects B50 scope", "/records/recuser/song/felys?scope=b50", 400, -1, 0, "error"},
 		// Chart records
 		{"Chart by wiki_id:difficulty scope=best", "/records/recuser/chart/felys:massive?scope=best", 200, 1, 1005000, "records"},
 		{"Chart by numeric ID scope=best", fmt.Sprintf("/records/recuser/chart/%d?scope=best", massiveChartID), 200, 1, 0, "records"},
@@ -124,6 +125,7 @@ func TestRecordController_SongAndChartRecords(t *testing.T) {
 		{"Chart not found wiki_id", "/records/recuser/chart/nonexistent:massive", 404, -1, 0, "error"},
 		{"Chart invalid difficulty", "/records/recuser/chart/felys:easy", 404, -1, 0, "error"},
 		{"Chart invalid scope", "/records/recuser/chart/felys:massive?scope=invalid", 400, -1, 0, "error"},
+		{"Chart rejects all-charts scope", "/records/recuser/chart/felys:massive?scope=all-charts", 400, -1, 0, "error"},
 	}
 
 	for _, tt := range tests {

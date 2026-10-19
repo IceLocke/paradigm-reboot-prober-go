@@ -37,11 +37,11 @@ func (s *RecordService) CreateRecords(ctx context.Context, username string, reco
 }
 
 func (s *RecordService) GetAllRecords(ctx context.Context, username string, pageSize, pageIndex int, sortBy model.RecordSort, order model.SortOrder, filter model.RecordFilter) ([]model.PlayRecord, error) {
-	return s.recordRepo.GetAllRecords(username, pageSize, pageIndex, sortBy, order == model.SortOrderDesc, filter)
+	return s.recordRepo.GetAllRecords(username, pageSize, pageIndex, sortBy, order.IsDescending(), filter)
 }
 
 func (s *RecordService) GetBest50Records(ctx context.Context, username string, underflow int, sortBy model.RecordSort, order model.SortOrder, filter model.RecordFilter) ([]*model.PlayRecord, error) {
-	b35, b15, err := s.recordRepo.GetBest50Records(username, underflow, sortBy, order == model.SortOrderDesc, filter)
+	b35, b15, err := s.recordRepo.GetBest50Records(username, underflow, sortBy, order.IsDescending(), filter)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (s *RecordService) GetBest50Records(ctx context.Context, username string, u
 }
 
 func (s *RecordService) GetBestRecords(ctx context.Context, username string, pageSize, pageIndex int, sortBy model.RecordSort, order model.SortOrder, filter model.RecordFilter) ([]model.PlayRecord, error) {
-	return s.recordRepo.GetBestRecords(username, pageSize, pageIndex, sortBy, order == model.SortOrderDesc, filter)
+	return s.recordRepo.GetBestRecords(username, pageSize, pageIndex, sortBy, order.IsDescending(), filter)
 }
 
 func (s *RecordService) GetAllChartsWithBestScores(ctx context.Context, username string, filter model.RecordFilter) ([]model.ChartWithScore, error) {
@@ -78,7 +78,7 @@ func (s *RecordService) GetBestRecordsBySong(ctx context.Context, username strin
 }
 
 func (s *RecordService) GetAllRecordsBySong(ctx context.Context, username string, songID int, pageSize, pageIndex int, sortBy model.RecordSort, order model.SortOrder) ([]model.PlayRecord, error) {
-	return s.recordRepo.GetAllRecordsBySong(username, songID, pageSize, pageIndex, sortBy, order == model.SortOrderDesc)
+	return s.recordRepo.GetAllRecordsBySong(username, songID, pageSize, pageIndex, sortBy, order.IsDescending())
 }
 
 func (s *RecordService) CountAllRecordsBySong(ctx context.Context, username string, songID int) (int64, error) {
@@ -90,7 +90,7 @@ func (s *RecordService) GetBestRecordByChart(ctx context.Context, username strin
 }
 
 func (s *RecordService) GetAllRecordsByChart(ctx context.Context, username string, chartID int, pageSize, pageIndex int, sortBy model.RecordSort, order model.SortOrder) ([]model.PlayRecord, error) {
-	return s.recordRepo.GetAllRecordsByChart(username, chartID, pageSize, pageIndex, sortBy, order == model.SortOrderDesc)
+	return s.recordRepo.GetAllRecordsByChart(username, chartID, pageSize, pageIndex, sortBy, order.IsDescending())
 }
 
 func (s *RecordService) CountAllRecordsByChart(ctx context.Context, username string, chartID int) (int64, error) {

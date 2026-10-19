@@ -54,11 +54,20 @@ func parsePaginationParams(c *gin.Context) paginationParams {
 		pageIndex = 1
 	}
 
+	sortBy := model.RecordSort(c.DefaultQuery("sort_by", string(model.RecordSortRating)))
+	if !sortBy.IsValid() {
+		sortBy = model.RecordSortRating
+	}
+	order := model.SortOrder(c.DefaultQuery("order", string(model.SortOrderDesc)))
+	if !order.IsValid() {
+		order = model.SortOrderAsc
+	}
+
 	return paginationParams{
 		pageSize:  pageSize,
 		pageIndex: pageIndex,
-		sortBy:    model.RecordSort(c.DefaultQuery("sort_by", string(model.RecordSortRating))),
-		order:     model.SortOrder(c.DefaultQuery("order", string(model.SortOrderDesc))),
+		sortBy:    sortBy,
+		order:     order,
 	}
 }
 
@@ -130,7 +139,7 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	scope := model.RecordScope(c.DefaultQuery("scope", string(model.RecordScopeB50)))
 	underflow, _ := strconv.Atoi(c.DefaultQuery("underflow", "0"))
 	p := parsePaginationParams(c)
-	if p.sortBy == model.RecordSortFittingRating && scope != model.RecordScopeB50 && scope != model.RecordScopeBest {
+	if p.sortBy == model.RecordSortFittingRating && !p.sortBy.IsValidForScope(scope) {
 		c.JSON(http.StatusBadRequest, model.Response{Error: "fitting_rating sorting is only supported for b50 and best scopes"})
 		return
 	}
@@ -180,6 +189,10 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 	}
 	if targetUser == nil {
 		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
+		return
+	}
+	if !scope.IsValid() {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter"})
 		return
 	}
 
@@ -256,10 +269,6 @@ func (ctrl *RecordController) GetPlayRecords(c *gin.Context) {
 			Nickname: targetUser.Nickname,
 			Charts:   charts,
 		})
-
-	default:
-		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter"})
-		return
 	}
 }
 
@@ -377,6 +386,10 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
+	if !scope.IsValidForSongOrChart() {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
+		return
+	}
 
 	switch scope {
 	case model.RecordScopeBest:
@@ -418,9 +431,6 @@ func (ctrl *RecordController) GetSongRecords(c *gin.Context) {
 			Total:    int(total),
 			Records:  recordInfos,
 		})
-
-	default:
-		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
 	}
 }
 
@@ -472,6 +482,10 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 		c.JSON(http.StatusNotFound, model.Response{Error: "user not found"})
 		return
 	}
+	if !scope.IsValidForSongOrChart() {
+		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
+		return
+	}
 
 	switch scope {
 	case model.RecordScopeBest:
@@ -513,8 +527,5 @@ func (ctrl *RecordController) GetChartRecords(c *gin.Context) {
 			Total:    int(total),
 			Records:  recordInfos,
 		})
-
-	default:
-		c.JSON(http.StatusBadRequest, model.Response{Error: "invalid scope parameter, expected 'best' or 'all'"})
 	}
 }

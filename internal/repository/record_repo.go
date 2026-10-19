@@ -14,21 +14,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// allowedSortColumns defines the whitelist of columns that can be used for sorting
-var allowedSortColumns = map[model.RecordSort]string{
-	model.RecordSortRating:     "rating",
-	model.RecordSortScore:      "score",
-	model.RecordSortRecordTime: "record_time",
-}
-
-// validateSortBy returns a safe column name for ORDER BY, defaulting to "rating" if not allowed
-func validateSortBy(sortBy model.RecordSort) string {
-	if col, ok := allowedSortColumns[sortBy]; ok {
-		return col
-	}
-	return allowedSortColumns[model.RecordSortRating]
-}
-
 type RecordRepository struct {
 	db    *gorm.DB
 	cache *repoCache
@@ -179,9 +164,7 @@ func (r *RecordRepository) createRecordInTx(tx *gorm.DB, record *model.PlayRecor
 // GetBest50Records ranks the current per-chart best records in each season, then applies display order.
 // Fitting queries rank the full candidate pool before applying the season limits.
 func (r *RecordRepository) GetBest50Records(username string, underflow int, sortBy model.RecordSort, descending bool, filter model.RecordFilter) ([]model.PlayRecord, []model.PlayRecord, error) {
-	if sortBy != model.RecordSortFittingRating {
-		sortBy = model.RecordSortRating
-	}
+	sortBy = sortBy.NormalizeForScope(model.RecordScopeB50)
 	key := b50CacheKey(username, underflow, sortBy, descending, filter)
 	if r.cache != nil {
 		if item := r.cache.Get(key); item != nil {
@@ -268,8 +251,8 @@ func (r *RecordRepository) GetAllRecords(username string, pageSize, pageIndex in
 		orderStr = string(model.SortOrderAsc)
 	}
 
-	// Use whitelist validation to prevent SQL injection
-	safeSortBy := validateSortBy(sortBy)
+	// Normalize to a declared SQL-backed sort field before building ORDER BY.
+	safeSortBy := string(sortBy.NormalizeForScope(model.RecordScopeAll))
 	query = query.Order(safeSortBy + " " + orderStr)
 
 	// pageIndex is 0-indexed from the service layer
@@ -304,8 +287,8 @@ func (r *RecordRepository) GetBestRecords(username string, pageSize, pageIndex i
 		orderStr = string(model.SortOrderAsc)
 	}
 
-	// Use whitelist validation to prevent SQL injection
-	safeSortBy := validateSortBy(sortBy)
+	// Normalize to a declared SQL-backed sort field before building ORDER BY.
+	safeSortBy := string(sortBy.NormalizeForScope(model.RecordScopeAll))
 	// Break ties by record ID so paginating the full best-record pool is stable.
 	query = query.Order(safeSortBy + " " + orderStr + ", play_records.id " + orderStr)
 
@@ -441,7 +424,7 @@ func (r *RecordRepository) GetAllRecordsBySong(username string, songID int, page
 		orderStr = string(model.SortOrderAsc)
 	}
 
-	safeSortBy := validateSortBy(sortBy)
+	safeSortBy := string(sortBy.NormalizeForScope(model.RecordScopeAll))
 	query = query.Order(safeSortBy + " " + orderStr)
 
 	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error
@@ -503,7 +486,7 @@ func (r *RecordRepository) GetAllRecordsByChart(username string, chartID int, pa
 		orderStr = string(model.SortOrderAsc)
 	}
 
-	safeSortBy := validateSortBy(sortBy)
+	safeSortBy := string(sortBy.NormalizeForScope(model.RecordScopeAll))
 	query = query.Order(safeSortBy + " " + orderStr)
 
 	err := query.Offset(pageSize * pageIndex).Limit(pageSize).Find(&records).Error

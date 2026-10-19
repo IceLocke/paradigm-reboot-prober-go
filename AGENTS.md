@@ -636,7 +636,7 @@ The `GET /records/:username/chart/:chart_addr` endpoint supports:
 - **Naming**: Standard Go conventions. The `var-naming` revive rule is disabled to allow certain non-standard names where needed.
 - **Error handling**: Errors are returned up the call chain. Controllers translate errors to appropriate HTTP status codes and `model.Response` JSON.
 - **Comments**: English. Controller methods have Swagger godoc annotations.
-- **SQL injection prevention**: Sort column names are validated against a whitelist (`allowedSortColumns` in `record_repo.go`).
+- **SQL injection prevention**: Sort fields are validated by `model.RecordSort` value-receiver methods and normalized with `NormalizeForScope(model.RecordScopeAll)` before use in SQL `ORDER BY` clauses.
 - **GORM conventions**: Models define explicit `TableName()` methods. Primary keys use the standard `id` column name.
 - **Struct tags**: Models use `gorm`, `json`, `binding`, and `example` tags.
 - **Deferred cleanup**: File handles use `defer func() { _ = f.Close() }()` pattern (explicitly ignoring close errors).

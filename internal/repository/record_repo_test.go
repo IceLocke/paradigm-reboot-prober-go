@@ -42,7 +42,7 @@ func TestRecordRepository_GetBestRecordsStablePagination(t *testing.T) {
 		return
 	}
 
-	for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortScore, model.RecordSortRecordTime, "invalid"} {
+	for _, sortBy := range []model.RecordSort{model.RecordSortRating, model.RecordSortScore, model.RecordSortRecordTime, "invalid", "rating desc; DROP TABLE play_records;--"} {
 		for _, descending := range []bool{true, false} {
 			t.Run(string(sortBy)+map[bool]string{true: "_desc", false: "_asc"}[descending], func(t *testing.T) {
 				var got []int
