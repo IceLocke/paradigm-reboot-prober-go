@@ -320,7 +320,7 @@ $$
 
 默认值:$\Delta_{\min} = 0.15$,$\Delta_{\max} = 0.3$,$L_{\text{low}} = 12.0$,$L_{\text{high}} = 17.0$。中间点 $L = 14.5$ 有 $\Delta(14.5) = \sqrt{\Delta_{\min}\cdot\Delta_{\max}} \approx 0.212$。这些是最终输出上限，在噪声衰减后应用，并在全库居中时重新应用。
 
-**退化规则。** 当 $\Delta_{\min} \le 0$,或 $L_{\text{low}}$/$L_{\text{high}}$ 配置不合法(参见 `internal/fitting/calculator.go:effectiveMaxDeviation`),实现静默回退到**平顶** $\Delta(L) \equiv \Delta_{\max}$;启动时的配置校验会拒绝最常见的误配置(见 `AGENTS.md`)。斗形坡道只影响上限的**宽窄**,不影响上限的**对称性**—— 在双向上都采用同一 $\Delta(L_c)$。
+**退化规则。** 当 $\Delta_{\min} \le 0$,或 $L_{\text{low}}$/$L_{\text{high}}$ 配置不合法(参见 `internal/fitting/calculator.go:effectiveMaxDeviation`),实现静默回退到**平顶** $\Delta(L) \equiv \Delta_{\max}$;启动时的配置校验会拒绝最常见的误配置(见 `config/config.go`)。斗形坡道只影响上限的**宽窄**,不影响上限的**对称性**—— 在双向上都采用同一 $\Delta(L_c)$。
 
 上限限制异常大的局部调整，§4.0 的总和约束另行控制整体尺度。α 与 κ 仍影响样本选择和收缩。上限不会要求每张谱面偏离官方。
 

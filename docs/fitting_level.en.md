@@ -401,7 +401,7 @@ $L_{\text{low}}$/$L_{\text{high}}$ are misconfigured (see
 `internal/fitting/calculator.go:effectiveMaxDeviation`), the implementation
 silently falls back to a **flat** cap $\Delta(L) \equiv \Delta_{\max}$; the
 startup validator rejects the most common misconfigurations (see
-`AGENTS.md`). The ramp only controls the **width** of the cap, never its
+`config/config.go`). The ramp only controls the **width** of the cap, never its
 **symmetry** — the same $\Delta(L_c)$ is used on both sides.
 
 The cap limits unusually large local adjustments; section 4.0 separately
